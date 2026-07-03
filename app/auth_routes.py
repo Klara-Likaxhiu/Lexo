@@ -1,0 +1,498 @@
+"""Authentication API backed by Supabase Auth."""
+
+from __future__ import annotations
+
+import os
+import re
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from pydantic import BaseModel, EmailStr, Field
+
+from app import auth as auth_utils
+from app import auth_db
+from app import oauth as oauth_utils
+from app.supabase_client import (
+    SupabaseAuthError,
+    admin_delete_user,
+    email_redirect,
+    email_verification_enabled,
+    get_user,
+    merge_public_user,
+    refresh_session,
+    require_supabase,
+    reset_password_for_email,
+    resend_signup,
+    session_response,
+    sign_in_with_id_token,
+    sign_in_with_password,
+    sign_out,
+    sign_up,
+    supabase_configured,
+    update_user,
+    verify_otp,
+)
+
+router = APIRouter(prefix="/api/auth", tags=["Auth"])
+bearer = HTTPBearer(auto_error=False)
+
+
+class SignupRequest(BaseModel):
+    username: str = Field(..., min_length=3, max_length=30)
+    email: EmailStr
+    password: str = Field(..., min_length=8, max_length=128)
+
+
+class LoginRequest(BaseModel):
+    login: str = Field(..., description="Username or email")
+    password: str = Field(..., min_length=1, max_length=128)
+    remember_me: bool = False
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
+
+class LogoutRequest(BaseModel):
+    refresh_token: str | None = None
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    password: str = Field(..., min_length=8, max_length=128)
+    type: str = Field(default="recovery", description="Supabase OTP type")
+
+
+class VerifyEmailRequest(BaseModel):
+    token: str
+    type: str = Field(default="signup", description="Supabase OTP type")
+
+
+class ResendVerificationRequest(BaseModel):
+    email: EmailStr
+
+
+class OAuthRequest(BaseModel):
+    id_token: str
+    remember_me: bool = True
+    username: str | None = None
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(..., min_length=1, max_length=128)
+    new_password: str = Field(..., min_length=8, max_length=128)
+
+
+class DeleteAccountRequest(BaseModel):
+    confirmation: str = Field(..., description='Must be exactly "DELETE"')
+    password: str | None = Field(default=None, max_length=128)
+
+
+def _username_from_email(email: str) -> str:
+    local = email.split("@")[0]
+    cleaned = re.sub(r"[^a-zA-Z0-9_]", "_", local)[:30]
+    return auth_db.unique_username(cleaned or "reader")
+
+
+def _raise_supabase_error(exc: SupabaseAuthError) -> None:
+    raise HTTPException(status_code=exc.status_code, detail=exc.message) from exc
+
+
+def _resolve_login_email(login: str) -> str:
+    login = login.strip()
+    if "@" in login:
+        return login.lower()
+    profile = auth_db.get_profile_by_username(login)
+    if not profile:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username/email or password.",
+        )
+    return profile["email"]
+
+
+def _save_profile_from_supabase_user(
+    supabase_user: dict,
+    *,
+    username: str | None = None,
+    auth_provider: str = "local",
+    provider_subject: str | None = None,
+) -> dict:
+    metadata = supabase_user.get("user_metadata") or {}
+    resolved_username = username or metadata.get("username") or _username_from_email(
+        supabase_user.get("email") or "reader"
+    )
+    return auth_db.upsert_profile(
+        supabase_user["id"],
+        resolved_username,
+        supabase_user.get("email") or "",
+        auth_provider=auth_provider,
+        provider_subject=provider_subject,
+    )
+
+
+def _get_current_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
+) -> dict:
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Not authenticated.")
+
+    try:
+        supabase_user = get_user(credentials.credentials)
+    except SupabaseAuthError as exc:
+        _raise_supabase_error(exc)
+
+    profile = auth_db.get_profile_by_id(supabase_user["id"])
+    public = merge_public_user(supabase_user, profile)
+    return {
+        **public,
+        "_access_token": credentials.credentials,
+        "_supabase_user": supabase_user,
+    }
+
+
+def _require_verified(user: dict) -> None:
+    if not email_verification_enabled():
+        return
+    if not user.get("email_verified"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Please verify your email before accessing your account.",
+        )
+
+
+@router.get("/config")
+def public_config() -> dict:
+    configured = supabase_configured()
+    return {
+        "google_client_id": os.getenv("GOOGLE_CLIENT_ID", "").strip(),
+        "apple_client_id": os.getenv("APPLE_CLIENT_ID", "").strip(),
+        "email_verification_required": email_verification_enabled() if configured else False,
+        "email_sending_enabled": configured,
+        "supabase_enabled": configured,
+    }
+
+
+@router.post("/signup")
+def signup(data: SignupRequest) -> dict:
+    try:
+        require_supabase()
+    except SupabaseAuthError as exc:
+        _raise_supabase_error(exc)
+
+    username_err = auth_utils.validate_username(data.username)
+    if username_err:
+        raise HTTPException(status_code=400, detail=username_err)
+
+    password_err = auth_utils.validate_password(data.password)
+    if password_err:
+        raise HTTPException(status_code=400, detail=password_err)
+
+    if auth_db.get_profile_by_username(data.username):
+        raise HTTPException(status_code=409, detail="That username is already taken.")
+
+    if auth_db.get_profile_by_email(str(data.email)):
+        raise HTTPException(status_code=409, detail="An account with this email already exists.")
+
+    try:
+        result = sign_up(
+            str(data.email),
+            data.password,
+            username=data.username.strip(),
+            email_redirect_to=email_redirect("/verify-email"),
+        )
+    except SupabaseAuthError as exc:
+        if exc.status_code == 422 or "already registered" in exc.message.lower():
+            raise HTTPException(status_code=409, detail="An account with this email already exists.") from exc
+        _raise_supabase_error(exc)
+
+    user = result.get("user") or {}
+    if user.get("id"):
+        profile = _save_profile_from_supabase_user(user, username=data.username.strip())
+    else:
+        profile = None
+
+    session = result.get("access_token")
+    if session and result.get("refresh_token"):
+        return {
+            "message": "Account created.",
+            "verification_required": False,
+            **session_response(result, remember_me=True, profile=profile),
+        }
+
+    public = merge_public_user(user, profile)
+    return {
+        "message": "Account created. Check your email to verify your address.",
+        "verification_required": True,
+        "user": public,
+    }
+
+
+@router.post("/login")
+def login(data: LoginRequest) -> dict:
+    try:
+        require_supabase()
+        email = _resolve_login_email(data.login)
+        result = sign_in_with_password(email, data.password)
+    except SupabaseAuthError as exc:
+        if exc.status_code in (400, 401):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Incorrect username/email or password.",
+            ) from exc
+        _raise_supabase_error(exc)
+
+    user = result.get("user") or {}
+    profile = auth_db.get_profile_by_id(user.get("id", "")) or _save_profile_from_supabase_user(user)
+    public = merge_public_user(user, profile)
+
+    if email_verification_enabled() and not public.get("email_verified"):
+        return {
+            "message": "Please verify your email to continue.",
+            "verification_required": True,
+            "user": public,
+        }
+
+    return {
+        "message": "Logged in.",
+        "verification_required": False,
+        **session_response(result, remember_me=data.remember_me, profile=profile),
+    }
+
+
+@router.post("/google")
+def google_sign_in(data: OAuthRequest) -> dict:
+    try:
+        require_supabase()
+        profile_data = oauth_utils.verify_google_id_token(data.id_token)
+        result = sign_in_with_id_token("google", data.id_token)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except SupabaseAuthError as exc:
+        _raise_supabase_error(exc)
+
+    user = result.get("user") or {}
+    existing = auth_db.get_profile_by_provider("google", profile_data["sub"])
+    username = existing["username"] if existing else _username_from_email(profile_data.get("email") or profile_data["sub"])
+    profile = _save_profile_from_supabase_user(
+        user,
+        username=username,
+        auth_provider="google",
+        provider_subject=profile_data["sub"],
+    )
+    return {
+        "message": "Signed in with Google.",
+        "verification_required": False,
+        **session_response(result, remember_me=data.remember_me, profile=profile),
+    }
+
+
+@router.post("/apple")
+def apple_sign_in(data: OAuthRequest) -> dict:
+    try:
+        require_supabase()
+        profile_data = oauth_utils.verify_apple_identity_token(data.id_token)
+        result = sign_in_with_id_token("apple", data.id_token)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="Invalid Apple sign-in token.") from exc
+    except SupabaseAuthError as exc:
+        _raise_supabase_error(exc)
+
+    user = result.get("user") or {}
+    existing = auth_db.get_profile_by_provider("apple", profile_data["sub"])
+    if existing:
+        username = existing["username"]
+    elif data.username:
+        username = auth_db.unique_username(data.username.strip())
+    else:
+        email = profile_data.get("email") or f"{profile_data['sub']}@apple.oauth"
+        username = _username_from_email(email)
+
+    profile = _save_profile_from_supabase_user(
+        user,
+        username=username,
+        auth_provider="apple",
+        provider_subject=profile_data["sub"],
+    )
+    return {
+        "message": "Signed in with Apple.",
+        "verification_required": False,
+        **session_response(result, remember_me=data.remember_me, profile=profile),
+    }
+
+
+@router.post("/verify-email")
+def verify_email(data: VerifyEmailRequest) -> dict:
+    try:
+        require_supabase()
+        result = verify_otp(data.token, data.type)
+    except SupabaseAuthError as exc:
+        _raise_supabase_error(exc)
+
+    user = result.get("user") or {}
+    profile = auth_db.get_profile_by_id(user.get("id", "")) or _save_profile_from_supabase_user(user)
+    return {
+        "message": "Email verified.",
+        **session_response(result, remember_me=True, profile=profile),
+    }
+
+
+@router.post("/resend-verification")
+def resend_verification(data: ResendVerificationRequest) -> dict:
+    try:
+        require_supabase()
+        resend_signup(str(data.email), email_redirect_to=email_redirect("/verify-email"))
+    except SupabaseAuthError as exc:
+        _raise_supabase_error(exc)
+
+    return {
+        "message": "If that account exists and is unverified, a new email has been sent.",
+        "email_sent": True,
+    }
+
+
+@router.post("/verification-status")
+def verification_status(data: ResendVerificationRequest) -> dict:
+    profile = auth_db.get_profile_by_email(str(data.email))
+    if not profile:
+        return {"account_exists": False, "verified": False}
+
+    try:
+        require_supabase()
+    except SupabaseAuthError:
+        return {"account_exists": True, "verified": False, "email": profile["email"]}
+
+    return {
+        "account_exists": True,
+        "verified": False,
+        "email": profile["email"],
+    }
+
+
+@router.post("/forgot-password")
+def forgot_password(data: ForgotPasswordRequest) -> dict:
+    try:
+        require_supabase()
+        reset_password_for_email(str(data.email), redirect_to=email_redirect("/reset-password"))
+    except SupabaseAuthError as exc:
+        _raise_supabase_error(exc)
+
+    return {"message": "If an account exists for that email, password reset instructions were sent."}
+
+
+@router.post("/reset-password")
+def reset_password(data: ResetPasswordRequest) -> dict:
+    password_err = auth_utils.validate_password(data.password)
+    if password_err:
+        raise HTTPException(status_code=400, detail=password_err)
+
+    try:
+        require_supabase()
+        session = verify_otp(data.token, data.type)
+        access_token = session.get("access_token")
+        if not access_token:
+            raise HTTPException(status_code=400, detail="Invalid or expired reset link.")
+        update_user(access_token, password=data.password)
+        sign_out(access_token)
+    except SupabaseAuthError as exc:
+        _raise_supabase_error(exc)
+
+    return {"message": "Password updated. You can now log in with your new password."}
+
+
+@router.post("/refresh")
+def refresh(data: RefreshRequest) -> dict:
+    try:
+        require_supabase()
+        result = refresh_session(data.refresh_token)
+    except SupabaseAuthError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session expired. Please log in again.",
+        ) from exc
+
+    user = result.get("user") or {}
+    profile = auth_db.get_profile_by_id(user.get("id", ""))
+    return session_response(result, remember_me=True, profile=profile)
+
+
+@router.post("/logout")
+def logout(
+    data: LogoutRequest,
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
+) -> dict:
+    token = credentials.credentials if credentials else None
+    if token:
+        try:
+            sign_out(token)
+        except SupabaseAuthError:
+            pass
+    return {"message": "Logged out."}
+
+
+@router.get("/me")
+def me(user: dict = Depends(_get_current_user)) -> dict:
+    _require_verified(user)
+    return {"user": merge_public_user(user["_supabase_user"], auth_db.get_profile_by_id(user["id"]))}
+
+
+@router.post("/change-password")
+def change_password(
+    data: ChangePasswordRequest,
+    user: dict = Depends(_get_current_user),
+) -> dict:
+    if user.get("auth_provider") not in ("local", "email"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password changes are managed by your social sign-in provider.",
+        )
+
+    password_err = auth_utils.validate_password(data.new_password)
+    if password_err:
+        raise HTTPException(status_code=400, detail=password_err)
+
+    try:
+        require_supabase()
+        sign_in_with_password(user["email"], data.current_password)
+        update_user(user["_access_token"], password=data.new_password)
+        sign_out(user["_access_token"])
+    except SupabaseAuthError as exc:
+        if exc.status_code in (400, 401):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Current password is incorrect.",
+            ) from exc
+        _raise_supabase_error(exc)
+
+    return {"message": "Password updated. Please sign in again with your new password."}
+
+
+@router.delete("/account")
+def delete_account(
+    data: DeleteAccountRequest,
+    user: dict = Depends(_get_current_user),
+) -> dict:
+    if data.confirmation != "DELETE":
+        raise HTTPException(status_code=400, detail="Type DELETE to confirm account deletion.")
+
+    if user.get("auth_provider") in ("local", "email"):
+        if not data.password:
+            raise HTTPException(status_code=401, detail="Password is required.")
+        try:
+            require_supabase()
+            sign_in_with_password(user["email"], data.password)
+        except SupabaseAuthError as exc:
+            raise HTTPException(status_code=401, detail="Password is incorrect.") from exc
+
+    try:
+        require_supabase()
+        admin_delete_user(user["id"])
+        auth_db.delete_profile(user["id"])
+    except SupabaseAuthError as exc:
+        _raise_supabase_error(exc)
+
+    return {"message": "Account deleted."}

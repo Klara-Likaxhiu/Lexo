@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Log In - BookMindAI</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="js/auth-ui.js"></script>
+  <script src="js/auth.js"></script>
+</head>
+<body>
+
+<div class="auth-page">
+  <div class="auth-card card">
+    <a href="/" class="back-link">← Back</a>
+
+    <h1>Welcome back</h1>
+    <p>Log in to access your library, Reader DNA, and personal reading data.</p>
+
+    <p id="verifiedBanner" class="auth-success" hidden>Your email is verified. Log in to continue.</p>
+
+    <div id="oauthButtons" class="oauth-buttons"></div>
+
+    <form id="loginForm">
+      <input type="text" id="login" placeholder="Username or email" autocomplete="username" required>
+
+      <div class="password-field">
+        <input type="password" id="password" placeholder="Password" autocomplete="current-password" required>
+        <button type="button" class="password-toggle" data-toggle-password="password" aria-label="Show password">
+          <svg class="icon-eye-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+          <svg class="icon-eye-closed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg>
+        </button>
+      </div>
+
+      <div class="auth-row">
+        <label class="auth-remember">
+          <input type="checkbox" id="rememberMe" checked>
+          <span>Remember me</span>
+        </label>
+        <a href="forgot-password.html" class="auth-link" id="forgotPasswordLink" data-requires-email hidden>Forgot password?</a>
+      </div>
+
+      <p id="loginError" class="auth-error" hidden></p>
+
+      <button type="submit" class="btn btn-primary" id="loginBtn">Log In</button>
+    </form>
+
+    <p class="small-text">
+      Don't have an account? <a href="signup.html">Sign Up</a>
+    </p>
+  </div>
+</div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("verified") === "1") {
+      document.getElementById("verifiedBanner").hidden = false;
+      const email = params.get("email");
+      if (email) document.getElementById("login").value = email;
+    }
+
+    BookMindAuthUI.initPasswordToggles();
+    BookMindAuthUI.loadOAuthButtons("oauthButtons", () => BookMindAuth.redirectAfterLogin(), "#rememberMe");
+
+    document.getElementById("loginForm").addEventListener("submit", async e => {
+      e.preventDefault();
+      BookMindAuth.hideError("loginError");
+
+      const login = document.getElementById("login").value.trim();
+      const password = document.getElementById("password").value;
+      const rememberMe = document.getElementById("rememberMe").checked;
+      const button = document.getElementById("loginBtn");
+
+      if (!login || !password) {
+        BookMindAuth.showError("loginError", "Please enter your username/email and password.");
+        return;
+      }
+
+      BookMindAuthUI.setLoading(button, true, "Log In", "Logging in…");
+
+      try {
+        const data = await BookMindAuth.login(login, password, rememberMe);
+        if (data.verification_required) {
+          window.location.href = `verify-email-pending.html?email=${encodeURIComponent(data.user.email)}`;
+          return;
+        }
+        BookMindAuthUI.showToast("Welcome back!");
+        BookMindAuth.redirectAfterLogin();
+      } catch (error) {
+        BookMindAuth.showError("loginError", error.message || "Could not log in. Please try again.");
+        BookMindAuthUI.setLoading(button, false, "Log In");
+      }
+    });
+  });
+</script>
+
+</body>
+</html>

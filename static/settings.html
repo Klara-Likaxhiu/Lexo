@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Settings - BookMindAI</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="js/auth.js"></script>
+  <script src="js/settings.js" defer></script>
+</head>
+<body>
+
+<div class="app-layout">
+
+  <aside class="sidebar">
+    <h2><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg> BookMindAI</h2>
+    <a href="home.html"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg> Home</a>
+    <a href="discovery.html"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg> Discovery</a>
+    <a href="ai-companion.html"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg> AI Companion</a>
+    <a href="reading-paths.html"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/></svg> Reading Paths</a>
+    <a href="library.html"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m16 6 4 14"/><path d="M12 6v14"/><path d="M8 8v12"/><path d="M4 4v16"/></svg> My Library</a>
+    <a href="community.html"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> Community</a>
+    <a href="challenges.html"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0z"/></svg> Challenges</a>
+    <a href="profile.html"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> Profile</a>
+    <a href="settings.html" class="active"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg> Settings</a>
+    <a href="reader-journey.html"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z"/><circle cx="12" cy="12" r="10"/></svg> Reader Journey</a>
+    <a href="#" class="sidebar-logout"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg> Logout</a>
+  </aside>
+
+  <main class="dashboard settings-page">
+
+    <div class="dashboard-header">
+      <div>
+        <h1>Settings</h1>
+        <p>Manage your account, reading preferences, and app experience.</p>
+      </div>
+      <a href="profile.html" class="btn btn-secondary">View Profile</a>
+    </div>
+
+    <div class="settings-layout">
+
+      <nav class="settings-nav card" aria-label="Settings sections">
+        <a href="#account" class="settings-nav-link active" data-section="account">Account</a>
+        <a href="#reading" class="settings-nav-link" data-section="reading">Reading Preferences</a>
+        <a href="#appearance" class="settings-nav-link" data-section="appearance">Appearance</a>
+        <a href="#notifications" class="settings-nav-link" data-section="notifications">Notifications</a>
+        <a href="#privacy" class="settings-nav-link" data-section="privacy">Privacy</a>
+        <a href="#about" class="settings-nav-link" data-section="about">About</a>
+      </nav>
+
+      <div class="settings-panels">
+
+        <section id="account" class="settings-section card">
+          <div class="settings-section-head">
+            <h2>Account</h2>
+            <p>Your sign-in details and account actions.</p>
+          </div>
+
+          <div class="settings-account-row">
+            <div id="settingsAvatar" class="settings-avatar" aria-hidden="true"></div>
+            <div class="settings-account-meta">
+              <label class="settings-file-label btn btn-secondary" for="settingsAvatarInput">Change Photo</label>
+              <input type="file" id="settingsAvatarInput" accept="image/*" hidden>
+              <p class="settings-meta-line"><span class="settings-meta-label">Username</span> <strong id="settingsUsername">—</strong></p>
+              <p class="settings-meta-line"><span class="settings-meta-label">Email</span> <strong id="settingsEmail">—</strong></p>
+            </div>
+          </div>
+
+          <div class="settings-actions-row">
+            <button type="button" class="btn btn-secondary" id="settingsChangePasswordBtn">Change Password</button>
+            <button type="button" class="btn btn-secondary" id="settingsLogoutBtn">Log Out</button>
+            <button type="button" class="btn btn-danger" id="settingsDeleteAccountBtn">Delete Account</button>
+          </div>
+        </section>
+
+        <section id="reading" class="settings-section card">
+          <div class="settings-section-head">
+            <h2>Reading Preferences</h2>
+            <p>Personalize recommendations and reading goals.</p>
+          </div>
+
+          <label class="settings-field-label">Preferred genres</label>
+          <div id="settingsGenreTags" class="settings-tag-grid"></div>
+
+          <label class="settings-field-label" for="settingsFavoriteAuthors">Favorite authors</label>
+          <input type="text" id="settingsFavoriteAuthors" class="settings-input" placeholder="e.g. Jane Austen, Stephen King">
+
+          <label class="settings-field-label" for="settingsReadingGoal">Reading goal (books per year)</label>
+          <input type="number" id="settingsReadingGoal" class="settings-input" min="1" max="365" value="12">
+
+          <label class="settings-field-label" for="settingsAiRecommendations">
+            AI recommendation style
+            <span class="settings-coming-soon">Coming Soon</span>
+          </label>
+          <select id="settingsAiRecommendations" class="settings-input">
+            <option value="balanced">Balanced mix</option>
+            <option value="adventurous">More adventurous picks</option>
+            <option value="comfort">Comfort reads</option>
+            <option value="challenge">Challenge me</option>
+          </select>
+
+          <button type="button" class="btn btn-primary" id="settingsSaveReadingBtn">Save Preferences</button>
+        </section>
+
+        <section id="appearance" class="settings-section card">
+          <div class="settings-section-head">
+            <h2>Appearance</h2>
+            <p>Adjust how BookMindAI looks and reads.</p>
+          </div>
+
+          <div class="settings-row">
+            <div>
+              <p class="settings-row-title">Dark mode</p>
+              <p class="settings-row-hint">Switch between light and dark themes.</p>
+            </div>
+            <label class="settings-switch">
+              <input type="checkbox" id="settingsThemeToggle">
+              <span class="settings-switch-slider"></span>
+            </label>
+          </div>
+
+          <label class="settings-field-label" for="settingsFontSize">Reading font size</label>
+          <select id="settingsFontSize" class="settings-input">
+            <option value="small">Small</option>
+            <option value="medium" selected>Medium</option>
+            <option value="large">Large</option>
+            <option value="xlarge">Extra Large</option>
+          </select>
+        </section>
+
+        <section id="notifications" class="settings-section card">
+          <div class="settings-section-head">
+            <h2>Notifications <span class="settings-coming-soon">Coming Soon</span></h2>
+            <p>Choose what you'd like to be notified about. Preferences are saved for when alerts launch.</p>
+          </div>
+
+          <div class="settings-row">
+            <div>
+              <p class="settings-row-title">Reading reminders</p>
+              <p class="settings-row-hint">Gentle nudges to keep your reading streak going.</p>
+            </div>
+            <label class="settings-switch">
+              <input type="checkbox" id="settingsReadingReminders">
+              <span class="settings-switch-slider"></span>
+            </label>
+          </div>
+
+          <div class="settings-row">
+            <div>
+              <p class="settings-row-title">Recommendation notifications</p>
+              <p class="settings-row-hint">New book picks based on your Reader DNA.</p>
+            </div>
+            <label class="settings-switch">
+              <input type="checkbox" id="settingsRecommendationAlerts">
+              <span class="settings-switch-slider"></span>
+            </label>
+          </div>
+
+          <div class="settings-row">
+            <div>
+              <p class="settings-row-title">Achievement notifications</p>
+              <p class="settings-row-hint">Celebrate milestones and reading challenges.</p>
+            </div>
+            <label class="settings-switch">
+              <input type="checkbox" id="settingsAchievementAlerts">
+              <span class="settings-switch-slider"></span>
+            </label>
+          </div>
+        </section>
+
+        <section id="privacy" class="settings-section card">
+          <div class="settings-section-head">
+            <h2>Privacy</h2>
+            <p>Control your visibility and data.</p>
+          </div>
+
+          <label class="settings-field-label" for="settingsProfileVisibility">
+            Profile visibility
+            <span class="settings-coming-soon">Coming Soon</span>
+          </label>
+          <select id="settingsProfileVisibility" class="settings-input">
+            <option value="public">Public</option>
+            <option value="private">Private</option>
+          </select>
+
+          <div class="settings-row settings-row-action">
+            <div>
+              <p class="settings-row-title">Export reading data</p>
+              <p class="settings-row-hint">Download your library, progress, and preferences as JSON.</p>
+            </div>
+            <button type="button" class="btn btn-secondary" id="settingsExportBtn">Export</button>
+          </div>
+        </section>
+
+        <section id="about" class="settings-section card">
+          <div class="settings-section-head">
+            <h2>About</h2>
+            <p>App information and support.</p>
+          </div>
+
+          <p class="settings-meta-line"><span class="settings-meta-label">App version</span> <strong id="settingsAppVersion">v1.0.0</strong></p>
+
+          <div class="settings-link-list">
+            <button type="button" class="settings-link-btn" data-coming-soon data-coming-soon-label="Privacy Policy">Privacy Policy <span class="settings-coming-soon">Coming Soon</span></button>
+            <button type="button" class="settings-link-btn" data-coming-soon data-coming-soon-label="Terms of Service">Terms of Service <span class="settings-coming-soon">Coming Soon</span></button>
+            <button type="button" class="settings-link-btn" data-coming-soon data-coming-soon-label="Contact Support">Contact Support <span class="settings-coming-soon">Coming Soon</span></button>
+            <button type="button" class="settings-link-btn" id="settingsFeedbackBtn">Send Feedback</button>
+          </div>
+        </section>
+
+      </div>
+    </div>
+  </main>
+</div>
+
+<div id="passwordModal" class="settings-modal" aria-hidden="true">
+  <div class="settings-modal-backdrop" data-close-modal="passwordModal"></div>
+  <div class="settings-modal-dialog card">
+    <button type="button" class="settings-modal-close" data-close-modal="passwordModal" aria-label="Close">&times;</button>
+    <h3>Change Password</h3>
+    <form id="passwordForm" class="settings-form">
+      <label for="currentPassword">Current password</label>
+      <input type="password" id="currentPassword" class="settings-input" required autocomplete="current-password">
+      <label for="newPassword">New password</label>
+      <input type="password" id="newPassword" class="settings-input" required minlength="8" autocomplete="new-password">
+      <label for="confirmNewPassword">Confirm new password</label>
+      <input type="password" id="confirmNewPassword" class="settings-input" required minlength="8" autocomplete="new-password">
+      <button type="submit" class="btn btn-primary">Update Password</button>
+    </form>
+  </div>
+</div>
+
+<div id="deleteModal" class="settings-modal" aria-hidden="true">
+  <div class="settings-modal-backdrop" data-close-modal="deleteModal"></div>
+  <div class="settings-modal-dialog card">
+    <button type="button" class="settings-modal-close" data-close-modal="deleteModal" aria-label="Close">&times;</button>
+    <h3>Delete Account</h3>
+    <p class="settings-danger-text">This permanently removes your account and cannot be undone. Your local reading library on this device will remain until you clear browser data.</p>
+    <form id="deleteForm" class="settings-form">
+      <label for="deletePassword">Password</label>
+      <input type="password" id="deletePassword" class="settings-input" autocomplete="current-password">
+      <label for="deleteConfirmation">Type DELETE to confirm</label>
+      <input type="text" id="deleteConfirmation" class="settings-input" placeholder="DELETE" required>
+      <button type="submit" class="btn btn-danger">Delete My Account</button>
+    </form>
+  </div>
+</div>
+
+<div id="feedbackModal" class="settings-modal" aria-hidden="true">
+  <div class="settings-modal-backdrop" data-close-modal="feedbackModal"></div>
+  <div class="settings-modal-dialog card">
+    <button type="button" class="settings-modal-close" data-close-modal="feedbackModal" aria-label="Close">&times;</button>
+    <h3>Send Feedback</h3>
+    <p class="settings-row-hint">Tell us what you love or what we should improve.</p>
+    <form id="feedbackForm" class="settings-form">
+      <label for="feedbackMessage">Your message</label>
+      <textarea id="feedbackMessage" class="settings-input settings-textarea" rows="5" required placeholder="Share your thoughts…"></textarea>
+      <button type="submit" class="btn btn-primary">Submit Feedback</button>
+    </form>
+  </div>
+</div>
+
+<div id="settingsToast" class="settings-toast" hidden></div>
+
+</body>
+</html>

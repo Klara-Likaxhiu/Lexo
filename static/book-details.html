@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Book Details - BookMindAI</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="js/auth.js"></script>
+
+  <script src="js/library.js" defer></script>
+  <script src="js/book-details.js" defer></script>
+</head>
+<body>
+
+<div class="app-layout">
+
+  <aside class="sidebar">
+    <h2><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg> BookMindAI</h2>
+    <a href="home.html"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg> Home</a>
+    <a href="discovery.html"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg> Discovery</a>
+    <a href="ai-companion.html"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg> AI Librarian</a>
+    <a href="reading-paths.html"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/></svg> Reading Paths</a>
+    <a href="library.html"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m16 6 4 14"/><path d="M12 6v14"/><path d="M8 8v12"/><path d="M4 4v16"/></svg> My Library</a>
+    <a href="community.html"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> Community</a>
+    <a href="challenges.html"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0z"/></svg> Challenges</a>
+    <a href="profile.html"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> Profile</a>
+    <a href="settings.html"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg> Settings</a>
+    <a href="reader-journey.html"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z"/><circle cx="12" cy="12" r="10"/></svg> Reader Journey</a>
+    <a href="#" class="sidebar-logout"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg> Logout</a>
+  </aside>
+
+  <main class="dashboard book-details-dashboard">
+
+    <a href="home.html" class="back-link">← Back to Home</a>
+
+    <section class="book-details-hero card">
+
+      <div class="book-details-left">
+        <div id="detailCover" class="detail-cover-area"></div>
+
+        <div class="rating-summary-card">
+          <div class="rating-stars" id="avgStars">☆ ☆ ☆ ☆ ☆</div>
+          <strong id="avgRating">—</strong>
+          <p id="avgRatingLabel">No ratings yet</p>
+        </div>
+      </div>
+
+      <div class="book-details-right">
+        <p class="book-hub-pill">BOOKMIND AI BOOK HUB</p>
+
+        <h1 id="detailTitle">Book Title</h1>
+        <p id="detailAuthor" class="book-author"></p>
+
+        <div class="detail-meta-row">
+          <span id="detailGenre"></span>
+          <span id="detailDifficulty"></span>
+          <span id="detailYear"></span>
+        </div>
+
+        <div class="recommendation-reason-box">
+          <h2>Why BookMindAI recommended it</h2>
+          <p id="detailReason"></p>
+        </div>
+
+        <div class="detail-status-row">
+          <button class="status-btn-modern" data-status="reading"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg> Reading</button>
+          <button class="status-btn-modern" data-status="want"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg> Want to Read</button>
+          <button class="status-btn-modern" data-status="read"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335"/><path d="m9 11 3 3L22 4"/></svg> Finished</button>
+          <button class="status-btn-modern" data-status="not_interested"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg> Not Interested</button>
+        </div>
+      </div>
+
+    </section>
+
+    <section class="book-hub-grid-v2">
+
+      <div class="book-hub-card-v2 card">
+        <p class="eyebrow">Reading Source</p>
+        <h2>Where will you read it?</h2>
+
+        <select id="readingSource">
+          <option value="">Choose source</option>
+          <option value="physical">Physical Book</option>
+          <option value="kindle">Kindle</option>
+          <option value="apple_books">Apple Books</option>
+          <option value="google_books">Google Books</option>
+          <option value="kobo">Kobo</option>
+          <option value="pdf">PDF</option>
+          <option value="epub">ePub</option>
+          <option value="audiobook">Audiobook</option>
+          <option value="other">Other</option>
+        </select>
+
+        <button id="saveSourceBtn" class="btn btn-secondary">Save Source</button>
+      </div>
+
+      <div class="book-hub-card-v2 card">
+        <p class="eyebrow">Reading Progress</p>
+        <h2>Track manually</h2>
+
+        <div class="progress-inputs">
+          <input id="currentPage" type="number" placeholder="Current page">
+          <input id="totalPages" type="number" placeholder="Total pages">
+        </div>
+
+        <div class="dna-progress-bar">
+          <div id="bookProgressFill"></div>
+        </div>
+
+        <p id="progressText">0% complete</p>
+
+        <button id="saveProgressBtn" class="btn btn-secondary">Save Progress</button>
+      </div>
+
+      <div class="book-hub-card-v2 find-book-card card">
+        <p class="eyebrow">Find Book</p>
+        <h2>Buy or locate it</h2>
+
+        <div class="find-links-v2">
+          <a id="googleBooksLink" class="find-link-card" target="_blank">
+            <span><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg></span>
+            <div>
+              <strong>Google Books</strong>
+              <p>Search and preview</p>
+            </div>
+            <b>→</b>
+          </a>
+
+          <a id="openLibraryLink" class="find-link-card" target="_blank">
+            <span><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m16 6 4 14"/><path d="M12 6v14"/><path d="M8 8v12"/><path d="M4 4v16"/></svg></span>
+            <div>
+              <strong>Open Library</strong>
+              <p>Explore editions</p>
+            </div>
+            <b>→</b>
+          </a>
+
+          <a id="mapsLink" class="find-link-card" target="_blank">
+            <span><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg></span>
+            <div>
+              <strong>Nearby Bookstores</strong>
+              <p>Find stores near you</p>
+            </div>
+            <b>→</b>
+          </a>
+        </div>
+      </div>
+
+    </section>
+
+    <section class="review-card-v2 card">
+      <p class="eyebrow">Your Review</p>
+
+      <div class="review-top-grid">
+        <div>
+          <h2>Rate this book</h2>
+          <div id="starRating" class="star-rating-v2">
+            <button data-rating="1">☆</button>
+            <button data-rating="2">☆</button>
+            <button data-rating="3">☆</button>
+            <button data-rating="4">☆</button>
+            <button data-rating="5">☆</button>
+          </div>
+          <p id="ratingHint" class="small-muted">Click a star to rate</p>
+        </div>
+
+        <div>
+          <h2>Would you recommend it?</h2>
+          <select id="recommendBook">
+            <option value="">Choose</option>
+            <option value="yes">Yes, I would</option>
+            <option value="no">No, I would not</option>
+          </select>
+        </div>
+
+        <div>
+          <h2>How difficult was it?</h2>
+          <select id="difficultyFeedback">
+            <option value="">Select difficulty</option>
+            <option value="much_easier">Much easier than expected</option>
+            <option value="easier">Easier than expected</option>
+            <option value="just_right">Just right</option>
+            <option value="hard">Hard</option>
+            <option value="very_difficult">Very difficult</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="review-write-grid">
+        <input id="reviewTitle" placeholder="Review title (optional)">
+        <textarea id="reviewText" placeholder="Write your review (optional)"></textarea>
+      </div>
+
+      <label class="review-visibility">
+        <input type="checkbox" id="reviewPublic">
+        <span>Share this review publicly in the community feed</span>
+      </label>
+
+      <div class="review-actions">
+        <button id="saveReviewBtn" class="btn btn-primary review-save-btn">Save Review</button>
+        <button id="deleteReviewBtn" class="btn btn-secondary" type="button" hidden>Delete Review</button>
+      </div>
+    </section>
+
+    <section class="community-book-reviews card" id="bookCommunitySection" hidden>
+      <p class="eyebrow">Community Reviews</p>
+      <h2>What other readers think</h2>
+      <div id="bookCommunityList" class="community-list"></div>
+    </section>
+
+    <section class="book-tip-card card">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>
+      <span>Tip: The more you read and review, the smarter BookMindAI becomes.</span>
+    </section>
+
+  </main>
+
+</div>
+
+<div id="bdToast" class="bd-toast" hidden></div>
+
+</body>
+</html>

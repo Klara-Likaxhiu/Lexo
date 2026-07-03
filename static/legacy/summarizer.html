@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BookMindAI — Your AI Reading Companion</title>
+  <meta name="description" content="Summarize books, extract key takeaways, and chat with your reading using AI." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Lora:ital@0;1&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📖</text></svg>" />
+</head>
+<body>
+  <div class="bg-orbs" aria-hidden="true">
+    <span class="orb orb-1"></span>
+    <span class="orb orb-2"></span>
+    <span class="orb orb-3"></span>
+  </div>
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="width:26px;height:26px;color:var(--primary,#a23c63)"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg></span>
+      <div>
+        <h1>BookMind<span>AI</span></h1>
+        <p class="tagline">Read smarter. Understand deeper.</p>
+      </div>
+    </div>
+    <div class="engine-badge" id="engineBadge" title="Active AI engine">
+      <span class="dot"></span>
+      <span id="engineText">Connecting…</span>
+    </div>
+  </header>
+
+  <main class="layout">
+    <!-- Input panel -->
+    <section class="panel input-panel">
+      <div class="panel-head">
+        <h2>Add your text</h2>
+        <p>Paste an excerpt, or upload a <code>.txt</code>, <code>.md</code>, or <code>.pdf</code>.</p>
+      </div>
+
+      <div class="dropzone" id="dropzone">
+        <input type="file" id="fileInput" accept=".txt,.md,.markdown,.pdf,.text" hidden />
+        <div class="dropzone-inner">
+          <span class="dz-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="width:30px;height:30px;color:var(--primary,#a23c63)"><path d="M12 3v12"/><path d="m17 8-5-5-5 5"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/></svg></span>
+          <p><strong>Drop a file here</strong> or <button type="button" class="link-btn" id="browseBtn">browse</button></p>
+          <span class="dz-hint" id="fileName">No file selected</span>
+        </div>
+      </div>
+
+      <div class="divider"><span>or paste text</span></div>
+
+      <textarea id="textInput" placeholder="Paste a chapter, article, or any passage you want to understand…"></textarea>
+
+      <div class="input-actions">
+        <span class="char-count" id="charCount">0 characters</span>
+        <div class="btn-row">
+          <button class="btn ghost" id="sampleBtn" type="button">Try a sample</button>
+          <button class="btn primary" id="analyzeBtn" type="button">
+            <span class="btn-label">Analyze</span>
+            <span class="spinner" hidden></span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Results panel -->
+    <section class="panel results-panel">
+      <div class="tabs">
+        <button class="tab active" data-tab="summary">Summary</button>
+        <button class="tab" data-tab="takeaways">Key Takeaways</button>
+        <button class="tab" data-tab="chat">Ask BookMind</button>
+      </div>
+
+      <!-- Empty state -->
+      <div class="empty-state" id="emptyState">
+        <span class="empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="width:36px;height:36px;color:var(--primary,#a23c63)"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.287 1.288L3 12l5.8 1.9a2 2 0 0 1 1.288 1.287L12 21l1.9-5.8a2 2 0 0 1 1.287-1.288L21 12l-5.8-1.9a2 2 0 0 1-1.288-1.287z"/><path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/></svg></span>
+        <h3>Your insights will appear here</h3>
+        <p>Add some text and hit <strong>Analyze</strong> to get a summary, the key takeaways, and a chat you can ask anything.</p>
+      </div>
+
+      <!-- Summary tab -->
+      <div class="tab-pane" id="pane-summary" hidden>
+        <div class="result-card">
+          <h3>Summary</h3>
+          <p class="prose" id="summaryText"></p>
+        </div>
+        <div class="result-card">
+          <h3>Keywords</h3>
+          <div class="chips" id="keywordsBox"></div>
+        </div>
+      </div>
+
+      <!-- Takeaways tab -->
+      <div class="tab-pane" id="pane-takeaways" hidden>
+        <div class="result-card">
+          <h3>Key Takeaways</h3>
+          <ul class="takeaways" id="takeawaysList"></ul>
+        </div>
+      </div>
+
+      <!-- Chat tab -->
+      <div class="tab-pane chat-pane" id="pane-chat" hidden>
+        <div class="chat-log" id="chatLog">
+          <div class="chat-msg assistant">
+            <span class="avatar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px;color:var(--primary,#a23c63)"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg></span>
+            <div class="bubble">Analyze a text first, then ask me anything about it — themes, characters, summaries, or specific facts.</div>
+          </div>
+        </div>
+        <form class="chat-form" id="chatForm">
+          <input type="text" id="chatInput" placeholder="Ask about the text…" autocomplete="off" />
+          <button class="btn primary" id="chatSend" type="submit">Send</button>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p>BookMindAI · runs locally · works offline with a built-in summarizer, or plug in an OpenAI key for full power.</p>
+  </footer>
+
+  <div class="toast" id="toast" hidden></div>
+
+  <script src="/legacy/app.js"></script>
+</body>
+</html>

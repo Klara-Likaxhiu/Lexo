@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Verify Email - BookMindAI</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="js/auth-ui.js"></script>
+  <script src="js/auth.js"></script>
+</head>
+<body>
+
+<div class="auth-page">
+  <div class="auth-card card auth-status-card">
+    <h1>Verifying your email…</h1>
+    <p id="verifyMessage">Please wait while we confirm your email address.</p>
+    <p id="verifyError" class="auth-error" hidden></p>
+  </div>
+</div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", async () => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get("token_hash") || params.get("token");
+    const type = params.get("type") || "signup";
+    const message = document.getElementById("verifyMessage");
+
+    if (!token) {
+      message.textContent = "Invalid verification link.";
+      BookMindAuth.showError("verifyError", "This link is missing a token. Request a new verification email.");
+      return;
+    }
+
+    try {
+      await BookMindAuth.verifyEmail(token, type);
+      message.textContent = "Email verified! Redirecting you to BookMindAI…";
+      BookMindAuthUI.showToast("Email verified successfully!");
+      setTimeout(() => BookMindAuth.redirectAfterLogin(), 1200);
+    } catch (error) {
+      message.textContent = "Verification failed.";
+      BookMindAuth.showError("verifyError", error.message || "This link may have expired.");
+    }
+  });
+</script>
+
+</body>
+</html>
