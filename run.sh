@@ -4,6 +4,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
+# Prefer Python 3.11+ locally; Render uses runtime.txt / .python-version (3.11.11).
 PY="${PYTHON:-python3}"
 
 if [ ! -d ".venv" ]; then
@@ -15,7 +16,7 @@ fi
 source .venv/bin/activate
 
 echo "→ Installing dependencies…"
-pip install --quiet --upgrade pip
+pip install --quiet --upgrade pip setuptools wheel
 pip install --quiet -r requirements.txt
 
 if [ ! -f ".env" ] && [ -f ".env.example" ]; then
