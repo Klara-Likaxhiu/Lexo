@@ -147,7 +147,7 @@ const BookMindAuth = {
   },
 
   redirectToVerifyEmailPending(email, delivery = {}) {
-    console.log("[BookMindAuth] redirectToVerifyEmailPending (explicit post-signup/login only)", email);
+    console.log("[BookMindAuth] redirectToVerifyEmailPending (explicit post-signup only)", email);
     const value = (email || "").trim();
     if (value) {
       this.setPendingSignupEmail(value);
@@ -1004,7 +1004,14 @@ function whenDomReady(fn) {
 
 (function initAuth() {
   const page = BookMindAuth.currentPage();
-  console.log("[BookMindAuth] initAuth page:", page, "path:", BookMindAuth.currentPath());
+  const path = BookMindAuth.currentPath();
+  console.log("[BookMindAuth] initAuth page:", page, "path:", path);
+
+  // Signup must never inherit stale auth — clear synchronously before any redirect logic.
+  if (page === "signup.html") {
+    BookMindAuth.clearAllAuthState();
+    console.log("[BookMindAuth] initAuth: sync cleared stale auth on signup");
+  }
 
   if (BookMindAuth.redirectAuthCallbackIfNeeded()) {
     console.log("[BookMindAuth] initAuth: auth callback redirect");

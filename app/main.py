@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from fastapi import FastAPI, File, HTTPException, UploadFile  # noqa: E402
-from fastapi.responses import FileResponse, JSONResponse  # noqa: E402
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse  # noqa: E402
 from fastapi.staticfiles import StaticFiles  # noqa: E402
 from pydantic import BaseModel, Field  # noqa: E402
 
@@ -28,13 +28,17 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 STATIC_DIR = BASE_DIR / "static"
 
 # Clean URL routes → HTML files in static/ (no server-side auth redirects).
+# /login and /signup redirect to .html paths so auth.js always sees canonical page names.
+AUTH_PAGE_REDIRECTS: dict[str, str] = {
+    "/login": "/login.html",
+    "/signup": "/signup.html",
+}
+
 FRONTEND_PAGES: dict[str, str] = {
     "/": "landing.html",
     "/landing.html": "landing.html",
     "/home": "home.html",
-    "/login": "login.html",
     "/login.html": "login.html",
-    "/signup": "signup.html",
     "/signup.html": "signup.html",
     "/discovery": "discovery.html",
     "/library": "library.html",
@@ -101,6 +105,18 @@ def _static_page(filename: str) -> FileResponse:
 
 
 def _register_frontend_routes() -> None:
+    for route, target in AUTH_PAGE_REDIRECTS.items():
+
+        def auth_redirect(url: str = target) -> RedirectResponse:
+            return RedirectResponse(url=url, status_code=302)
+
+        app.add_api_route(
+            route,
+            auth_redirect,
+            methods=["GET"],
+            include_in_schema=False,
+        )
+
     for route, filename in FRONTEND_PAGES.items():
 
         def page_handler(page_file: str = filename) -> FileResponse:

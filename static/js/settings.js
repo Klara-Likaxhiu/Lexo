@@ -378,7 +378,7 @@ const BookMindSettings = {
       try {
         await BookMindAuth.deleteAccount(password, confirmation);
         BookMindAuth.clearSession();
-        window.location.href = "/login";
+        window.location.href = "/login.html";
       } catch (error) {
         this.showToast(error.message || "Could not delete account.", "error");
       }

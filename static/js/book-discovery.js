@@ -321,7 +321,7 @@ const BookMindDetailModal = {
   async saveShelf(status, label) {
     if (!window.BookMindAuth || !BookMindAuth.isLoggedIn()) {
       const next = encodeURIComponent("/discovery");
-      window.location.href = `/login?next=${next}`;
+      window.location.href = `/login.html?next=${next}`;
       return;
     }
 
