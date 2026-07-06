@@ -27,12 +27,15 @@ from app.extract import UnsupportedFileType, extract_text  # noqa: E402
 BASE_DIR = Path(__file__).resolve().parent.parent
 STATIC_DIR = BASE_DIR / "static"
 
-# Clean URL routes → HTML files in static/
+# Clean URL routes → HTML files in static/ (no server-side auth redirects).
 FRONTEND_PAGES: dict[str, str] = {
     "/": "landing.html",
+    "/landing.html": "landing.html",
     "/home": "home.html",
     "/login": "login.html",
+    "/login.html": "login.html",
     "/signup": "signup.html",
+    "/signup.html": "signup.html",
     "/discovery": "discovery.html",
     "/library": "library.html",
     "/settings": "settings.html",
@@ -50,6 +53,7 @@ FRONTEND_PAGES: dict[str, str] = {
     "/verify-email": "verify-email.html",
     "/verify-email.html": "verify-email.html",
     "/verify-email-pending": "verify-email-pending.html",
+    "/verify-email-pending.html": "verify-email-pending.html",
 }
 
 app = FastAPI(

@@ -642,6 +642,7 @@ const BookMindAuth = {
   /** Map clean URLs and legacy .html paths to a canonical page id. */
   ROUTE_ALIASES: {
     "/": "landing.html",
+    "/landing.html": "landing.html",
     "/home": "home.html",
     "/login": "login.html",
     "/signup": "signup.html",
@@ -675,7 +676,19 @@ const BookMindAuth = {
   currentPage() {
     const path = this.currentPath();
     if (this.ROUTE_ALIASES[path]) return this.ROUTE_ALIASES[path];
+
     const tail = path.split("/").pop() || "";
+    const cleanNames = {
+      login: "login.html",
+      signup: "signup.html",
+      "forgot-password": "forgot-password.html",
+      "reset-password": "reset-password.html",
+      "verify-email": "verify-email.html",
+      "verify-email-pending": "verify-email-pending.html",
+      landing: "landing.html"
+    };
+    if (cleanNames[tail]) return cleanNames[tail];
+    if (tail.endsWith(".html")) return tail;
     return tail || "landing.html";
   },
 
