@@ -6,7 +6,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app import auth_db
-from app.supabase_client import SupabaseAuthError, get_user, merge_public_user
+from app.supabase_client import SupabaseAuthError, email_verification_enabled, get_user, merge_public_user
 
 bearer = HTTPBearer(auto_error=False)
 
@@ -29,3 +29,12 @@ def get_current_user(
         "_access_token": credentials.credentials,
         "_supabase_user": supabase_user,
     }
+
+
+def get_verified_user(user: dict = Depends(get_current_user)) -> dict:
+    if email_verification_enabled() and not user.get("email_verified"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Please verify your email before accessing your account.",
+        )
+    return user

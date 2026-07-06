@@ -188,6 +188,30 @@ def reset_password_for_email(email: str, redirect_to: str | None = None) -> dict
     return _request("POST", "/recover", json=body)
 
 
+def admin_generate_link(
+    email: str,
+    *,
+    link_type: str = "magiclink",
+    password: str | None = None,
+    redirect_to: str | None = None,
+) -> dict[str, Any]:
+    """Generate a Supabase verification/magic link (requires service role key)."""
+    service_key = supabase_service_role_key()
+    if not service_key:
+        raise SupabaseAuthError(
+            "SUPABASE_SERVICE_ROLE_KEY is required to generate verification links.",
+            status_code=503,
+        )
+
+    body: dict[str, Any] = {"type": link_type, "email": email}
+    if password:
+        body["password"] = password
+    if redirect_to:
+        body["options"] = {"redirect_to": redirect_to}
+
+    return _request("POST", "/admin/generate_link", json=body, api_key=service_key)
+
+
 def admin_delete_user(user_id: str) -> None:
     service_key = supabase_service_role_key()
     if not service_key:
@@ -251,46 +275,60 @@ def _username_from_email(email: str) -> str:
     return cleaned or "reader"
 
 
-def email_redirect(path: str) -> str:
-    """Build absolute redirect URL for Supabase auth emails."""
-    base = os.getenv("APP_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
+def email_redirect(path: str = "verify-email.html") -> str:
+    """Build absolute redirect URL for Supabase auth emails from APP_BASE_URL."""
+    base = os.getenv("APP_BASE_URL", "").strip().rstrip("/")
+    if not base:
+        raise SupabaseAuthError(
+            "APP_BASE_URL is not set. Configure it to your public app URL "
+            "(e.g. https://bookmindai-0a6u.onrender.com).",
+            status_code=503,
+        )
+
     path = path.lstrip("/")
-    # Supabase must redirect to the exact page that handles the callback.
-    html_routes = {
-        "verify-email": "verify-email.html",
-        "reset-password": "reset-password.html",
-    }
-    if path in html_routes:
-        path = html_routes[path]
+    if path in ("verify-email", "verify-email.html"):
+        path = "verify-email.html"
+    elif path in ("reset-password", "reset-password.html"):
+        path = "reset-password.html"
     elif not path.endswith(".html") and not path.startswith("http"):
         path = f"{path}.html" if "." not in path.split("/")[-1] else path
     return f"{base}/{path}"
 
 
+def verification_redirect_url() -> str:
+    """Canonical Supabase emailRedirectTo target for signup verification."""
+    return email_redirect("verify-email.html")
+
+
 def get_user_by_email(email: str) -> dict[str, Any] | None:
-    """Look up an auth user by email (service role). Used for verification status."""
+    """Look up an auth user by email (service role)."""
     service_key = supabase_service_role_key()
     if not service_key:
         return None
 
+    needle = email.strip().lower()
+    page = 1
     try:
-        payload = _request(
-            "GET",
-            "/admin/users",
-            params={"page": "1", "per_page": "50"},
-            api_key=service_key,
-        )
+        while page <= 50:
+            payload = _request(
+                "GET",
+                "/admin/users",
+                params={"page": str(page), "per_page": "100"},
+                api_key=service_key,
+            )
+            users = payload.get("users") if isinstance(payload, dict) else None
+            if not isinstance(users, list) or not users:
+                return None
+
+            for user in users:
+                if (user.get("email") or "").lower() == needle:
+                    return user
+
+            if len(users) < 100:
+                return None
+            page += 1
     except SupabaseAuthError:
         return None
-
-    users = payload.get("users") if isinstance(payload, dict) else None
-    if not isinstance(users, list):
-        return None
-
-    needle = email.strip().lower()
-    for user in users:
-        if (user.get("email") or "").lower() == needle:
-            return user
     return None
 
 

@@ -36,6 +36,39 @@ const BookMindAuthUI = {
     if (el) el.hidden = true;
   },
 
+  showSuccess(elementId, message) {
+    const el = document.getElementById(elementId);
+    if (!el) return;
+    el.textContent = message;
+    el.hidden = false;
+  },
+
+  hideSuccess(elementId) {
+    const el = document.getElementById(elementId);
+    if (el) el.hidden = true;
+  },
+
+  showStatusMessage(elementId, message, type = "info") {
+    const el = document.getElementById(elementId);
+    if (!el) return;
+    el.textContent = message;
+    const tone =
+      type === "success" ? "auth-success-inline" : type === "warn" ? "auth-warn-inline" : "";
+    el.className = tone ? `auth-status-message ${tone}` : "auth-status-message";
+    el.hidden = false;
+  },
+
+  hideStatusMessage(elementId) {
+    const el = document.getElementById(elementId);
+    if (el) el.hidden = true;
+  },
+
+  clearAuthMessages({ errorId, successId, statusId } = {}) {
+    if (errorId) this.hideError(errorId);
+    if (successId) this.hideSuccess(successId);
+    if (statusId) this.hideStatusMessage(statusId);
+  },
+
   initPasswordToggles() {
     document.querySelectorAll("[data-toggle-password]").forEach(button => {
       const targetId = button.getAttribute("data-toggle-password");

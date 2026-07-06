@@ -80,7 +80,14 @@
       try {
         const data = await BookMindAuth.login(login, password, rememberMe);
         if (data.verification_required) {
-          window.location.href = `verify-email-pending.html?email=${encodeURIComponent(data.user.email)}`;
+          BookMindAuthUI.showError(
+            "loginError",
+            data.message || "Please verify your email before logging in."
+          );
+          BookMindAuthUI.setLoading(button, false, "Log In");
+          setTimeout(() => {
+            BookMindAuth.redirectToVerifyEmailPending(data.user.email, data);
+          }, 1200);
           return;
         }
         BookMindAuthUI.showToast("Welcome back!");

@@ -4,6 +4,7 @@
   <title>Want to Read - BookMindAI</title>
   <link rel="stylesheet" href="styles.css">
   <script src="js/auth.js"></script>
+  <script src="js/library.js"></script>
 </head>
 <body>
 
@@ -34,31 +35,30 @@
 </div>
 
 <script>
-  const library = JSON.parse(localStorage.getItem("bookmind_library")) || {
-    read: [],
-    reading: [],
-    want: []
-  };
-
-  const container = document.getElementById("wantList");
-
-  if (!library.want || library.want.length === 0) {
-    container.innerHTML = `<p class="empty-text">No future reads saved yet.</p>`;
-  } else {
-    library.want.forEach(book => {
-      const card = document.createElement("div");
-      card.className = "small-book-card card";
-
-      card.innerHTML = `
-        <div class="small-cover"><svg class="cover-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg></div>
-        <h3>${book.title}</h3>
-        <p>${book.author || "Unknown Author"}</p>
-        <span>${book.genre || "Book"}</span>
-      `;
-
-      container.appendChild(card);
-    });
-  }
+  document.addEventListener("DOMContentLoaded", async () => {
+    const container = document.getElementById("wantList");
+    try {
+      await BookMindLibrary.ensureLoaded();
+      const books = BookMindLibrary.getBooksByStatus("want");
+      if (!books.length) {
+        container.innerHTML = `<p class="empty-text">No future reads saved yet.</p>`;
+        return;
+      }
+      books.forEach(book => {
+        const card = document.createElement("div");
+        card.className = "small-book-card card";
+        card.innerHTML = `
+          <div class="small-cover"><svg class="cover-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg></div>
+          <h3>${book.title}</h3>
+          <p>${book.author || "Unknown Author"}</p>
+          <span>${book.genre || "Book"}</span>
+        `;
+        container.appendChild(card);
+      });
+    } catch {
+      container.innerHTML = `<p class="empty-text">Could not load your library.</p>`;
+    }
+  });
 </script>
 
 </body>

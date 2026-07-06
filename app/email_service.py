@@ -47,7 +47,7 @@ class SendResult:
 
 
 def _base_url() -> str:
-    return os.getenv("APP_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
+    return os.getenv("APP_BASE_URL", "").strip().rstrip("/")
 
 
 def smtp_configured() -> bool:
@@ -69,8 +69,16 @@ def delivery_info() -> dict:
 
 
 def _extract_verification_url(body: str) -> str | None:
-    match = re.search(r"(https?://[^\s]+verify-email\.html\?token=[^\s]+)", body)
-    return match.group(1) if match else None
+    patterns = [
+        r"(https?://[^\s]+/auth/v1/verify[^\s]+)",
+        r"(https?://[^\s]+verify-email\.html\?token=[^\s]+)",
+        r"(https?://[^\s]+verify-email\.html[^\s]*)",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, body)
+        if match:
+            return match.group(1).rstrip(").,;]")
+    return None
 
 
 def _outbox_path_for(to: str, subject: str) -> Path:
@@ -199,10 +207,14 @@ def _send(to: str, subject: str, body: str) -> SendResult:
 
 def send_verification_email(to: str, token: str) -> SendResult:
     link = f"{_base_url()}/verify-email.html?token={token}"
+    return send_verification_link(to, link)
+
+
+def send_verification_link(to: str, verification_url: str) -> SendResult:
     body = (
         "Welcome to BookMindAI!\n\n"
         "Please verify your email address by opening this link:\n"
-        f"{link}\n\n"
+        f"{verification_url}\n\n"
         "This link expires in 24 hours.\n\n"
         "If you don't see this email, check your Spam or Junk folder.\n\n"
         "If you did not create an account, you can ignore this email."

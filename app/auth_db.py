@@ -1,49 +1,32 @@
-"""Local profile metadata keyed by Supabase user id (no passwords or sessions)."""
+"""User profiles in Supabase Postgres (no passwords or sessions)."""
 
 from __future__ import annotations
 
-import sqlite3
 import uuid
 from datetime import datetime, timezone
-from pathlib import Path
 
-DATA_DIR = Path(__file__).resolve().parent / "data"
-DB_PATH = DATA_DIR / "bookmind.db"
+from app.supabase_rest import SupabaseRestError, request
 
-
-def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+TABLE = "profiles"
 
 
-def _iso(dt: datetime) -> str:
-    return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
-def get_connection() -> sqlite3.Connection:
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
-    return conn
+def _utcnow_iso() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def init_db() -> None:
-    with get_connection() as conn:
-        conn.executescript(
-            """
-            CREATE TABLE IF NOT EXISTS profiles (
-                id TEXT PRIMARY KEY,
-                username TEXT NOT NULL COLLATE NOCASE UNIQUE,
-                email TEXT NOT NULL COLLATE NOCASE,
-                auth_provider TEXT NOT NULL DEFAULT 'local',
-                provider_subject TEXT,
-                created_at TEXT NOT NULL
-            );
+    """No-op — schema is managed in supabase/schema.sql."""
 
-            CREATE INDEX IF NOT EXISTS idx_profiles_email ON profiles(email);
-            CREATE INDEX IF NOT EXISTS idx_profiles_username ON profiles(username);
-            """
-        )
+
+def _row_to_profile(row: dict) -> dict:
+    return {
+        "id": row["id"],
+        "username": row["username"],
+        "email": row["email"],
+        "auth_provider": row.get("auth_provider") or "local",
+        "provider_subject": row.get("provider_subject"),
+        "created_at": row.get("created_at"),
+    }
 
 
 def upsert_profile(
@@ -54,67 +37,76 @@ def upsert_profile(
     auth_provider: str = "local",
     provider_subject: str | None = None,
 ) -> dict:
-    created_at = _iso(_utcnow())
-    with get_connection() as conn:
-        existing = conn.execute("SELECT created_at FROM profiles WHERE id = ?", (user_id,)).fetchone()
-        if existing:
-            created_at = existing["created_at"]
-        conn.execute(
-            """
-            INSERT INTO profiles (id, username, email, auth_provider, provider_subject, created_at)
-            VALUES (?, ?, ?, ?, ?, ?)
-            ON CONFLICT(id) DO UPDATE SET
-                username = excluded.username,
-                email = excluded.email,
-                auth_provider = excluded.auth_provider,
-                provider_subject = excluded.provider_subject
-            """,
-            (
-                user_id,
-                username.strip(),
-                email.strip().lower(),
-                auth_provider,
-                provider_subject,
-                created_at,
-            ),
-        )
-    return get_profile_by_id(user_id)
+    existing = get_profile_by_id(user_id)
+    payload = {
+        "id": user_id,
+        "username": username.strip(),
+        "email": email.strip().lower(),
+        "auth_provider": auth_provider,
+        "provider_subject": provider_subject,
+    }
+    if not existing:
+        payload["created_at"] = _utcnow_iso()
+
+    rows = request(
+        "POST",
+        TABLE,
+        params={"on_conflict": "id"},
+        json=payload,
+        prefer="resolution=merge-duplicates,return=representation",
+    )
+    if isinstance(rows, list) and rows:
+        return _row_to_profile(rows[0])
+    return get_profile_by_id(user_id) or payload
 
 
 def get_profile_by_id(user_id: str) -> dict | None:
-    with get_connection() as conn:
-        row = conn.execute("SELECT * FROM profiles WHERE id = ?", (user_id,)).fetchone()
-    return dict(row) if row else None
+    rows = request(
+        "GET",
+        TABLE,
+        params={"id": f"eq.{user_id}", "select": "*", "limit": "1"},
+    )
+    if isinstance(rows, list) and rows:
+        return _row_to_profile(rows[0])
+    return None
 
 
 def get_profile_by_username(username: str) -> dict | None:
-    with get_connection() as conn:
-        row = conn.execute(
-            "SELECT * FROM profiles WHERE username = ? COLLATE NOCASE",
-            (username.strip(),),
-        ).fetchone()
-    return dict(row) if row else None
+    rows = request(
+        "GET",
+        TABLE,
+        params={"username": f"ilike.{username.strip()}", "select": "*", "limit": "1"},
+    )
+    if isinstance(rows, list) and rows:
+        return _row_to_profile(rows[0])
+    return None
 
 
 def get_profile_by_email(email: str) -> dict | None:
-    with get_connection() as conn:
-        row = conn.execute(
-            "SELECT * FROM profiles WHERE email = ? COLLATE NOCASE",
-            (email.strip().lower(),),
-        ).fetchone()
-    return dict(row) if row else None
+    rows = request(
+        "GET",
+        TABLE,
+        params={"email": f"eq.{email.strip().lower()}", "select": "*", "limit": "1"},
+    )
+    if isinstance(rows, list) and rows:
+        return _row_to_profile(rows[0])
+    return None
 
 
 def get_profile_by_provider(auth_provider: str, provider_subject: str) -> dict | None:
-    with get_connection() as conn:
-        row = conn.execute(
-            """
-            SELECT * FROM profiles
-            WHERE auth_provider = ? AND provider_subject = ?
-            """,
-            (auth_provider, provider_subject),
-        ).fetchone()
-    return dict(row) if row else None
+    rows = request(
+        "GET",
+        TABLE,
+        params={
+            "auth_provider": f"eq.{auth_provider}",
+            "provider_subject": f"eq.{provider_subject}",
+            "select": "*",
+            "limit": "1",
+        },
+    )
+    if isinstance(rows, list) and rows:
+        return _row_to_profile(rows[0])
+    return None
 
 
 def unique_username(base: str) -> str:
@@ -129,16 +121,7 @@ def unique_username(base: str) -> str:
 
 
 def delete_profile(user_id: str) -> None:
-    with get_connection() as conn:
-        conn.execute("DELETE FROM profiles WHERE id = ?", (user_id,))
-
-
-# Backward-compatible aliases used during migration
-get_user_by_id = get_profile_by_id
-get_user_by_username = get_profile_by_username
-get_user_by_email = get_profile_by_email
-get_user_by_provider = get_profile_by_provider
-get_user_by_login = lambda login: (
-    get_profile_by_email(login) if "@" in login.strip() else get_profile_by_username(login)
-)
-delete_user = delete_profile
+    try:
+        request("DELETE", TABLE, params={"id": f"eq.{user_id}"})
+    except SupabaseRestError:
+        pass

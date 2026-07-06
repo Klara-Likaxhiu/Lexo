@@ -4,6 +4,8 @@
   <title>Reader Journey - BookMindAI</title>
   <link rel="stylesheet" href="styles.css">
   <script src="js/auth.js"></script>
+  <script src="js/library.js"></script>
+  <script src="js/user-data.js"></script>
 </head>
 <body>
 
@@ -70,30 +72,32 @@
 </div>
 
 <script>
-  const profile = JSON.parse(localStorage.getItem("readerProfile"));
-  const library = JSON.parse(localStorage.getItem("bookmind_library")) || {
-    read: [],
-    reading: [],
-    want: []
-  };
+  document.addEventListener("DOMContentLoaded", async () => {
+    if (window.BookMindUserData) await BookMindUserData.loadReaderProfile();
+    const profile = JSON.parse(localStorage.getItem("readerProfile") || "null");
+    const mood = localStorage.getItem("bookmind_today_mood");
+    const goal = localStorage.getItem("bookmind_today_goal");
 
-  const mood = localStorage.getItem("bookmind_today_mood");
-  const goal = localStorage.getItem("bookmind_today_goal");
+    if (profile) {
+      document.getElementById("journeyType").textContent = profile.reader_type || "Unknown Reader";
+      document.getElementById("journeyLevel").textContent =
+        `Reading level: ${profile.confirmed_reading_level || profile.reading_level || "Not available"}`;
+    }
 
-  if (profile) {
-    document.getElementById("journeyType").textContent = profile.reader_type || "Unknown Reader";
-    document.getElementById("journeyLevel").textContent =
-      `Reading level: ${profile.confirmed_reading_level || "Not available"}`;
-  }
+    document.getElementById("todayMode").textContent =
+      mood || goal ? `${mood || "any mood"} + ${goal || "any goal"}` : "No mode selected";
 
-  document.getElementById("todayMode").textContent =
-    mood || goal ? `${mood || "any mood"} + ${goal || "any goal"}` : "No mode selected";
-
-  const allBooks = [
-    ...library.read,
-    ...library.reading,
-    ...library.want
-  ];
+    let allBooks = [];
+    try {
+      await BookMindLibrary.ensureLoaded();
+      allBooks = [
+        ...BookMindLibrary.getBooksByStatus("read"),
+        ...BookMindLibrary.getBooksByStatus("reading"),
+        ...BookMindLibrary.getBooksByStatus("want")
+      ];
+    } catch {
+      allBooks = [];
+    }
 
   function findTopGenre(books) {
     const counts = {};
@@ -154,6 +158,7 @@
 
   document.getElementById("growthList").innerHTML =
     growthSuggestions.map(tag => `<span>${tag}</span>`).join("");
+  });
 </script>
 
 </body>

@@ -20,6 +20,7 @@ const BookMindAuth = {
   REFRESH_KEY: "bookmind_refresh_token",
   USER_KEY: "bookmind_auth_user",
   REMEMBER_KEY: "bookmind_remember_me",
+  PENDING_EMAIL_KEY: "bookmind_pending_signup_email",
 
   PROTECTED_PAGES: new Set([
     "home.html",
@@ -91,8 +92,77 @@ const BookMindAuth = {
       store.removeItem(this.ACCESS_KEY);
       store.removeItem(this.REFRESH_KEY);
       store.removeItem(this.USER_KEY);
+      store.removeItem(this.PENDING_EMAIL_KEY);
     });
     localStorage.removeItem(this.REMEMBER_KEY);
+  },
+
+  /** Drop any stale auth from an unfinished signup — signup page must stay accessible. */
+  clearPendingSignupState() {
+    this.clearSession();
+  },
+
+  setPendingSignupEmail(email) {
+    const value = (email || "").trim();
+    if (!value) return;
+    sessionStorage.setItem(this.PENDING_EMAIL_KEY, value);
+  },
+
+  getPendingSignupEmail() {
+    const params = new URLSearchParams(window.location.search);
+    const fromQuery = (params.get("email") || "").trim();
+    if (fromQuery) return fromQuery;
+
+    return (
+      sessionStorage.getItem(this.PENDING_EMAIL_KEY) ||
+      localStorage.getItem(this.PENDING_EMAIL_KEY) ||
+      ""
+    );
+  },
+
+  redirectToVerifyEmailPending(email, delivery = {}) {
+    const value = (email || "").trim();
+    if (value) {
+      this.setPendingSignupEmail(value);
+    }
+
+    const params = new URLSearchParams();
+    if (value) params.set("email", value);
+
+    const devUrl =
+      delivery.dev_verification_url ||
+      delivery.email_delivery?.dev_verification_url ||
+      null;
+    if (devUrl) params.set("dev_url", devUrl);
+
+    const query = params.toString();
+    window.location.href = `/verify-email-pending.html${query ? `?${query}` : ""}`;
+  },
+
+  restartSignupFlow() {
+    this.clearPendingSignupState();
+    window.location.href = "/signup.html?fresh=1";
+  },
+
+  goToLoginPage(query = "") {
+    window.location.href = `/login.html${query}`;
+  },
+
+  prepareSignupPage() {
+    this.clearPendingSignupState();
+  },
+
+  resetSignupForm() {
+    const form = document.getElementById("signupForm");
+    if (!form) return;
+    form.reset();
+    this.hideError("signupError");
+    const button = document.getElementById("signupBtn");
+    if (button) {
+      button.disabled = false;
+      button.classList.remove("is-loading");
+      button.textContent = "Create Account";
+    }
   },
 
   getAccessToken() {
@@ -162,7 +232,9 @@ const BookMindAuth = {
 
   async signup(username, email, password) {
     const data = await this.api("/api/auth/signup", { username, email, password });
-    if (data.access_token && !data.verification_required) {
+    if (data.verification_required) {
+      this.clearPendingSignupState();
+    } else if (data.access_token) {
       this.saveSession(data);
     }
     return data;
@@ -174,7 +246,9 @@ const BookMindAuth = {
       password,
       remember_me: rememberMe
     });
-    if (!data.verification_required) {
+    if (data.verification_required) {
+      this.clearPendingSignupState();
+    } else {
       this.saveSession(data);
     }
     return data;
@@ -255,10 +329,10 @@ const BookMindAuth = {
   },
 
   redirectAfterVerification(user) {
-    this.clearSession();
+    this.clearPendingSignupState();
     const email = user?.email ? encodeURIComponent(user.email) : "";
     const query = email ? `?verified=1&email=${email}` : "?verified=1";
-    window.location.href = `/login${query}`;
+    window.location.href = `/login.html${query}`;
   },
 
   async resendVerification(email) {
@@ -267,17 +341,6 @@ const BookMindAuth = {
 
   async checkVerificationStatus(email) {
     return this.api("/api/auth/verification-status", { email });
-  },
-
-  async getDevEmailPreview(email) {
-    const response = await fetch(
-      `/api/auth/dev/email-preview?email=${encodeURIComponent(email)}`
-    );
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      throw new Error(data.detail || "No preview available.");
-    }
-    return data;
   },
 
   async forgotPassword(email) {
@@ -418,7 +481,8 @@ const BookMindAuth = {
     }
   },
 
-  async verifySession() {
+  async verifySession(options = {}) {
+    const redirectUnverified = Boolean(options.redirectUnverified);
     const token = this.getAccessToken();
     if (!token) return false;
 
@@ -427,11 +491,10 @@ const BookMindAuth = {
         headers: this.getAuthHeaders()
       });
       if (response.status === 403) {
-        const config = await this.getConfig();
-        if (config.email_verification_required && config.email_sending_enabled) {
+        if (redirectUnverified) {
           const user = this.getUser();
           const email = user?.email ? `?email=${encodeURIComponent(user.email)}` : "";
-          window.location.replace(`verify-email-pending.html${email}`);
+          window.location.replace(`/verify-email-pending${email}`);
         }
         return false;
       }
@@ -447,8 +510,10 @@ const BookMindAuth = {
           config.email_sending_enabled &&
           !data.user.email_verified
         ) {
-          const email = data.user.email ? `?email=${encodeURIComponent(data.user.email)}` : "";
-          window.location.replace(`verify-email-pending.html${email}`);
+          if (redirectUnverified) {
+            const email = data.user.email ? `?email=${encodeURIComponent(data.user.email)}` : "";
+            window.location.replace(`/verify-email-pending${email}`);
+          }
           return false;
         }
         return true;
@@ -457,7 +522,18 @@ const BookMindAuth = {
       /* fall through */
     }
 
-    return this.refreshSession();
+    const refreshed = await this.refreshSession();
+    if (!refreshed) return false;
+
+    if (redirectUnverified) {
+      return this.verifySession({ redirectUnverified: true });
+    }
+
+    const user = this.getUser();
+    if (!user?.email_verified) {
+      return false;
+    }
+    return Boolean(this.getAccessToken());
   },
 
   async applyAuthUiConfig() {
@@ -476,9 +552,13 @@ const BookMindAuth = {
     const page = this.currentPage();
     if (!this.EMAIL_FEATURE_PAGES.has(page)) return;
 
+    if (page === "verify-email-pending.html" || page === "verify-email.html" || page === "reset-password.html") {
+      return;
+    }
+
     const config = await this.getConfig();
     if (!config.email_sending_enabled) {
-      window.location.replace("/login");
+      window.location.replace("/login.html");
     }
   },
 
@@ -496,7 +576,7 @@ const BookMindAuth = {
     } catch {
       /* always clear locally */
     }
-    this.clearSession();
+    this.clearPendingSignupState();
     window.location.href = "/login";
   },
 
@@ -528,6 +608,8 @@ const BookMindAuth = {
     "/home": "home.html",
     "/login": "login.html",
     "/signup": "signup.html",
+    "/signup.html": "signup.html",
+    "/login.html": "login.html",
     "/discovery": "discovery.html",
     "/library": "library.html",
     "/settings": "settings.html",
@@ -544,7 +626,8 @@ const BookMindAuth = {
     "/reset-password.html": "reset-password.html",
     "/verify-email": "verify-email.html",
     "/verify-email.html": "verify-email.html",
-    "/verify-email-pending": "verify-email-pending.html"
+    "/verify-email-pending": "verify-email-pending.html",
+    "/verify-email-pending.html": "verify-email-pending.html"
   },
 
   currentPath() {
@@ -565,7 +648,7 @@ const BookMindAuth = {
 
     document.documentElement.classList.add("auth-pending");
 
-    const ok = await this.verifySession();
+    const ok = await this.verifySession({ redirectUnverified: true });
     if (!ok) {
       if (this.currentPage() === "verify-email-pending.html") {
         document.documentElement.classList.remove("auth-pending");
@@ -584,6 +667,12 @@ const BookMindAuth = {
   async guardPublicAuthPage() {
     const page = this.currentPage();
     if (!this.PUBLIC_AUTH_PAGES.has(page)) return;
+
+    if (page === "signup.html") {
+      this.prepareSignupPage();
+      return;
+    }
+
     if (page === "verify-email-pending.html" || page === "reset-password.html" || page === "verify-email.html") {
       return;
     }
@@ -591,19 +680,277 @@ const BookMindAuth = {
     if (page === "login.html") {
       const params = new URLSearchParams(window.location.search);
       if (params.get("verified") === "1") {
+        this.clearPendingSignupState();
         return;
       }
+
+      const ok = await this.verifySession({ redirectUnverified: false });
+      if (ok) {
+        window.location.replace("/home");
+        return;
+      }
+
+      if (this.getAccessToken()) {
+        this.clearPendingSignupState();
+      }
+      return;
     }
 
-    const ok = await this.verifySession();
+    const ok = await this.verifySession({ redirectUnverified: false });
     if (ok) {
       window.location.replace("/home");
     }
   },
 
+  initSignupPage() {
+    this.prepareSignupPage();
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("fresh") === "1") {
+      this.resetSignupForm();
+      if (window.history.replaceState) {
+        const path = this.currentPath().endsWith(".html") ? this.currentPath() : "/signup.html";
+        window.history.replaceState({}, "", path);
+      }
+    }
+  },
+
+  initVerifyEmailPendingPage() {
+    const email = this.getPendingSignupEmail();
+    const pendingEmailEl = document.getElementById("pendingEmail");
+    const resendBtn = document.getElementById("resendBtn");
+    const checkVerifiedBtn = document.getElementById("checkVerifiedBtn");
+    const signupAgainLink = document.getElementById("signupAgainLink");
+    const backToLoginLink = document.getElementById("backToLoginLink");
+
+    if (email && pendingEmailEl) {
+      pendingEmailEl.textContent = email;
+      this.setPendingSignupEmail(email);
+    } else if (pendingEmailEl) {
+      pendingEmailEl.textContent = "your email address";
+      BookMindAuthUI.showError(
+        "resendError",
+        "No email address provided. Use Sign up again to create a new account."
+      );
+      if (resendBtn) resendBtn.disabled = true;
+      if (checkVerifiedBtn) checkVerifiedBtn.disabled = true;
+    }
+
+    if (signupAgainLink) {
+      signupAgainLink.addEventListener("click", event => {
+        event.preventDefault();
+        BookMindAuth.restartSignupFlow();
+      });
+    }
+
+    if (backToLoginLink) {
+      backToLoginLink.addEventListener("click", event => {
+        event.preventDefault();
+        BookMindAuth.goToLoginPage();
+      });
+    }
+
+    if (checkVerifiedBtn) {
+      checkVerifiedBtn.addEventListener("click", async () => {
+        if (!email) return;
+        BookMindAuthUI.clearAuthMessages({
+          errorId: "resendError",
+          successId: "resendSuccess",
+          statusId: "statusMessage"
+        });
+
+        BookMindAuthUI.setLoading(checkVerifiedBtn, true, "I've verified — continue", "Checking…");
+        try {
+          const status = await BookMindAuth.checkVerificationStatus(email);
+          if (!status.account_exists) {
+            BookMindAuthUI.showError(
+              "resendError",
+              "No account found for this email. Use Sign up again to create a new account."
+            );
+            return;
+          }
+          if (status.verified) {
+            BookMindAuth.clearPendingSignupState();
+            BookMindAuthUI.showStatusMessage(
+              "statusMessage",
+              "Email verified! Redirecting you to log in…",
+              "success"
+            );
+            BookMindAuthUI.showToast("Email verified! You can log in now.");
+            setTimeout(() => {
+              window.location.href = `/login.html?verified=1&email=${encodeURIComponent(email)}`;
+            }, 900);
+            return;
+          }
+          BookMindAuthUI.showStatusMessage(
+            "statusMessage",
+            "Your email is not verified yet. Open the link in your inbox (check Spam/Junk), then try again.",
+            "warn"
+          );
+        } catch (error) {
+          BookMindAuthUI.showError(
+            "resendError",
+            error.message || "Could not check verification status."
+          );
+        } finally {
+          BookMindAuthUI.setLoading(checkVerifiedBtn, false, "I've verified — continue");
+        }
+      });
+    }
+
+    if (resendBtn) {
+      resendBtn.addEventListener("click", async () => {
+        if (!email) return;
+        BookMindAuthUI.clearAuthMessages({
+          errorId: "resendError",
+          successId: "resendSuccess",
+          statusId: "statusMessage"
+        });
+
+        BookMindAuthUI.setLoading(resendBtn, true, "Resend verification email", "Sending…");
+        try {
+          const data = await BookMindAuth.resendVerification(email);
+          if (data.already_verified) {
+            BookMindAuth.clearPendingSignupState();
+            window.location.href = `/login.html?verified=1&email=${encodeURIComponent(email)}`;
+            return;
+          }
+          const successText = data.email_sent
+            ? "Verification email sent. Check your inbox and Spam/Junk folder."
+            : data.message || "Verification email queued.";
+          BookMindAuthUI.showSuccess("resendSuccess", successText);
+          BookMindAuthUI.showToast(data.email_sent ? "Verification email sent." : successText);
+        } catch (error) {
+          BookMindAuthUI.showError(
+            "resendError",
+            error.message || "Could not send verification email."
+          );
+        } finally {
+          BookMindAuthUI.setLoading(resendBtn, false, "Resend verification email");
+        }
+      });
+    }
+  },
+
+  _showDevLink(url) {
+    const wrap = document.getElementById("devLinkWrap");
+    const link = document.getElementById("devVerifyLink");
+    const loadDevLinkBtn = document.getElementById("loadDevLinkBtn");
+    if (link) link.href = url;
+    if (wrap) wrap.hidden = false;
+    if (loadDevLinkBtn) loadDevLinkBtn.hidden = true;
+  },
+
+  initVerifyEmailPage() {
+    const title = document.getElementById("verifyTitle");
+    const message = document.getElementById("verifyMessage");
+    const successEl = document.getElementById("verifySuccess");
+    const errorEl = document.getElementById("verifyError");
+    const actions = document.getElementById("verifyActions");
+    const footer = document.getElementById("verifyFooter");
+    const resendBtn = document.getElementById("resendBtn");
+    const goLoginBtn = document.getElementById("goLoginBtn");
+
+    let pendingEmail = new URLSearchParams(window.location.search).get("email") || "";
+
+    const params = this.parseAuthParams();
+    const hasCallback = Boolean(params.token_hash || params.access_token || params.error);
+
+    if (goLoginBtn) {
+      goLoginBtn.addEventListener("click", () => {
+        window.location.href = pendingEmail
+          ? `/login.html?email=${encodeURIComponent(pendingEmail)}`
+          : "/login.html";
+      });
+    }
+
+    if (resendBtn) {
+      resendBtn.addEventListener("click", async () => {
+        if (!pendingEmail) {
+          const entered = window.prompt("Enter your account email to resend verification:");
+          if (!entered) return;
+          pendingEmail = entered.trim();
+        }
+
+        this.hideError("verifyError");
+        if (successEl) successEl.hidden = true;
+        BookMindAuthUI.setLoading(resendBtn, true, "Resend verification email", "Sending…");
+
+        try {
+          const data = await this.resendVerification(pendingEmail);
+          if (data.already_verified) {
+            window.location.href = `/login.html?verified=1&email=${encodeURIComponent(pendingEmail)}`;
+            return;
+          }
+          const text = data.email_sent
+            ? "Verification email sent. Check your inbox and Spam/Junk folder."
+            : data.message || "Verification email sent.";
+          if (successEl) {
+            successEl.textContent = text;
+            successEl.hidden = false;
+          }
+          BookMindAuthUI.showToast(text);
+        } catch (error) {
+          this.showError("verifyError", error.message || "Could not resend verification email.");
+        } finally {
+          BookMindAuthUI.setLoading(resendBtn, false, "Resend verification email");
+        }
+      });
+    }
+
+    if (!hasCallback) {
+      if (title) title.textContent = "Check your email";
+      if (message) {
+        message.textContent =
+          "Open the verification link from your inbox to confirm your account.";
+      }
+      if (actions) actions.hidden = false;
+      if (footer) footer.hidden = false;
+      return;
+    }
+
+    if (window.history.replaceState) {
+      window.history.replaceState({}, "", this.currentPath());
+    }
+
+    this.completeEmailVerification()
+      .then(result => {
+        pendingEmail = result.user?.email || pendingEmail;
+        if (title) title.textContent = "Email verified!";
+        if (message) message.textContent = "Your email address has been confirmed.";
+        if (successEl) {
+          successEl.textContent = "Redirecting you to log in…";
+          successEl.hidden = false;
+        }
+        const icon = document.getElementById("verifyIcon");
+        if (icon) icon.classList.add("auth-status-icon-success");
+        BookMindAuthUI.showToast("Email verified successfully!");
+        setTimeout(() => this.redirectAfterVerification(result.user), 1500);
+      })
+      .catch(error => {
+        if (title) title.textContent = "Verification failed";
+        if (message) {
+          message.textContent = "We couldn't verify your email with this link.";
+        }
+        this.showError(
+          "verifyError",
+          error.message || "This link may be invalid or expired. Request a new verification email."
+        );
+        if (actions) actions.hidden = false;
+        if (footer) footer.hidden = false;
+      });
+  },
+
   showError: (id, msg) => BookMindAuthUI.showError(id, msg),
   hideError: id => BookMindAuthUI.hideError(id)
 };
+
+function whenDomReady(fn) {
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", fn);
+  } else {
+    fn();
+  }
+}
 
 (function initAuth() {
   if (BookMindAuth.redirectAuthCallbackIfNeeded()) {
@@ -614,14 +961,24 @@ const BookMindAuth = {
 
   if (BookMindAuth.EMAIL_FEATURE_PAGES.has(page)) {
     BookMindAuth.guardEmailFeaturePage();
+    if (page === "verify-email-pending.html") {
+      whenDomReady(() => BookMindAuth.initVerifyEmailPendingPage());
+    } else if (page === "verify-email.html") {
+      whenDomReady(() => BookMindAuth.initVerifyEmailPage());
+    }
   } else if (BookMindAuth.PROTECTED_PAGES.has(page)) {
     BookMindAuth.guardPage();
   } else if (BookMindAuth.PUBLIC_AUTH_PAGES.has(page)) {
     BookMindAuth.guardPublicAuthPage();
-    if (page === "login.html" || page === "signup.html") {
-      document.addEventListener("DOMContentLoaded", () => BookMindAuth.applyAuthUiConfig());
+    if (page === "signup.html") {
+      whenDomReady(() => {
+        BookMindAuth.initSignupPage();
+        BookMindAuth.applyAuthUiConfig();
+      });
+    } else if (page === "login.html") {
+      whenDomReady(() => BookMindAuth.applyAuthUiConfig());
     }
   } else {
-    document.addEventListener("DOMContentLoaded", () => BookMindAuth.setupLogoutLinks());
+    whenDomReady(() => BookMindAuth.setupLogoutLinks());
   }
 })();

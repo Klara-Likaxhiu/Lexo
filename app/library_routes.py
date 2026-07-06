@@ -7,7 +7,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from app.deps import get_current_user
+from app.deps import get_verified_user
 from app.library_store import (
     LibraryStoreError,
     delete_book,
@@ -77,7 +77,7 @@ def _request_to_book(data: LibraryBookRequest) -> dict[str, Any]:
 
 
 @router.get("")
-def get_library(user: dict = Depends(get_current_user)) -> dict:
+def get_library(user: dict = Depends(get_verified_user)) -> dict:
     try:
         books = list_user_books(user["id"])
     except LibraryStoreError as exc:
@@ -94,7 +94,7 @@ def get_library(user: dict = Depends(get_current_user)) -> dict:
 
 
 @router.post("")
-def save_book(data: LibraryBookRequest, user: dict = Depends(get_current_user)) -> dict:
+def save_book(data: LibraryBookRequest, user: dict = Depends(get_verified_user)) -> dict:
     if data.status not in VALID_STATUSES:
         raise HTTPException(status_code=400, detail="Invalid shelf status.")
 
@@ -116,7 +116,7 @@ def save_book(data: LibraryBookRequest, user: dict = Depends(get_current_user)) 
 def patch_book(
     library_id: str,
     data: LibraryUpdateRequest,
-    user: dict = Depends(get_current_user),
+    user: dict = Depends(get_verified_user),
 ) -> dict:
     if data.current_page is not None and data.total_pages is not None:
         try:
@@ -152,7 +152,7 @@ def patch_book(
 def save_reading_progress(
     library_id: str,
     data: ReadingProgressRequest,
-    user: dict = Depends(get_current_user),
+    user: dict = Depends(get_verified_user),
 ) -> dict:
     if data.current_page > data.total_pages:
         raise HTTPException(
@@ -179,7 +179,7 @@ def save_reading_progress(
 
 
 @router.post("/{library_id}/open")
-def record_book_opened(library_id: str, user: dict = Depends(get_current_user)) -> dict:
+def record_book_opened(library_id: str, user: dict = Depends(get_verified_user)) -> dict:
     try:
         saved = touch_last_opened(user["id"], library_id=library_id)
     except LibraryStoreError as exc:
@@ -188,7 +188,7 @@ def record_book_opened(library_id: str, user: dict = Depends(get_current_user)) 
 
 
 @router.delete("/{library_id}")
-def remove_book(library_id: str, user: dict = Depends(get_current_user)) -> dict:
+def remove_book(library_id: str, user: dict = Depends(get_verified_user)) -> dict:
     try:
         delete_book(user["id"], library_id=library_id)
     except LibraryStoreError as exc:

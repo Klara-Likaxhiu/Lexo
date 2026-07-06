@@ -26,75 +26,10 @@
     </div>
 
     <p class="small-text" id="verifyFooter" hidden>
-      <a href="login.html">Back to login</a> · <a href="signup.html">Sign up</a>
+      <a href="/login.html">Back to login</a> · <a href="/signup.html">Sign up</a>
     </p>
   </div>
 </div>
-
-<script>
-  document.addEventListener("DOMContentLoaded", async () => {
-    const title = document.getElementById("verifyTitle");
-    const message = document.getElementById("verifyMessage");
-    const successEl = document.getElementById("verifySuccess");
-    const errorEl = document.getElementById("verifyError");
-    const actions = document.getElementById("verifyActions");
-    const footer = document.getElementById("verifyFooter");
-    const resendBtn = document.getElementById("resendBtn");
-    const goLoginBtn = document.getElementById("goLoginBtn");
-
-    let pendingEmail = new URLSearchParams(window.location.search).get("email") || "";
-
-    goLoginBtn.addEventListener("click", () => {
-      window.location.href = pendingEmail
-        ? `login.html?email=${encodeURIComponent(pendingEmail)}`
-        : "login.html";
-    });
-
-    resendBtn.addEventListener("click", async () => {
-      if (!pendingEmail) {
-        const entered = window.prompt("Enter your account email to resend verification:");
-        if (!entered) return;
-        pendingEmail = entered.trim();
-      }
-
-      BookMindAuth.hideError("verifyError");
-      successEl.hidden = true;
-      BookMindAuthUI.setLoading(resendBtn, true, "Resend verification email", "Sending…");
-
-      try {
-        const data = await BookMindAuth.resendVerification(pendingEmail);
-        successEl.textContent = data.message || "Verification email sent. Check your inbox and Spam folder.";
-        successEl.hidden = false;
-        BookMindAuthUI.showToast("Verification email sent.");
-      } catch (error) {
-        BookMindAuth.showError("verifyError", error.message || "Could not resend verification email.");
-      } finally {
-        BookMindAuthUI.setLoading(resendBtn, false, "Resend verification email");
-      }
-    });
-
-    try {
-      const result = await BookMindAuth.completeEmailVerification();
-      pendingEmail = result.user?.email || pendingEmail;
-
-      title.textContent = "Email verified!";
-      message.textContent = "Your email address has been confirmed.";
-      successEl.textContent = "You can now log in to BookMindAI.";
-      successEl.hidden = false;
-      document.getElementById("verifyIcon").classList.add("auth-status-icon-success");
-      BookMindAuthUI.showToast("Email verified successfully!");
-
-      setTimeout(() => BookMindAuth.redirectAfterVerification(result.user), 1800);
-    } catch (error) {
-      title.textContent = "Verification failed";
-      message.textContent = "We couldn't verify your email with this link.";
-      BookMindAuth.showError("verifyError", error.message || "This link may have expired.");
-      actions.hidden = false;
-      footer.hidden = false;
-      resendBtn.hidden = false;
-    }
-  });
-</script>
 
 </body>
 </html>

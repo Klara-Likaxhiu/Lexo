@@ -384,6 +384,9 @@ async function finishFirstDiscovery() {
 
     const profile = await response.json();
     localStorage.setItem("readerProfile", JSON.stringify(profile));
+    if (window.BookMindUserData) {
+      await BookMindUserData.saveReaderProfile(profile);
+    }
   } catch (error) {
     console.error(error);
   }

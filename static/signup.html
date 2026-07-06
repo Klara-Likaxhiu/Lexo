@@ -81,8 +81,7 @@
       try {
         const data = await BookMindAuth.signup(username, email, password);
         if (data.verification_required) {
-          BookMindAuth.clearSession();
-          window.location.href = `verify-email-pending.html?email=${encodeURIComponent(email)}`;
+          BookMindAuth.redirectToVerifyEmailPending(email, data);
           return;
         }
         BookMindAuthUI.showToast("Account created!");

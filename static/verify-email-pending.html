@@ -19,16 +19,6 @@
 
     <div class="auth-notice auth-notice-info">
       <strong>Check your Spam or Junk folder</strong> if you don't see the email within a few minutes.
-      Add the sender to your contacts to improve delivery.
-    </div>
-
-    <div id="devOutboxNotice" class="auth-notice auth-notice-warning" hidden>
-      <strong>Email delivery is not configured on this server.</strong>
-      <span id="devOutboxText">Verification links are saved locally instead of being emailed. Configure <code>SMTP_HOST</code> in <code>.env</code> to send real emails.</span>
-      <p id="devLinkWrap" hidden>
-        <a id="devVerifyLink" class="auth-dev-link" href="#" target="_blank" rel="noopener">Open verification link (development)</a>
-      </p>
-      <button type="button" class="btn btn-secondary btn-sm" id="loadDevLinkBtn">Show verification link</button>
     </div>
 
     <p class="small-muted">You must verify your email before accessing My Library, Reader DNA, and other personal data.</p>
@@ -43,131 +33,11 @@
     </div>
 
     <p class="small-text">
-      Wrong email? <a href="signup.html">Sign up again</a> · <a href="login.html">Back to login</a>
+      Wrong email? <a href="/signup.html?fresh=1" id="signupAgainLink">Sign up again</a>
+      · <a href="/login.html" id="backToLoginLink">Back to login</a>
     </p>
   </div>
 </div>
-
-<script>
-  document.addEventListener("DOMContentLoaded", async () => {
-    const params = new URLSearchParams(window.location.search);
-    const email = (params.get("email") || "").trim();
-    if (email) {
-      document.getElementById("pendingEmail").textContent = email;
-    } else {
-      document.getElementById("pendingEmail").textContent = "your email address";
-      BookMindAuth.showError("resendError", "No email address provided. Please sign up or log in again.");
-      document.getElementById("resendBtn").disabled = true;
-      document.getElementById("checkVerifiedBtn").disabled = true;
-    }
-
-    try {
-      const config = await BookMindAuth.getConfig();
-      if (config.requires_smtp_for_real_delivery || config.email_delivery_mode === "outbox") {
-        const notice = document.getElementById("devOutboxNotice");
-        notice.hidden = false;
-        if (params.get("dev_url")) {
-          showDevLink(decodeURIComponent(params.get("dev_url")));
-        }
-      }
-    } catch {
-      /* config optional */
-    }
-
-    function showDevLink(url) {
-      const wrap = document.getElementById("devLinkWrap");
-      const link = document.getElementById("devVerifyLink");
-      link.href = url;
-      wrap.hidden = false;
-      document.getElementById("loadDevLinkBtn").hidden = true;
-    }
-
-    document.getElementById("loadDevLinkBtn").addEventListener("click", async () => {
-      if (!email) return;
-      const btn = document.getElementById("loadDevLinkBtn");
-      BookMindAuthUI.setLoading(btn, true, "Show verification link", "Loading…");
-      try {
-        const preview = await BookMindAuth.getDevEmailPreview(email);
-        showDevLink(preview.verification_url);
-        BookMindAuthUI.showToast("Development verification link loaded.");
-      } catch (error) {
-        BookMindAuth.showError("resendError", error.message);
-      } finally {
-        BookMindAuthUI.setLoading(btn, false, "Show verification link");
-      }
-    });
-
-    document.getElementById("checkVerifiedBtn").addEventListener("click", async () => {
-      if (!email) return;
-      BookMindAuth.hideError("resendError");
-      const statusEl = document.getElementById("statusMessage");
-      statusEl.hidden = true;
-
-      const button = document.getElementById("checkVerifiedBtn");
-      BookMindAuthUI.setLoading(button, true, "I've verified — continue", "Checking…");
-
-      try {
-        const status = await BookMindAuth.checkVerificationStatus(email);
-        if (!status.account_exists) {
-          BookMindAuth.showError("resendError", "No account found for this email. Please sign up first.");
-          return;
-        }
-        if (status.verified) {
-          statusEl.textContent = "Email verified! Redirecting you to log in…";
-          statusEl.className = "auth-status-message auth-success-inline";
-          statusEl.hidden = false;
-          BookMindAuthUI.showToast("Email verified! You can log in now.");
-          setTimeout(() => {
-            window.location.href = `login.html?verified=1&email=${encodeURIComponent(email)}`;
-          }, 900);
-          return;
-        }
-        statusEl.textContent =
-          "Your email is not verified yet. Open the link in your inbox (check Spam/Junk), then try again.";
-        statusEl.className = "auth-status-message auth-warn-inline";
-        statusEl.hidden = false;
-      } catch (error) {
-        BookMindAuth.showError("resendError", error.message || "Could not check verification status.");
-      } finally {
-        BookMindAuthUI.setLoading(button, false, "I've verified — continue");
-      }
-    });
-
-    document.getElementById("resendBtn").addEventListener("click", async () => {
-      if (!email) return;
-      BookMindAuth.hideError("resendError");
-      document.getElementById("resendSuccess").hidden = true;
-      document.getElementById("statusMessage").hidden = true;
-
-      const button = document.getElementById("resendBtn");
-      BookMindAuthUI.setLoading(button, true, "Resend verification email", "Sending…");
-
-      try {
-        const data = await BookMindAuth.resendVerification(email);
-        if (data.already_verified) {
-          window.location.href = `login.html?verified=1&email=${encodeURIComponent(email)}`;
-          return;
-        }
-        document.getElementById("resendSuccess").textContent = data.message;
-        document.getElementById("resendSuccess").hidden = false;
-        BookMindAuthUI.showToast(data.email_sent ? "Verification email sent." : data.message);
-
-        const delivery = data.email_delivery;
-        if (delivery && delivery.mode === "outbox" && delivery.dev_verification_url) {
-          showDevLink(delivery.dev_verification_url);
-          document.getElementById("devOutboxNotice").hidden = false;
-        }
-      } catch (error) {
-        BookMindAuth.showError(
-          "resendError",
-          error.message || "Could not send verification email. Check server SMTP settings."
-        );
-      } finally {
-        BookMindAuthUI.setLoading(button, false, "Resend verification email");
-      }
-    });
-  });
-</script>
 
 </body>
 </html>
