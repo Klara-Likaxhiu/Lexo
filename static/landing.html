@@ -173,11 +173,14 @@
   <script>
     document.addEventListener("DOMContentLoaded", async () => {
       console.log("[BookMindAuth] landing: checking session (no verify-email-pending redirect)");
-      if (window.BookMindAuth && BookMindAuth.isLoggedIn()) {
-        const ok = await BookMindAuth.verifySession();
-        if (ok) {
-          console.log("[BookMindAuth] landing: verified session, redirect home");
-          window.location.replace("/home");
+      if (window.BookMindAuth) {
+        await BookMindAuth.whenReady();
+        if (BookMindAuth.isLoggedIn()) {
+          const ok = await BookMindAuth.verifySession();
+          if (ok) {
+            console.log("[BookMindAuth] landing: verified session, redirect home");
+            window.location.replace("/home");
+          }
         }
       }
     });

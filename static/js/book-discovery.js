@@ -205,6 +205,10 @@ const BookMindDetailModal = {
   async open(book) {
     if (!book || Date.now() < this._ignoreOpenUntil) return;
 
+    if (window.BookMindAuth?.whenReady) {
+      await BookMindAuth.whenReady();
+    }
+
     if (window.BookMindAuth?.isLoggedIn()) {
       try {
         await BookMindLibrary.ensureLoaded();
@@ -319,11 +323,13 @@ const BookMindDetailModal = {
   },
 
   async saveShelf(status, label) {
-    if (!window.BookMindAuth || !BookMindAuth.isLoggedIn()) {
-      const next = encodeURIComponent("/discovery");
-      window.location.href = `/login.html?next=${next}`;
+    if (!window.BookMindAPI?.ensureAuth) {
+      window.location.href = "/login.html";
       return;
     }
+
+    const token = await BookMindAPI.ensureAuth({ redirect: true });
+    if (!token) return;
 
     const book = this.selectedBook;
     if (!book) return;
@@ -481,6 +487,10 @@ const BookMindDiscovery = {
 };
 
 document.addEventListener("DOMContentLoaded", async () => {
+  if (window.BookMindAuth?.whenReady) {
+    await BookMindAuth.whenReady();
+  }
+
   if (window.BookMindAuth?.isLoggedIn()) {
     try {
       await BookMindLibrary.ensureLoaded();

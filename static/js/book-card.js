@@ -87,6 +87,7 @@ const BookMindBookCard = {
         button.disabled = true;
         try {
           await BookMindLibrary.addBook(book, this.dataset.status, { silent: true });
+          console.log("[BookMindBookCard] shelf saved with token:", Boolean(BookMindAuth?.getAccessToken()));
           const label = BookMindLibrary.getShelfLabel(this.dataset.status);
           window.BookMindLibraryPage?.showToast?.(
             `"${book.title}" moved to ${label}.`

@@ -769,6 +769,14 @@ button, .btn {
   margin-top: 28px;
 }
 
+.auth-label {
+  display: block;
+  margin-bottom: -8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-secondary, #5c4a52);
+}
+
 .auth-card input {
   padding: 16px 18px;
   border-radius: 16px;

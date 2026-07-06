@@ -130,21 +130,34 @@ function toggleComplete(pathId, bookId) {
   const book = path.books.find(b => b.id === bookId);
   if (!book) return;
 
-  if (!window.BookMindAuth?.isLoggedIn()) {
-    showPathToast("Sign in to update your library.", true);
-    return;
-  }
+  void (async () => {
+    if (window.BookMindAuth?.whenReady) {
+      await BookMindAuth.whenReady();
+    }
 
-  const nextCompleted = !book.completed;
-  book.completed = nextCompleted;
+    if (!window.BookMindAuth?.isLoggedIn()) {
+      showPathToast("Sign in to update your library.", true);
+      return;
+    }
 
-  const payload = {
-    title: book.title,
-    author: book.author || "",
-    genre: book.genre || "Book",
-  };
+    const nextCompleted = !book.completed;
+    book.completed = nextCompleted;
 
-  (async () => {
+    const payload = {
+      title: book.title,
+      author: book.author || "",
+      genre: book.genre || "Book",
+    };
+
+    if (window.BookMindAuth?.logShelfAuthDebug) {
+      await BookMindAuth.logShelfAuthDebug("reading-paths mark complete", {
+        pathId,
+        bookId,
+        title: book.title,
+        nextCompleted,
+      });
+    }
+
     try {
       if (nextCompleted) {
         const existing = BookMindLibrary.findBook(payload);

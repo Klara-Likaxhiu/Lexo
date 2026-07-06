@@ -64,51 +64,27 @@ const BookMindLibrary = {
   },
 
   async _request(path, { method = "GET", body = null } = {}) {
-    if (!window.BookMindAuth?.isLoggedIn()) {
+    if (!window.BookMindAPI?.request) {
+      throw new Error("BookMindAPI is not loaded. Include js/api.js before js/library.js.");
+    }
+
+    const token = await BookMindAPI.ensureAuth({ redirect: true });
+    if (!token) {
       throw new Error("Sign in to save books to your library.");
     }
 
-    const url = this.apiUrl(path);
-    const headers = { ...this._authHeaders() };
-    if (body != null) {
-      headers["Content-Type"] = "application/json";
+    const data = await BookMindAPI.request(path, { method, body, auth: true, redirect: true });
+    if (data === null) {
+      throw new Error("Redirecting to login.");
     }
-
-    const response = await fetch(url, {
-      method,
-      headers,
-      body: body == null ? undefined : JSON.stringify(body),
-    });
-
-    const rawBody = await response.text();
-    let data = {};
-    if (rawBody) {
-      try {
-        data = JSON.parse(rawBody);
-      } catch {
-        data = { raw: rawBody };
-      }
-    }
-
-    if (!response.ok) {
-      const detail = this._extractError(data, rawBody, response.status);
-      const message = `[HTTP ${response.status}] ${detail}`;
-      console.error("[BookMindLibrary] API error", {
-        method,
-        url,
-        status: response.status,
-        statusText: response.statusText,
-        requestBody: body,
-        responseBody: data,
-        rawBody,
-      });
-      throw new Error(message);
-    }
-
     return data;
   },
 
   async ensureLoaded(force = false) {
+    if (window.BookMindAuth?.whenReady) {
+      await BookMindAuth.whenReady();
+    }
+
     if (!window.BookMindAuth?.isLoggedIn()) {
       this._cache = this.emptyLibrary();
       this._books = [];

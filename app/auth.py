@@ -6,13 +6,21 @@ import os
 import re
 
 
-USERNAME_RE = re.compile(r"^[a-zA-Z0-9_]{3,30}$")
+USERNAME_RE = re.compile(r"^[^\s]{3,30}$")
+EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 
 
 def validate_username(username: str) -> str | None:
     username = username.strip()
     if not USERNAME_RE.match(username):
-        return "Username must be 3–30 characters and use only letters, numbers, or underscores."
+        return "Username must be 3–30 characters (letters, numbers, and symbols allowed; no spaces)."
+    return None
+
+
+def validate_email(email: str) -> str | None:
+    email = email.strip()
+    if not EMAIL_RE.match(email):
+        return "Please enter a valid email address (e.g. name+tag@example.com)."
     return None
 
 

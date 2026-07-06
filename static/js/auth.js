@@ -35,6 +35,115 @@ const BookMindAuth = {
   PENDING_EMAIL_KEY: "bookmind_pending_signup_email",
   PENDING_VERIFICATION_KEY: "pendingVerificationEmail",
   LEGACY_PENDING_SIGNUP_KEY: "pendingSignupEmail",
+  LEGACY_AUTH_KEYS: ["bookmind_user_id", "bookmind_session", "bookmind_user_name"],
+
+  /** In-memory session — single source of truth after restoreSession(). */
+  _session: {
+    ready: false,
+    accessToken: null,
+    refreshToken: null,
+    user: null
+  },
+
+  _sessionReadyPromise: null,
+
+  _readStorageItem(key) {
+    return localStorage.getItem(key) || sessionStorage.getItem(key);
+  },
+
+  _writeStorageItem(key, value) {
+    localStorage.setItem(key, value);
+    sessionStorage.removeItem(key);
+  },
+
+  _removeStorageItem(key) {
+    localStorage.removeItem(key);
+    sessionStorage.removeItem(key);
+  },
+
+  /** Move any sessionStorage auth tokens into localStorage (one canonical store). */
+  _migrateLegacySession() {
+    const access = sessionStorage.getItem(this.ACCESS_KEY);
+    if (access && !localStorage.getItem(this.ACCESS_KEY)) {
+      localStorage.setItem(this.ACCESS_KEY, access);
+    }
+    const refresh = sessionStorage.getItem(this.REFRESH_KEY);
+    if (refresh && !localStorage.getItem(this.REFRESH_KEY)) {
+      localStorage.setItem(this.REFRESH_KEY, refresh);
+    }
+    const user = sessionStorage.getItem(this.USER_KEY);
+    if (user && !localStorage.getItem(this.USER_KEY)) {
+      localStorage.setItem(this.USER_KEY, user);
+    }
+    sessionStorage.removeItem(this.ACCESS_KEY);
+    sessionStorage.removeItem(this.REFRESH_KEY);
+    sessionStorage.removeItem(this.USER_KEY);
+  },
+
+  _parseStoredUser() {
+    const raw = this._readStorageItem(this.USER_KEY);
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  },
+
+  _syncSessionFromStorage() {
+    this._migrateLegacySession();
+    this._session.accessToken = this._readStorageItem(this.ACCESS_KEY);
+    this._session.refreshToken = this._readStorageItem(this.REFRESH_KEY);
+    this._session.user = this._parseStoredUser();
+  },
+
+  _updateSession({ access_token, refresh_token, user } = {}) {
+    if (access_token) {
+      this._writeStorageItem(this.ACCESS_KEY, access_token);
+      this._session.accessToken = access_token;
+    }
+    if (refresh_token) {
+      this._writeStorageItem(this.REFRESH_KEY, refresh_token);
+      this._session.refreshToken = refresh_token;
+    }
+    if (user) {
+      this._persistUser(user);
+      this._session.user = user;
+    }
+  },
+
+  _clearLegacyAuthKeys() {
+    this.LEGACY_AUTH_KEYS.forEach(key => {
+      localStorage.removeItem(key);
+      sessionStorage.removeItem(key);
+    });
+  },
+
+  _resetSessionState() {
+    this._session = {
+      ready: false,
+      accessToken: null,
+      refreshToken: null,
+      user: null
+    };
+  },
+
+  /** App pages that need session restore (not login/signup/public auth). */
+  APP_PAGES: new Set([
+    "home.html",
+    "discovery.html",
+    "library.html",
+    "settings.html",
+    "profile.html",
+    "book-details.html",
+    "reading-paths.html",
+    "ai-companion.html",
+    "challenges.html",
+    "community.html",
+    "reader-journey.html",
+    "reader-quiz.html",
+    "want-to-read.html",
+  ]),
 
   /** Pages that require a verified login. */
   PROTECTED_PAGES: new Set([
@@ -73,66 +182,274 @@ const BookMindAuth = {
   ]),
 
   storage(remember) {
-    return remember ? localStorage : sessionStorage;
+    return localStorage;
   },
 
   isRemembered() {
-    return localStorage.getItem(this.REMEMBER_KEY) === "true";
+    return localStorage.getItem(this.REMEMBER_KEY) !== "false";
   },
 
   getActiveStorage() {
-    return this.isRemembered() ? localStorage : sessionStorage;
+    return localStorage;
   },
 
   saveSession({ access_token, refresh_token, remember_me, user }) {
-    if (!access_token || !refresh_token) return;
-    const remember = Boolean(remember_me);
+    if (!access_token) {
+      console.warn("[BookMindAuth] saveSession: missing access_token");
+      return;
+    }
+    if (!refresh_token) {
+      console.warn("[BookMindAuth] saveSession: missing refresh_token — session cannot be refreshed");
+    }
+
+    const remember = remember_me !== undefined ? Boolean(remember_me) : true;
     localStorage.setItem(this.REMEMBER_KEY, remember ? "true" : "false");
+    this._clearLegacyAuthKeys();
+    this._updateSession({ access_token, refresh_token, user });
 
-    const primary = this.storage(remember);
-    const secondary = remember ? sessionStorage : localStorage;
+    this._session.ready = true;
+    this._sessionReadyPromise = Promise.resolve(user || this.getCurrentUser());
+    this._dispatchAuthReady(user || this.getCurrentUser());
+    console.log("saved access token:", access_token);
+    console.log("[BookMindAuth] saveSession storage", {
+      accessKey: this.ACCESS_KEY,
+      refreshKey: this.REFRESH_KEY,
+      userKey: this.USER_KEY,
+      accessInLocalStorage: Boolean(localStorage.getItem(this.ACCESS_KEY)),
+      refreshInLocalStorage: Boolean(localStorage.getItem(this.REFRESH_KEY)),
+      hasRefresh: Boolean(refresh_token),
+      user: user?.username || user?.email,
+    });
+  },
 
-    primary.setItem(this.ACCESS_KEY, access_token);
-    primary.setItem(this.REFRESH_KEY, refresh_token);
-    primary.setItem(this.USER_KEY, JSON.stringify(user));
+  _persistUser(user) {
+    if (!user) return;
+    this._writeStorageItem(this.USER_KEY, JSON.stringify(user));
+    this._session.user = user;
+  },
 
-    secondary.removeItem(this.ACCESS_KEY);
-    secondary.removeItem(this.REFRESH_KEY);
-    secondary.removeItem(this.USER_KEY);
+  _dispatchAuthReady(user) {
+    document.dispatchEvent(
+      new CustomEvent("bookmind:auth-ready", {
+        detail: { user: user || null, loggedIn: this.isLoggedIn() }
+      })
+    );
+  },
 
-    if (user && user.username) {
-      localStorage.setItem("bookmind_user_name", user.username);
+  /** Publish global auth state for api.js and other scripts. */
+  _publishAuthState(phase) {
+    const state = {
+      phase,
+      ready: this._session.ready,
+      loggedIn: this.isLoggedIn(),
+      hasAccessToken: Boolean(this.getAccessToken()),
+      hasRefreshToken: Boolean(this.getRefreshToken()),
+      user: this.getCurrentUser(),
+      accessKey: this.ACCESS_KEY,
+      refreshKey: this.REFRESH_KEY,
+    };
+    console.log("[BookMindAuth] auth state:", state);
+    window.__BOOKMIND_AUTH_STATE__ = state;
+    this._dispatchAuthReady(state.user);
+    return state;
+  },
+
+  getAuthState() {
+    this._syncSessionFromStorage();
+    return {
+      loggedIn: this.isLoggedIn(),
+      hasAccessToken: Boolean(this.getAccessToken()),
+      hasRefreshToken: Boolean(this.getRefreshToken()),
+      user: this.getCurrentUser(),
+      accessToken: this.getAccessToken(),
+    };
+  },
+
+  whenReady() {
+    if (!this._sessionReadyPromise) {
+      this._sessionReadyPromise = this.restoreSession();
+    }
+    return this._sessionReadyPromise;
+  },
+
+  /** Redacted session snapshot for shelf-action debugging. */
+  getSessionDebugSnapshot() {
+    this._syncSessionFromStorage();
+    const token = this.getAccessToken();
+    return {
+      sessionReady: this._session.ready,
+      accessTokenExists: Boolean(token),
+      refreshTokenExists: Boolean(this.getRefreshToken()),
+      isLoggedIn: this.isLoggedIn(),
+      userId: this.getCurrentUser()?.id || null,
+      username: this.getCurrentUser()?.username || null,
+      email: this.getCurrentUser()?.email || null,
+      storage: {
+        localAccess: Boolean(localStorage.getItem(this.ACCESS_KEY)),
+        sessionAccess: Boolean(sessionStorage.getItem(this.ACCESS_KEY)),
+      },
+    };
+  },
+
+  /** Session shape for debug logs (tokens redacted). */
+  async getSessionForDebug() {
+    const { data } = await this.getSession();
+    const session = data?.session;
+    if (!session) return null;
+    return {
+      access_token_exists: Boolean(session.access_token),
+      refresh_token_exists: Boolean(session.refresh_token),
+      user: session.user || null,
+    };
+  },
+
+  _redactHeaders(headers = {}) {
+    const copy = { ...headers };
+    if (copy.Authorization) {
+      copy.Authorization = copy.Authorization.startsWith("Bearer ")
+        ? "Bearer <present>"
+        : "<present>";
+    }
+    return copy;
+  },
+
+  /** Log client session + call /api/auth/me/debug. */
+  async logShelfAuthDebug(label, extra = {}) {
+    const session = await this.getSessionForDebug();
+    console.group(`[BookMindShelf] ${label}`);
+    console.log("current Supabase session:", session);
+    console.log("access token exists:", Boolean(this.getAccessToken()));
+    if (Object.keys(extra).length) console.log("context:", extra);
+
+    const url = this.apiUrl("/api/auth/me/debug");
+    const headers = this.getAuthHeaders();
+    try {
+      const response = await fetch(url, { headers });
+      const rawBody = await response.text();
+      let body = rawBody;
+      try {
+        body = JSON.parse(rawBody);
+      } catch {
+        /* keep raw */
+      }
+      console.log("request URL:", url);
+      console.log("request headers:", this._redactHeaders(headers));
+      console.log("backend response status:", response.status);
+      console.log("backend response body:", body);
+    } catch (error) {
+      console.log("request URL:", url);
+      console.log("request headers:", this._redactHeaders(headers));
+      console.error("backend /api/auth/me/debug request failed:", error);
+    }
+    console.groupEnd();
+  },
+
+  /** Supabase-compatible session accessor — validates via /api/auth/me. */
+  async getSession() {
+    await this.whenReady();
+    const access_token = this.getAccessToken();
+    const refresh_token = this.getRefreshToken();
+    const user = this.getCurrentUser();
+    if (!access_token) {
+      return { data: { session: null } };
+    }
+    return { data: { session: { access_token, refresh_token, user } } };
+  },
+
+  async restoreSession() {
+    const page = this.currentPage();
+    this._syncSessionFromStorage();
+
+    if (page === "signup.html") {
+      this._session.ready = true;
+      this._publishAuthState("signup-skip");
+      return null;
+    }
+
+    if (!this._session.accessToken) {
+      console.log("[BookMindAuth] restoreSession: no token");
+      this._clearLegacyAuthKeys();
+      this._session.ready = true;
+      this._publishAuthState("no-token");
+      return null;
+    }
+
+    try {
+      const user = await this.fetchCurrentUser({ allowRefresh: true });
+      this._syncSessionFromStorage();
+      this._session.ready = true;
+      console.log("[BookMindAuth] restoreSession: ok", user?.username || user?.email || "(no profile)");
+      this._publishAuthState("restored");
+      this.updateAuthUi();
+      return user;
+    } catch (error) {
+      console.warn("[BookMindAuth] restoreSession failed", error);
+      this._session.ready = true;
+      this._publishAuthState("restore-failed");
+      this.updateAuthUi();
+      return this._session.user;
     }
   },
 
-  clearSession() {
-    [localStorage, sessionStorage].forEach(store => {
-      store.removeItem(this.ACCESS_KEY);
-      store.removeItem(this.REFRESH_KEY);
-      store.removeItem(this.USER_KEY);
-      store.removeItem(this.PENDING_EMAIL_KEY);
-      store.removeItem(this.PENDING_VERIFICATION_KEY);
-      store.removeItem(this.LEGACY_PENDING_SIGNUP_KEY);
+  getCurrentUser() {
+    if (this._session.user) return this._session.user;
+    return this._parseStoredUser();
+  },
+
+  getUser() {
+    return this.getCurrentUser();
+  },
+
+  async fetchCurrentUser({ allowRefresh = true } = {}) {
+    const token = this.getAccessToken();
+    if (!token) return null;
+
+    let response = await fetch(this.apiUrl("/api/auth/me"), {
+      headers: { Authorization: `Bearer ${token}` },
     });
+
+    if (response.status === 401 && allowRefresh) {
+      const refreshed = await this.refreshSession({ clearOnFailure: false });
+      if (!refreshed) {
+        console.warn("[BookMindAuth] fetchCurrentUser: refresh failed, keeping stored token");
+        return this._session.user;
+      }
+      response = await fetch(this.apiUrl("/api/auth/me"), {
+        headers: this.getAuthHeaders(),
+      });
+    }
+
+    if (!response.ok) {
+      if (response.status === 403) {
+        return this._session.user;
+      }
+      throw new Error(`Failed to load user (HTTP ${response.status})`);
+    }
+
+    const data = await response.json();
+    if (data.user) {
+      this._persistUser(data.user);
+    }
+    return data.user || this._session.user;
+  },
+
+  clearSession() {
+    this._removeStorageItem(this.ACCESS_KEY);
+    this._removeStorageItem(this.REFRESH_KEY);
+    this._removeStorageItem(this.USER_KEY);
+    this._removeStorageItem(this.PENDING_EMAIL_KEY);
+    this._removeStorageItem(this.PENDING_VERIFICATION_KEY);
+    this._removeStorageItem(this.LEGACY_PENDING_SIGNUP_KEY);
     localStorage.removeItem(this.REMEMBER_KEY);
+    this._resetSessionState();
+    this._clearLegacyAuthKeys();
   },
 
   /** Clear auth session and pending signup/verification state (not user data like settings). */
   clearAllAuthState() {
     console.log("[BookMindAuth] clearAllAuthState");
-    const authKeys = [
-      this.ACCESS_KEY,
-      this.REFRESH_KEY,
-      this.USER_KEY,
-      this.REMEMBER_KEY,
-      this.PENDING_EMAIL_KEY,
-      this.PENDING_VERIFICATION_KEY,
-      this.LEGACY_PENDING_SIGNUP_KEY,
-      "bookmind_user_name"
-    ];
-    [localStorage, sessionStorage].forEach(store => {
-      authKeys.forEach(key => store.removeItem(key));
-    });
+    this.clearSession();
+    this._sessionReadyPromise = null;
   },
 
   /** Drop any stale auth from an unfinished signup — signup page must stay accessible. */
@@ -217,31 +534,13 @@ const BookMindAuth = {
   },
 
   getAccessToken() {
-    return (
-      this.getActiveStorage().getItem(this.ACCESS_KEY) ||
-      sessionStorage.getItem(this.ACCESS_KEY) ||
-      localStorage.getItem(this.ACCESS_KEY)
-    );
+    this._syncSessionFromStorage();
+    return this._session.accessToken;
   },
 
   getRefreshToken() {
-    return (
-      this.getActiveStorage().getItem(this.REFRESH_KEY) ||
-      sessionStorage.getItem(this.REFRESH_KEY) ||
-      localStorage.getItem(this.REFRESH_KEY)
-    );
-  },
-
-  getUser() {
-    const raw =
-      this.getActiveStorage().getItem(this.USER_KEY) ||
-      sessionStorage.getItem(this.USER_KEY) ||
-      localStorage.getItem(this.USER_KEY);
-    try {
-      return raw ? JSON.parse(raw) : null;
-    } catch {
-      return null;
-    }
+    this._syncSessionFromStorage();
+    return this._session.refreshToken;
   },
 
   isEmailVerified(user) {
@@ -256,6 +555,10 @@ const BookMindAuth = {
 
   isLoggedIn() {
     return Boolean(this.getAccessToken());
+  },
+
+  hasAuthenticatedUser() {
+    return this.isLoggedIn() && Boolean(this.getCurrentUser());
   },
 
   apiUrl(path) {
@@ -377,10 +680,19 @@ const BookMindAuth = {
       password,
       remember_me: rememberMe
     });
+    console.log("[BookMindAuth] login response", {
+      verification_required: data.verification_required,
+      hasAccessToken: Boolean(data.access_token),
+      hasRefreshToken: Boolean(data.refresh_token),
+      hasUser: Boolean(data.user),
+    });
     if (data.verification_required) {
       this.clearPendingSignupState();
-    } else {
+    } else if (data.access_token) {
       this.saveSession(data);
+      console.log("[BookMindAuth] login after saveSession, getAccessToken:", Boolean(this.getAccessToken()));
+    } else {
+      console.error("[BookMindAuth] login succeeded but no access_token in response");
     }
     return data;
   },
@@ -606,76 +918,70 @@ const BookMindAuth = {
     }
   },
 
-  async refreshSession() {
+  async refreshSession({ clearOnFailure = false } = {}) {
     const refreshToken = this.getRefreshToken();
-    if (!refreshToken) return false;
+    if (!refreshToken) {
+      console.warn("[BookMindAuth] refreshSession: no refresh token in storage");
+      return false;
+    }
 
     try {
-      const data = await this.api("/api/auth/refresh", { refresh_token: refreshToken });
-      const remember = this.isRemembered();
-      const store = this.storage(remember);
-      store.setItem(this.ACCESS_KEY, data.access_token);
-      if (data.user) {
-        store.setItem(this.USER_KEY, JSON.stringify(data.user));
-        localStorage.setItem("bookmind_user_name", data.user.username);
+      const response = await fetch(this.apiUrl("/api/auth/refresh"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh_token: refreshToken })
+      });
+
+      if (!response.ok) {
+        if (clearOnFailure && response.status === 401) {
+          this.clearSession();
+        }
+        return false;
       }
-      return true;
-    } catch {
-      this.clearSession();
+
+      const data = await response.json();
+      this._updateSession({
+        access_token: data.access_token,
+        refresh_token: data.refresh_token,
+        user: data.user
+      });
+      this._session.ready = true;
+      this._sessionReadyPromise = Promise.resolve(data.user || this.getCurrentUser());
+      return Boolean(data.access_token);
+    } catch (error) {
+      console.error("[BookMindAuth] refreshSession failed", error);
       return false;
     }
   },
 
   async verifySession() {
-    const token = this.getAccessToken();
-    if (!token) {
+    if (!this.getAccessToken()) {
       console.log("[BookMindAuth] verifySession: no token");
       return false;
     }
 
+    const user = await this.fetchCurrentUser({ allowRefresh: true });
+    if (!this.isLoggedIn() || !user?.id) {
+      console.log("[BookMindAuth] verifySession: no valid session");
+      return false;
+    }
+
     try {
-      const response = await fetch("/api/auth/me", {
-        headers: this.getAuthHeaders()
-      });
-      if (response.status === 403) {
-        console.log("[BookMindAuth] verifySession: 403 unverified");
+      const config = await this.getConfig();
+      if (
+        config.email_verification_required &&
+        config.email_sending_enabled &&
+        !user.email_verified
+      ) {
+        console.log("[BookMindAuth] verifySession: email not verified");
         return false;
       }
-      if (response.ok) {
-        const data = await response.json();
-        const store = this.getActiveStorage();
-        store.setItem(this.USER_KEY, JSON.stringify(data.user));
-        localStorage.setItem("bookmind_user_name", data.user.username);
-
-        const config = await this.getConfig();
-        if (
-          config.email_verification_required &&
-          config.email_sending_enabled &&
-          !data.user.email_verified
-        ) {
-          console.log("[BookMindAuth] verifySession: email not verified");
-          return false;
-        }
-        console.log("[BookMindAuth] verifySession: ok");
-        return true;
-      }
     } catch (error) {
-      console.log("[BookMindAuth] verifySession: /me failed", error);
+      console.log("[BookMindAuth] verifySession: config check failed", error);
     }
 
-    const refreshed = await this.refreshSession();
-    if (!refreshed) {
-      console.log("[BookMindAuth] verifySession: refresh failed");
-      return false;
-    }
-
-    const user = this.getUser();
-    if (!user?.email_verified) {
-      console.log("[BookMindAuth] verifySession: user still unverified after refresh");
-      return false;
-    }
-    console.log("[BookMindAuth] verifySession: ok after refresh");
-    return Boolean(this.getAccessToken());
+    console.log("[BookMindAuth] verifySession: ok");
+    return true;
   },
 
   async applyAuthUiConfig() {
@@ -719,6 +1025,7 @@ const BookMindAuth = {
     } catch {
       /* always clear locally */
     }
+    this._sessionReadyPromise = null;
     this.clearAllAuthState();
     window.location.href = "/login.html";
   },
@@ -737,12 +1044,21 @@ const BookMindAuth = {
   },
 
   setupLogoutLinks() {
+    const loggedIn = this.isLoggedIn();
     document.querySelectorAll(".sidebar-logout").forEach(link => {
+      link.hidden = !loggedIn;
+      link.style.display = loggedIn ? "" : "none";
+      if (link.dataset.bookmindLogoutBound === "1") return;
+      link.dataset.bookmindLogoutBound = "1";
       link.addEventListener("click", event => {
         event.preventDefault();
         this.logout();
       });
     });
+  },
+
+  updateAuthUi() {
+    this.setupLogoutLinks();
   },
 
   /** Map clean URLs and legacy .html paths to a canonical page id. */
@@ -805,6 +1121,7 @@ const BookMindAuth = {
     console.log("[BookMindAuth] guardPage: protecting", page);
     document.documentElement.classList.add("auth-pending");
 
+    await this.whenReady();
     const ok = await this.verifySession();
     if (!ok) {
       const next = encodeURIComponent(this.currentPath() + window.location.search);
@@ -851,8 +1168,8 @@ const BookMindAuth = {
           window.location.replace("/home");
           return;
         }
-        console.log("[BookMindAuth] guardPublicAuthPage: stale unverified session on login, clearing");
-        this.clearAllAuthState();
+        console.log("[BookMindAuth] guardPublicAuthPage: stale session on login, clearing tokens");
+        this.clearSession();
       }
       return;
     }
@@ -1122,15 +1439,23 @@ function whenDomReady(fn) {
   }
 }
 
-(function initAuth() {
+(async function initAuth() {
   const page = BookMindAuth.currentPage();
   const path = BookMindAuth.currentPath();
   console.log("[BookMindAuth] initAuth page:", page, "path:", path);
 
-  // Signup must never inherit stale auth — clear synchronously before any redirect logic.
+  // Sync bookmind_access_token / bookmind_refresh_token from localStorage immediately.
+  BookMindAuth._syncSessionFromStorage();
+  console.log(
+    "[BookMindAuth] initAuth bootstrap hasAccessToken:",
+    Boolean(BookMindAuth.getAccessToken())
+  );
+
   if (page === "signup.html") {
     BookMindAuth.clearAllAuthState();
-    console.log("[BookMindAuth] initAuth: sync cleared stale auth on signup");
+    console.log("[BookMindAuth] initAuth: signup — cleared stale auth");
+    BookMindAuth._publishAuthState("signup-cleared");
+    return;
   }
 
   if (BookMindAuth.redirectAuthCallbackIfNeeded()) {
@@ -1138,35 +1463,40 @@ function whenDomReady(fn) {
     return;
   }
 
+  // Every non-signup page restores the Supabase session before app scripts call APIs.
+  console.log("[BookMindAuth] initAuth: restoring session");
+  BookMindAuth._sessionReadyPromise = null;
+  await BookMindAuth.whenReady();
+  BookMindAuth.updateAuthUi();
+
   if (BookMindAuth.PUBLIC_PAGES.has(page) || page === "landing.html") {
-    console.log("[BookMindAuth] initAuth: public page, no protected guard");
+    console.log("[BookMindAuth] initAuth: public page");
     if (BookMindAuth.EMAIL_FEATURE_PAGES.has(page)) {
-      BookMindAuth.guardEmailFeaturePage();
+      await BookMindAuth.guardEmailFeaturePage();
       if (page === "verify-email-pending.html") {
         whenDomReady(() => BookMindAuth.initVerifyEmailPendingPage());
       } else if (page === "verify-email.html") {
         whenDomReady(() => BookMindAuth.initVerifyEmailPage());
       }
     } else if (BookMindAuth.PUBLIC_AUTH_PAGES.has(page)) {
-      BookMindAuth.guardPublicAuthPage();
-      if (page === "signup.html") {
-        whenDomReady(() => {
-          BookMindAuth.initSignupPage();
-          BookMindAuth.applyAuthUiConfig();
-        });
-      } else if (page === "login.html") {
+      await BookMindAuth.guardPublicAuthPage();
+      if (page === "login.html") {
         whenDomReady(() => BookMindAuth.applyAuthUiConfig());
       }
     }
+    whenDomReady(() => BookMindAuth.setupLogoutLinks());
     return;
   }
 
   if (BookMindAuth.PROTECTED_PAGES.has(page)) {
     console.log("[BookMindAuth] initAuth: protected page");
-    BookMindAuth.guardPage();
+    await BookMindAuth.guardPage();
     return;
   }
 
-  console.log("[BookMindAuth] initAuth: other page, setup logout only");
+  console.log(
+    "[BookMindAuth] initAuth: app page ready, hasAccessToken:",
+    Boolean(BookMindAuth.getAccessToken())
+  );
   whenDomReady(() => BookMindAuth.setupLogoutLinks());
 })();

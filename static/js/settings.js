@@ -81,8 +81,17 @@ const BookMindSettings = {
   },
 
   async init() {
+    if (window.BookMindAuth) {
+      await BookMindAuth.whenReady();
+    }
+
+    const token = window.BookMindAPI
+      ? await BookMindAPI.ensureAuth({ redirect: true })
+      : null;
+    if (!token) return;
+
     this.settings = this.load();
-    this.authUser = window.BookMindAuth ? BookMindAuth.getUser() : null;
+    this.authUser = window.BookMindAuth ? BookMindAuth.getCurrentUser() : null;
     this.readerProfile = JSON.parse(localStorage.getItem("readerProfile") || "null");
     this.userProfile = JSON.parse(localStorage.getItem("bookmind_user_profile") || "{}");
 
@@ -103,15 +112,16 @@ const BookMindSettings = {
     const emailEl = document.getElementById("settingsEmail");
     const avatarEl = document.getElementById("settingsAvatar");
 
-    let user = this.authUser;
-    if (window.BookMindAuth && BookMindAuth.isLoggedIn()) {
-      try {
-        const response = await fetch("/api/auth/me", { headers: BookMindAuth.getAuthHeaders() });
-        const data = await response.json().catch(() => ({}));
-        if (response.ok && data.user) user = data.user;
-      } catch {
-        /* use cached user */
+    let user = null;
+    try {
+      if (!window.BookMindAPI?.getMe) {
+        throw new Error("BookMindAPI is not loaded.");
       }
+      user = await BookMindAPI.getMe({ redirect: true });
+      console.log("[BookMindSettings] loadAccount user:", user?.username, user?.email);
+    } catch (error) {
+      console.error("[BookMindSettings] loadAccount", error);
+      user = window.BookMindAuth?.getCurrentUser() || null;
     }
 
     if (usernameEl) usernameEl.textContent = user?.username || "—";

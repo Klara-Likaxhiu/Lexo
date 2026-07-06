@@ -4,6 +4,7 @@
   <title>Profile - BookMindAI</title>
   <link rel="stylesheet" href="styles.css">
   <script src="js/auth.js"></script>
+  <script src="js/api.js"></script>
 </head>
 <body>
 
@@ -68,8 +69,12 @@
 </div>
 
 <script>
-  document.addEventListener("DOMContentLoaded", function () {
-    const authUser = window.BookMindAuth && BookMindAuth.getUser();
+  document.addEventListener("DOMContentLoaded", async function () {
+    if (window.BookMindAuth?.whenReady) {
+      await BookMindAuth.whenReady();
+    }
+
+    const authUser = await BookMindAPI.getMe({ redirect: true });
     const usernameEl = document.getElementById("authUsername");
     if (usernameEl && authUser) {
       usernameEl.textContent = authUser.username;
@@ -83,8 +88,7 @@
     const bioInput = document.getElementById("bioInput");
     const displayBio = document.getElementById("displayBio");
 
-    nicknameInput.value =
-      savedUserProfile.nickname || (authUser && authUser.username) || localStorage.getItem("bookmind_user_name") || "";
+    nicknameInput.value = savedUserProfile.nickname || (authUser && authUser.username) || "";
     bioInput.value = savedUserProfile.bio || "";
     displayBio.textContent = savedUserProfile.bio || "No description yet.";
 
@@ -119,7 +123,6 @@
       };
 
       localStorage.setItem("bookmind_user_profile", JSON.stringify(updatedProfile));
-      localStorage.setItem("bookmind_user_name", nicknameInput.value || (authUser && authUser.username) || "Reader");
 
       displayBio.textContent = bioInput.value || "No description yet.";
       alert("Profile saved!");

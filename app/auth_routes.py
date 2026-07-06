@@ -7,7 +7,7 @@ import re
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
 
 from app import auth as auth_utils
 from app import auth_db
@@ -47,7 +47,7 @@ bearer = HTTPBearer(auto_error=False)
 
 class SignupRequest(BaseModel):
     username: str = Field(..., min_length=3, max_length=30)
-    email: EmailStr
+    email: str = Field(..., min_length=3, max_length=254)
     password: str = Field(..., min_length=8, max_length=128)
 
 
@@ -66,7 +66,7 @@ class LogoutRequest(BaseModel):
 
 
 class ForgotPasswordRequest(BaseModel):
-    email: EmailStr
+    email: str = Field(..., min_length=3, max_length=254)
 
 
 class ResetPasswordRequest(BaseModel):
@@ -84,7 +84,7 @@ class VerifyEmailRequest(BaseModel):
 
 
 class ResendVerificationRequest(BaseModel):
-    email: EmailStr
+    email: str = Field(..., min_length=3, max_length=254)
 
 
 class OAuthRequest(BaseModel):
@@ -255,6 +255,10 @@ def signup(data: SignupRequest) -> dict:
     if username_err:
         raise HTTPException(status_code=400, detail=username_err)
 
+    email_err = auth_utils.validate_email(data.email)
+    if email_err:
+        raise HTTPException(status_code=400, detail=email_err)
+
     password_err = auth_utils.validate_password(data.password)
     if password_err:
         raise HTTPException(status_code=400, detail=password_err)
@@ -388,6 +392,9 @@ def apple_sign_in(data: OAuthRequest) -> dict:
     if existing:
         username = existing["username"]
     elif data.username:
+        username_err = auth_utils.validate_username(data.username)
+        if username_err:
+            raise HTTPException(status_code=400, detail=username_err)
         username = auth_db.unique_username(data.username.strip())
     else:
         email = profile_data.get("email") or f"{profile_data['sub']}@apple.oauth"
@@ -492,6 +499,10 @@ def verify_email(data: VerifyEmailRequest) -> dict:
 
 @router.post("/resend-verification")
 def resend_verification(data: ResendVerificationRequest) -> dict:
+    email_err = auth_utils.validate_email(data.email)
+    if email_err:
+        raise HTTPException(status_code=400, detail=email_err)
+
     try:
         require_supabase()
         redirect_to = verification_redirect_url()
@@ -557,6 +568,10 @@ def verification_status(data: ResendVerificationRequest) -> dict:
 
 @router.post("/forgot-password")
 def forgot_password(data: ForgotPasswordRequest) -> dict:
+    email_err = auth_utils.validate_email(data.email)
+    if email_err:
+        raise HTTPException(status_code=400, detail=email_err)
+
     try:
         require_supabase()
         reset_password_for_email(str(data.email), redirect_to=email_redirect("reset-password.html"))
@@ -618,8 +633,49 @@ def logout(
 
 @router.get("/me")
 def me(user: dict = Depends(_get_current_user)) -> dict:
-    _require_verified(user)
-    return {"user": merge_public_user(user["_supabase_user"], auth_db.get_profile_by_id(user["id"]))}
+    """Return the authenticated Supabase user merged with the profiles row."""
+    profile = auth_db.get_profile_by_id(user["id"])
+    return {"user": merge_public_user(user["_supabase_user"], profile)}
+
+
+@router.get("/me/debug")
+def me_debug(
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
+) -> dict:
+    """Diagnostic endpoint — no auth required; reports token/header validation state."""
+    result: dict = {
+        "authorization_header_present": bool(credentials and credentials.credentials),
+        "token_validates_with_supabase": False,
+        "supabase_user_id": None,
+        "profile_row_found": False,
+        "profile_username": None,
+        "profile_email": None,
+        "token_error": None,
+        "profile_error": None,
+    }
+
+    if not credentials or not credentials.credentials:
+        return result
+
+    try:
+        supabase_user = get_user(credentials.credentials)
+    except SupabaseAuthError as exc:
+        result["token_error"] = exc.message
+        return result
+
+    result["token_validates_with_supabase"] = True
+    result["supabase_user_id"] = supabase_user.get("id")
+
+    try:
+        profile = auth_db.get_profile_by_id(supabase_user["id"])
+        result["profile_row_found"] = profile is not None
+        if profile:
+            result["profile_username"] = profile.get("username")
+            result["profile_email"] = profile.get("email")
+    except SupabaseRestError as exc:
+        result["profile_error"] = exc.message
+
+    return result
 
 
 @router.post("/change-password")

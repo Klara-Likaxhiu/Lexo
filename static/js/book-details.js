@@ -7,16 +7,13 @@ let bookCover = null;
 initialize();
 
 function getUserId() {
-  let id = localStorage.getItem("bookmind_user_id");
-  if (!id) {
-    id = "u_" + Math.random().toString(36).slice(2, 10);
-    localStorage.setItem("bookmind_user_id", id);
-  }
-  return id;
+  const user = window.BookMindAuth?.getCurrentUser();
+  return user?.id || "anonymous";
 }
 
 function getUserName() {
-  return localStorage.getItem("bookmind_user_name") || "Anonymous Reader";
+  const user = window.BookMindAuth?.getCurrentUser();
+  return user?.username || "Anonymous Reader";
 }
 
 function reviewId() {
@@ -32,6 +29,14 @@ function escapeHtml(value) {
 }
 
 function initialize() {
+  void initBookDetails();
+}
+
+async function initBookDetails() {
+  if (window.BookMindAuth?.whenReady) {
+    await BookMindAuth.whenReady();
+  }
+
   const saved = JSON.parse(localStorage.getItem("selectedBook"));
 
   if (!saved || !saved.ai_recommendation) {
@@ -138,6 +143,14 @@ function setupShelfButtons() {
     button.addEventListener("click", async () => {
       const status = button.dataset.status;
       const current = getCurrentShelf();
+
+      if (window.BookMindAuth?.logShelfAuthDebug) {
+        await BookMindAuth.logShelfAuthDebug("book-details shelf button click", {
+          status,
+          currentShelf: current,
+          book: currentBook?.title,
+        });
+      }
 
       try {
         if (current === status) {

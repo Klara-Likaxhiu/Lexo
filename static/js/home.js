@@ -1,8 +1,14 @@
 document.addEventListener("DOMContentLoaded", async () => {
-  const name = localStorage.getItem("bookmind_user_name") || "Reader";
+  if (window.BookMindAuth?.whenReady) {
+    await BookMindAuth.whenReady();
+  }
+
+  const user = window.BookMindAuth?.getCurrentUser();
+  const name = user?.username || "Reader";
   let profile = JSON.parse(localStorage.getItem("readerProfile"));
 
-  document.getElementById("welcomeText").textContent = `Welcome back, ${name}`;
+  document.getElementById("welcomeText").textContent =
+    window.BookMindAuth?.isLoggedIn() ? `Welcome back, ${name}` : "Welcome to BookMindAI";
 
   try {
     await BookMindLibrary.ensureLoaded();
