@@ -168,3 +168,6 @@ const BookMindAPI = {
     });
   },
 };
+
+window.BookMindAPI = BookMindAPI;
+console.log("BookMindAPI created", window.BookMindAPI);
