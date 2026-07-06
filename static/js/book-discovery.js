@@ -334,6 +334,8 @@ const BookMindDetailModal = {
     const book = this.selectedBook;
     if (!book) return;
 
+    await BookMindLibrary.ensureLoaded();
+
     const entry = BookMindDiscoveryFormat.libraryEntry(book);
     const existing = BookMindLibrary.findShelf(entry);
 
@@ -341,18 +343,23 @@ const BookMindDetailModal = {
       btn.disabled = true;
     });
 
+    const shelf = BookMindLibrary.normalizeStatus(status);
     try {
-      await BookMindLibrary.addBookWithMeta(entry, status, {
+      const data = await BookMindLibrary.saveBook(entry, shelf, {
         source: book.source || "google_books",
         totalPages: book.total_pages,
+        progress: shelf === "read" ? 100 : undefined,
       });
 
-      const shelfLabel = label || BookMindLibrary.getShelfLabel(status);
+      const shelfLabel = BookMindLibrary.getShelfLabel(data.book?.status || shelf);
       this.showToast(
-        !existing
-          ? `"${entry.title}" added to ${shelfLabel}.`
-          : `"${entry.title}" moved to ${shelfLabel}.`
+        data.message ||
+          (!existing
+            ? `"${entry.title}" added to ${shelfLabel}.`
+            : `"${entry.title}" moved to ${shelfLabel}.`)
       );
+
+      await BookMindLibrary.refresh();
 
       this.els.shelfBtns?.forEach(btn => {
         btn.disabled = false;

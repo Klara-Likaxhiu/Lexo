@@ -63,6 +63,14 @@ const BookMindLibrary = {
     return `Request failed (HTTP ${status}).`;
   },
 
+  async _hasAuth() {
+    if (!window.BookMindAPI?.ensureAuth) {
+      return false;
+    }
+    const token = await BookMindAPI.ensureAuth({ redirect: false });
+    return Boolean(token);
+  },
+
   async _request(path, { method = "GET", body = null } = {}) {
     if (!window.BookMindAPI?.request) {
       throw new Error("BookMindAPI is not loaded. Include js/api.js before js/library.js.");
@@ -85,7 +93,7 @@ const BookMindLibrary = {
       await BookMindAuth.whenReady();
     }
 
-    if (!window.BookMindAuth?.isLoggedIn()) {
+    if (!(await this._hasAuth())) {
       this._cache = this.emptyLibrary();
       this._books = [];
       this._loaded = true;
@@ -205,7 +213,7 @@ const BookMindLibrary = {
 
   async updateReadingProgress(libraryId, currentPage, totalPages, options = {}) {
     if (!libraryId) throw new Error("Missing library entry.");
-    if (!window.BookMindAuth?.isLoggedIn()) {
+    if (!(await this._hasAuth())) {
       throw new Error("Sign in to save reading progress.");
     }
 
@@ -244,7 +252,7 @@ const BookMindLibrary = {
   },
 
   async recordBookOpened(libraryId) {
-    if (!libraryId || !window.BookMindAuth?.isLoggedIn()) return null;
+    if (!libraryId || !(await this._hasAuth())) return null;
 
     try {
       const data = await this._request(
@@ -261,6 +269,11 @@ const BookMindLibrary = {
 
   _bookPayload(book, status, meta = {}) {
     const shelf = this.normalizeStatus(status);
+    let progress = Number(meta.progress ?? book.progress ?? 0) || 0;
+    if (shelf === "read") {
+      progress = 100;
+    }
+
     const payload = {
       title: book.title,
       author: book.author || "Unknown Author",
@@ -268,7 +281,7 @@ const BookMindLibrary = {
       cover_url: book.cover_url || null,
       description: book.description || book.description_preview || null,
       status: shelf,
-      progress: Number(meta.progress ?? book.progress ?? 0) || 0,
+      progress,
       favorite: Boolean(meta.favorite ?? book.favorite),
     };
 
@@ -309,11 +322,10 @@ const BookMindLibrary = {
 
   async addBook(book, status, meta = {}) {
     const shelf = this.normalizeStatus(status);
-    const data = await this.saveBook(book, shelf, meta);
+    const saveMeta = shelf === "read" ? { ...meta, progress: 100 } : meta;
+    const data = await this.saveBook(book, shelf, saveMeta);
     if (meta.silent !== true) {
-      const label = this.getShelfLabel(shelf);
-      const verb = data.created ? "added to" : "moved to";
-      this._notify(`"${book.title}" ${verb} ${label}.`, "success");
+      this._notify(data.message || `"${book.title}" saved.`, "success");
     }
     return data.book;
   },
@@ -328,6 +340,9 @@ const BookMindLibrary = {
     const body = { ...patch };
     if (body.status != null) {
       body.status = this.normalizeStatus(body.status);
+      if (body.status === "read" && body.progress == null) {
+        body.progress = 100;
+      }
     }
 
     const data = await this._request(`/api/library/${encodeURIComponent(libraryId)}`, {

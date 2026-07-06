@@ -182,7 +182,10 @@ function renderShelf(shelf) {
     });
 
     BookMindBookCard.attachActions(card, book, {
-      onChanged: () => renderAll(),
+      onChanged: async () => {
+        await BookMindLibrary.ensureLoaded(true);
+        renderAll();
+      },
       onError: msg => showToast(msg, true),
       onProgressSaved: (msg, finished) => {
         showToast(msg || (finished ? "Marked as Finished!" : "Reading progress saved."));
@@ -205,6 +208,9 @@ function escapeHtml(value) {
 }
 
 window.BookMindLibraryPage = {
-  refresh: () => renderAll(),
+  refresh: async () => {
+    await BookMindLibrary.ensureLoaded(true);
+    renderAll();
+  },
   showToast,
 };

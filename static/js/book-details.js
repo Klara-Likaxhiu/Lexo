@@ -142,31 +142,37 @@ function setupShelfButtons() {
   document.querySelectorAll(".status-btn-modern").forEach(button => {
     button.addEventListener("click", async () => {
       const status = button.dataset.status;
-      const current = getCurrentShelf();
 
       if (window.BookMindAuth?.logShelfAuthDebug) {
         await BookMindAuth.logShelfAuthDebug("book-details shelf button click", {
           status,
-          currentShelf: current,
+          currentShelf: getCurrentShelf(),
           book: currentBook?.title,
         });
       }
 
+      button.disabled = true;
+
       try {
+        await BookMindLibrary.ensureLoaded();
+        const current = getCurrentShelf();
         if (current === status) {
           await BookMindLibrary.removeBook(currentBook, { silent: true });
           toast(`Removed "${currentBook.title}" from your shelves.`);
         } else {
-          await moveToShelf(status);
-          toast(`Moved to ${BookMindLibrary.getShelfLabel(status)}.`);
+          const saved = await moveToShelf(status);
+          toast(saved?.message || `Moved to ${BookMindLibrary.getShelfLabel(status)}.`);
         }
 
+        await BookMindLibrary.refresh();
         restoreShelf();
         refreshMotivation();
         window.BookMindLibraryPage?.refresh?.();
       } catch (error) {
         console.error("[BookDetails] shelf update failed", error);
         toast(error.message || "Could not update shelf.", true);
+      } finally {
+        button.disabled = false;
       }
     });
   });
@@ -179,8 +185,9 @@ function setupAddDropdown() {
     const status = select.value;
     if (!status) return;
     try {
-      await moveToShelf(status);
-      toast(`Moved to ${BookMindLibrary.getShelfLabel(status)}.`);
+      const saved = await moveToShelf(status);
+      toast(saved?.message || `Moved to ${BookMindLibrary.getShelfLabel(status)}.`);
+      await BookMindLibrary.refresh();
       restoreShelf();
       refreshMotivation();
     } catch (error) {
@@ -191,11 +198,14 @@ function setupAddDropdown() {
 }
 
 async function moveToShelf(status) {
-  await BookMindLibrary.addBookWithMeta(currentBook, status, {
+  const shelf = BookMindLibrary.normalizeStatus(status);
+  const meta = {
     source: getSavedSource() || undefined,
     totalPages: document.getElementById("totalPages")?.value,
-    progress: getSavedPercent(),
-  });
+    progress: shelf === "read" ? 100 : getSavedPercent(),
+  };
+  const data = await BookMindLibrary.saveBook(currentBook, shelf, meta);
+  return data;
 }
 
 function getSavedSource() {
@@ -423,11 +433,14 @@ function setupReview() {
     });
   }
 
-  document.getElementById("saveReviewBtn").addEventListener("click", () => {
+  document.getElementById("saveReviewBtn").addEventListener("click", async () => {
     if (selectedRating === 0) {
       toast("Please choose a star rating first.", true);
       return;
     }
+
+    const saveBtn = document.getElementById("saveReviewBtn");
+    saveBtn.disabled = true;
 
     const reviews = JSON.parse(localStorage.getItem("book_reviews")) || [];
     const existingIndex = reviews.findIndex(
@@ -453,83 +466,99 @@ function setupReview() {
       updated: new Date().toISOString()
     };
 
-    if (existingIndex >= 0) {
-      reviews[existingIndex] = review;
-    } else {
-      reviews.push(review);
+    try {
+      if (existingIndex >= 0) {
+        reviews[existingIndex] = review;
+      } else {
+        reviews.push(review);
+      }
+
+      localStorage.setItem("book_reviews", JSON.stringify(reviews));
+
+      const deleteBtn = document.getElementById("deleteReviewBtn");
+      if (deleteBtn) deleteBtn.hidden = false;
+
+      await syncReviewVisibility(review);
+      await loadBookCommunity();
+      toast(isPublic ? "Review saved and shared with the community." : "Review saved.");
+    } catch (error) {
+      console.error("[BookDetails] save review failed", error);
+      toast(error.message || "Could not save review.", true);
+    } finally {
+      saveBtn.disabled = false;
     }
-
-    localStorage.setItem("book_reviews", JSON.stringify(reviews));
-
-    const deleteBtn = document.getElementById("deleteReviewBtn");
-    if (deleteBtn) deleteBtn.hidden = false;
-
-    syncReviewVisibility(review);
-    toast(isPublic ? "Review saved and shared with the community." : "Review saved.");
   });
 }
 
-function syncReviewVisibility(review) {
-  const request =
-    review.visibility === "public"
-      ? fetch("/api/reviews/publish", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            id: review.id,
-            user: getUserName(),
-            book_title: review.title,
-            author: review.author,
-            genre: review.genre,
-            cover_url: review.cover_url,
-            rating: review.rating,
-            review_title: review.reviewTitle,
-            review_text: review.reviewText,
-            recommend: review.recommend,
-            created: review.created
-          })
-        })
-      : fetch("/api/reviews/unpublish", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id: review.id })
-        });
+async function syncReviewVisibility(review) {
+  if (!window.BookMindAPI?.post) {
+    throw new Error("BookMindAPI is not loaded.");
+  }
 
-  request.catch(error => console.error(error)).finally(() => loadBookCommunity());
+  const me = await BookMindAPI.getMe({ redirect: true });
+  if (!me) {
+    throw new Error("Sign in to share reviews with the community.");
+  }
+
+  if (review.visibility === "public") {
+    await BookMindAPI.post("/api/reviews/publish", {
+      id: review.id,
+      user: me.username || "Reader",
+      book_title: review.title,
+      author: review.author,
+      genre: review.genre,
+      cover_url: review.cover_url,
+      rating: review.rating,
+      review_title: review.reviewTitle,
+      review_text: review.reviewText,
+      recommend: review.recommend,
+      created: review.created,
+    });
+  } else {
+    await BookMindAPI.post("/api/reviews/unpublish", { id: review.id });
+  }
 }
 
 function setupDeleteReview() {
   const button = document.getElementById("deleteReviewBtn");
   if (!button) return;
 
-  button.addEventListener("click", () => {
+  button.addEventListener("click", async () => {
+    button.disabled = true;
+
     const reviews = JSON.parse(localStorage.getItem("book_reviews")) || [];
     const remaining = reviews.filter(
       r => BookMindLibrary.normalizeTitle(r.title) !== bookKey
     );
-    localStorage.setItem("book_reviews", JSON.stringify(remaining));
+    const removedId = reviewId();
 
-    selectedRating = 0;
-    paintStars(0);
-    selectedRecommend = "";
-    paintRecommend("");
-    document.getElementById("reviewPublic").checked = false;
-    document.getElementById("reviewTitle").value = "";
-    document.getElementById("reviewText").value = "";
-    document.getElementById("difficultyFeedback").value = "";
-    const hint = document.getElementById("ratingHint");
-    if (hint) hint.textContent = "Click a star to rate";
-    button.hidden = true;
+    try {
+      localStorage.setItem("book_reviews", JSON.stringify(remaining));
 
-    fetch("/api/reviews/unpublish", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: reviewId() })
-    })
-      .catch(error => console.error(error))
-      .finally(() => loadBookCommunity());
+      selectedRating = 0;
+      paintStars(0);
+      selectedRecommend = "";
+      paintRecommend("");
+      document.getElementById("reviewPublic").checked = false;
+      document.getElementById("reviewTitle").value = "";
+      document.getElementById("reviewText").value = "";
+      document.getElementById("difficultyFeedback").value = "";
+      const hint = document.getElementById("ratingHint");
+      if (hint) hint.textContent = "Click a star to rate";
+      button.hidden = true;
 
-    toast("Review deleted.");
+      if (window.BookMindAPI?.post) {
+        await BookMindAPI.post("/api/reviews/unpublish", { id: removedId });
+      }
+
+      await loadBookCommunity();
+      toast("Review deleted.");
+    } catch (error) {
+      console.error("[BookDetails] delete review failed", error);
+      toast(error.message || "Could not delete review.", true);
+    } finally {
+      button.disabled = false;
+    }
   });
 }
 
@@ -541,10 +570,14 @@ async function loadBookCommunity() {
   if (!section || !list || !currentBook) return;
 
   try {
-    const response = await fetch(
-      `/api/reviews/community?book=${encodeURIComponent(currentBook.title || "")}`
+    if (!window.BookMindAPI?.get) {
+      throw new Error("BookMindAPI is not loaded.");
+    }
+
+    const data = await BookMindAPI.get(
+      `/api/reviews/community?book=${encodeURIComponent(currentBook.title || "")}`,
+      { auth: false }
     );
-    const data = await response.json();
 
     updateAverageRating(data.average_rating, data.rating_count);
 

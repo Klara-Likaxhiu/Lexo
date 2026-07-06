@@ -2,22 +2,26 @@
 
 const feed = document.getElementById("communityFeed");
 
-loadCommunityFeed();
+document.addEventListener("DOMContentLoaded", () => {
+  loadCommunityFeed();
+});
 
 async function loadCommunityFeed() {
   feed.innerHTML = `<p class="community-loading">Loading community reviews…</p>`;
 
   try {
-    const response = await fetch("/api/reviews/community?limit=100");
-    if (!response.ok) throw new Error(`Feed failed: ${response.status}`);
-    const data = await response.json();
+    if (!window.BookMindAPI?.get) {
+      throw new Error("BookMindAPI is not loaded. Include js/api.js before js/community.js.");
+    }
+
+    const data = await BookMindAPI.get("/api/reviews/community?limit=100", { auth: false });
     renderFeed(data.reviews || []);
   } catch (error) {
     console.error(error);
     feed.innerHTML = `
       <div class="empty-library card">
         <h2>Couldn't load the feed.</h2>
-        <p>Please refresh the page in a moment.</p>
+        <p>${escapeHtml(error.message || "Please refresh the page in a moment.")}</p>
       </div>
     `;
   }

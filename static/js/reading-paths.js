@@ -56,10 +56,19 @@ function normalize(result) {
 
 let state = loadPaths();
 
-if (state) {
-  renderPaths(state);
-  generateBtn.textContent = "Regenerate Paths";
-}
+void (async () => {
+  if (window.BookMindAPI?.ensureAuth) {
+    const token = await BookMindAPI.ensureAuth({ redirect: false });
+    if (token) {
+      await BookMindLibrary.ensureLoaded();
+    }
+  }
+
+  if (state) {
+    renderPaths(state);
+    generateBtn.textContent = "Regenerate Paths";
+  }
+})();
 
 generateBtn.addEventListener("click", async () => {
   generateBtn.textContent = "Generating...";
@@ -131,32 +140,25 @@ function toggleComplete(pathId, bookId) {
   if (!book) return;
 
   void (async () => {
-    if (window.BookMindAuth?.whenReady) {
-      await BookMindAuth.whenReady();
+    if (!window.BookMindAPI?.ensureAuth) {
+      showPathToast("BookMindAPI is not loaded.", true);
+      return;
     }
 
-    if (!window.BookMindAuth?.isLoggedIn()) {
+    const token = await BookMindAPI.ensureAuth({ redirect: true });
+    if (!token) {
       showPathToast("Sign in to update your library.", true);
       return;
     }
 
-    const nextCompleted = !book.completed;
-    book.completed = nextCompleted;
+    await BookMindLibrary.ensureLoaded();
 
+    const nextCompleted = !book.completed;
     const payload = {
       title: book.title,
       author: book.author || "",
       genre: book.genre || "Book",
     };
-
-    if (window.BookMindAuth?.logShelfAuthDebug) {
-      await BookMindAuth.logShelfAuthDebug("reading-paths mark complete", {
-        pathId,
-        bookId,
-        title: book.title,
-        nextCompleted,
-      });
-    }
 
     try {
       if (nextCompleted) {
@@ -167,8 +169,9 @@ function toggleComplete(pathId, bookId) {
             progress: 100,
           });
         } else {
-          await BookMindLibrary.addBook(payload, "read", { progress: 100 });
+          await BookMindLibrary.addBook(payload, "read", { progress: 100, silent: true });
         }
+        book.completed = true;
         showPathToast(`"${book.title}" marked as Finished in your library.`);
       } else {
         const entry = BookMindLibrary.findBook(payload);
@@ -180,14 +183,16 @@ function toggleComplete(pathId, bookId) {
         } else {
           BookMindLibrary.clearFinish(payload);
         }
+        book.completed = false;
         showPathToast(`"${book.title}" moved back to Currently Reading.`);
       }
+
       savePaths(state);
       renderPaths(state);
+      await BookMindLibrary.refresh();
       window.BookMindLibraryPage?.refresh?.();
     } catch (error) {
       console.error("[ReadingPaths] toggleComplete failed", error);
-      book.completed = !nextCompleted;
       showPathToast(error.message || "Could not update your library.", true);
     }
   })();

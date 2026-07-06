@@ -86,14 +86,18 @@ const BookMindBookCard = {
         event.stopPropagation();
         button.disabled = true;
         try {
-          await BookMindLibrary.addBook(book, this.dataset.status, { silent: true });
-          console.log("[BookMindBookCard] shelf saved with token:", Boolean(BookMindAuth?.getAccessToken()));
+          const saved = await BookMindLibrary.addBook(book, this.dataset.status, { silent: true });
           const label = BookMindLibrary.getShelfLabel(this.dataset.status);
+          const entry = BookMindLibrary.findBook(saved || book);
+          const shelfLabel = entry ? BookMindLibrary.getShelfLabel(entry.status) : label;
           window.BookMindLibraryPage?.showToast?.(
-            `"${book.title}" moved to ${label}.`
+            `"${book.title}" moved to ${shelfLabel}.`
           );
-          if (onChanged) onChanged();
-          else location.reload();
+          if (onChanged) {
+            await onChanged();
+          } else {
+            location.reload();
+          }
         } catch (error) {
         console.error("[BookMindBookCard] shelf update failed", error);
         if (onError) onError(error.message);
