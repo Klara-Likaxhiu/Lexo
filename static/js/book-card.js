@@ -94,8 +94,8 @@ const BookMindBookCard = {
           if (onChanged) onChanged();
           else location.reload();
         } catch (error) {
-          console.error(error);
-          if (onError) onError(error.message);
+        console.error("[BookMindBookCard] shelf update failed", error);
+        if (onError) onError(error.message);
           else alert(error.message);
         } finally {
           button.disabled = false;

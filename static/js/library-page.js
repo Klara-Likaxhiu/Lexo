@@ -13,8 +13,14 @@ document.addEventListener("DOMContentLoaded", () => {
   initLibraryPage();
 });
 
-document.addEventListener("bookmind:library-changed", () => {
-  renderAll();
+document.addEventListener("bookmind:library-changed", async () => {
+  try {
+    await BookMindLibrary.ensureLoaded(true);
+    renderAll();
+  } catch (error) {
+    console.error("[BookMindLibrary] refresh after library change failed", error);
+    showToast(error.message || "Could not refresh library.", true);
+  }
 });
 
 async function initLibraryPage() {

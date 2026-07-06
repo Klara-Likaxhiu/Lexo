@@ -17,6 +17,97 @@ const BookMindLibrary = {
     return BookMindAuth.getAuthHeaders();
   },
 
+  apiUrl(path) {
+    if (window.BookMindAuth?.apiUrl) {
+      return BookMindAuth.apiUrl(path);
+    }
+    const normalized = path.startsWith("/") ? path : `/${path}`;
+    return `${window.location.origin}${normalized}`;
+  },
+
+  normalizeStatus(status) {
+    const value = String(status || "")
+      .trim()
+      .toLowerCase()
+      .replace(/-/g, "_");
+    const map = {
+      want: "want",
+      want_to_read: "want",
+      "want to read": "want",
+      reading: "reading",
+      currently_reading: "reading",
+      "currently reading": "reading",
+      read: "read",
+      finished: "read",
+      "not interested": "not_interested",
+      not_interested: "not_interested",
+      not_recommend: "not_interested",
+      "not recommend": "not_interested",
+    };
+    const normalized = map[value] || value;
+    if (!this.SHELVES.includes(normalized)) {
+      throw new Error(`Invalid shelf status: ${status}`);
+    }
+    return normalized;
+  },
+
+  _extractError(data, rawBody, status) {
+    if (window.BookMindAuth?.extractErrorMessage) {
+      return BookMindAuth.extractErrorMessage(data, rawBody, status);
+    }
+    if (typeof data?.detail === "string") return data.detail;
+    if (Array.isArray(data?.detail)) {
+      return data.detail.map(item => (typeof item === "string" ? item : item?.msg || JSON.stringify(item))).join("; ");
+    }
+    if (rawBody && rawBody.length < 600) return rawBody;
+    return `Request failed (HTTP ${status}).`;
+  },
+
+  async _request(path, { method = "GET", body = null } = {}) {
+    if (!window.BookMindAuth?.isLoggedIn()) {
+      throw new Error("Sign in to save books to your library.");
+    }
+
+    const url = this.apiUrl(path);
+    const headers = { ...this._authHeaders() };
+    if (body != null) {
+      headers["Content-Type"] = "application/json";
+    }
+
+    const response = await fetch(url, {
+      method,
+      headers,
+      body: body == null ? undefined : JSON.stringify(body),
+    });
+
+    const rawBody = await response.text();
+    let data = {};
+    if (rawBody) {
+      try {
+        data = JSON.parse(rawBody);
+      } catch {
+        data = { raw: rawBody };
+      }
+    }
+
+    if (!response.ok) {
+      const detail = this._extractError(data, rawBody, response.status);
+      const message = `[HTTP ${response.status}] ${detail}`;
+      console.error("[BookMindLibrary] API error", {
+        method,
+        url,
+        status: response.status,
+        statusText: response.statusText,
+        requestBody: body,
+        responseBody: data,
+        rawBody,
+      });
+      throw new Error(message);
+    }
+
+    return data;
+  },
+
   async ensureLoaded(force = false) {
     if (!window.BookMindAuth?.isLoggedIn()) {
       this._cache = this.emptyLibrary();
@@ -36,17 +127,7 @@ const BookMindLibrary = {
   },
 
   async _fetchLibrary() {
-    const response = await fetch("/api/library", {
-      headers: this._authHeaders(),
-    });
-
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      const message = data.detail || "Could not load your library.";
-      this._lastError = message;
-      throw new Error(message);
-    }
-
+    const data = await this._request("/api/library");
     this._cache = data.library || this.emptyLibrary();
     this._books = Array.isArray(data.books) ? data.books : [];
     this._loaded = true;
@@ -164,22 +245,13 @@ const BookMindLibrary = {
       throw new Error("Current page cannot be greater than total pages.");
     }
 
-    const response = await fetch(
+    const data = await this._request(
       `/api/library/${encodeURIComponent(libraryId)}/progress`,
       {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          ...this._authHeaders(),
-        },
-        body: JSON.stringify({ current_page: current, total_pages: total }),
+        body: { current_page: current, total_pages: total },
       }
     );
-
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      throw new Error(data.detail || "Could not save progress.");
-    }
 
     await this.refresh();
     const book = data.book;
@@ -199,30 +271,27 @@ const BookMindLibrary = {
     if (!libraryId || !window.BookMindAuth?.isLoggedIn()) return null;
 
     try {
-      const response = await fetch(
+      const data = await this._request(
         `/api/library/${encodeURIComponent(libraryId)}/open`,
-        {
-          method: "POST",
-          headers: this._authHeaders(),
-        }
+        { method: "POST" }
       );
-      if (!response.ok) return null;
-      const data = await response.json();
       await this.refresh();
       return data.book;
-    } catch {
+    } catch (error) {
+      console.error("[BookMindLibrary] recordBookOpened failed", error);
       return null;
     }
   },
 
   _bookPayload(book, status, meta = {}) {
+    const shelf = this.normalizeStatus(status);
     const payload = {
       title: book.title,
       author: book.author || "Unknown Author",
       genre: book.genre || "Book",
       cover_url: book.cover_url || null,
       description: book.description || book.description_preview || null,
-      status,
+      status: shelf,
       progress: Number(meta.progress ?? book.progress ?? 0) || 0,
       favorite: Boolean(meta.favorite ?? book.favorite),
     };
@@ -235,47 +304,38 @@ const BookMindLibrary = {
     else if (book.source) payload.source = book.source;
 
     const totalPages = meta.totalPages ?? meta.total_pages ?? book.total_pages;
-    if (totalPages != null && totalPages !== "") {
-      payload.total_pages = Number(totalPages) || 0;
+    const totalNum = Number(totalPages);
+    if (Number.isFinite(totalNum) && totalNum > 0) {
+      payload.total_pages = totalNum;
     }
 
     const currentPage = meta.currentPage ?? meta.current_page ?? book.current_page;
-    if (currentPage != null && currentPage !== "") {
-      payload.current_page = Number(currentPage) || 0;
+    const currentNum = Number(currentPage);
+    if (Number.isFinite(currentNum) && currentNum >= 0) {
+      payload.current_page = currentNum;
     }
 
     return payload;
   },
 
   async saveBook(book, status, meta = {}) {
-    if (!window.BookMindAuth?.isLoggedIn()) {
-      throw new Error("Sign in to save books to your library.");
-    }
-
-    const response = await fetch("/api/library", {
+    const shelf = this.normalizeStatus(status);
+    const data = await this._request("/api/library", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...this._authHeaders(),
-      },
-      body: JSON.stringify(this._bookPayload(book, status, meta)),
+      body: this._bookPayload(book, shelf, meta),
     });
 
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      throw new Error(data.detail || "Could not save book.");
-    }
-
     await this.refresh();
-    this.syncFinishState(book, status);
-    this._emitChange({ action: "save", book: data.book, status, created: data.created });
+    this.syncFinishState(book, shelf);
+    this._emitChange({ action: "save", book: data.book, status: shelf, created: data.created });
     return data;
   },
 
   async addBook(book, status, meta = {}) {
-    const data = await this.saveBook(book, status, meta);
+    const shelf = this.normalizeStatus(status);
+    const data = await this.saveBook(book, shelf, meta);
     if (meta.silent !== true) {
-      const label = this.getShelfLabel(status);
+      const label = this.getShelfLabel(shelf);
       const verb = data.created ? "added to" : "moved to";
       this._notify(`"${book.title}" ${verb} ${label}.`, "success");
     }
@@ -289,19 +349,15 @@ const BookMindLibrary = {
   async patchBook(libraryId, patch) {
     if (!libraryId) throw new Error("Missing library entry.");
 
-    const response = await fetch(`/api/library/${encodeURIComponent(libraryId)}`, {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        ...this._authHeaders(),
-      },
-      body: JSON.stringify(patch),
-    });
-
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      throw new Error(data.detail || "Could not update book.");
+    const body = { ...patch };
+    if (body.status != null) {
+      body.status = this.normalizeStatus(body.status);
     }
+
+    const data = await this._request(`/api/library/${encodeURIComponent(libraryId)}`, {
+      method: "PATCH",
+      body,
+    });
 
     await this.refresh();
     const book = data.book;
@@ -318,18 +374,9 @@ const BookMindLibrary = {
       throw new Error("Book is not in your library.");
     }
 
-    const response = await fetch(
-      `/api/library/${encodeURIComponent(entry.library_id)}`,
-      {
-        method: "DELETE",
-        headers: this._authHeaders(),
-      }
-    );
-
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      throw new Error(data.detail || "Could not remove book.");
-    }
+    const data = await this._request(`/api/library/${encodeURIComponent(entry.library_id)}`, {
+      method: "DELETE",
+    });
 
     await this.refresh();
     this.clearFinish(book);

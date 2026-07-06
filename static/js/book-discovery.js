@@ -354,8 +354,10 @@ const BookMindDetailModal = {
       });
       this.els.hint.textContent = `In your library as “${BookMindLibrary.getShelfLabel(status)}”. Choose a shelf to update.`;
       this.els.hint.hidden = false;
+
+      window.BookMindLibraryPage?.refresh?.();
     } catch (error) {
-      console.error(error);
+      console.error("[BookMindDiscovery] saveShelf failed", error);
       this.showToast(error.message || "Could not save book.", true);
       this.els.shelfBtns?.forEach(btn => {
         btn.disabled = false;

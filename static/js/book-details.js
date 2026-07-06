@@ -150,7 +150,9 @@ function setupShelfButtons() {
 
         restoreShelf();
         refreshMotivation();
+        window.BookMindLibraryPage?.refresh?.();
       } catch (error) {
+        console.error("[BookDetails] shelf update failed", error);
         toast(error.message || "Could not update shelf.", true);
       }
     });
@@ -169,6 +171,7 @@ function setupAddDropdown() {
       restoreShelf();
       refreshMotivation();
     } catch (error) {
+      console.error("[BookDetails] shelf dropdown update failed", error);
       toast(error.message || "Could not update shelf.", true);
     }
   });

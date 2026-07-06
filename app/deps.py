@@ -7,6 +7,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app import auth_db
 from app.supabase_client import SupabaseAuthError, email_verification_enabled, get_user, merge_public_user
+from app.supabase_rest import SupabaseRestError
 
 bearer = HTTPBearer(auto_error=False)
 
@@ -22,7 +23,10 @@ def get_current_user(
     except SupabaseAuthError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.message) from exc
 
-    profile = auth_db.get_profile_by_id(supabase_user["id"])
+    try:
+        profile = auth_db.get_profile_by_id(supabase_user["id"])
+    except SupabaseRestError:
+        profile = None
     public = merge_public_user(supabase_user, profile)
     return {
         **public,

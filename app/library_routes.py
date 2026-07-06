@@ -35,7 +35,7 @@ class LibraryBookRequest(BaseModel):
     progress: int = Field(default=0, ge=0, le=100)
     favorite: bool = False
     source: str | None = None
-    total_pages: int | None = Field(default=None, ge=0)
+    total_pages: int | None = Field(default=None, gt=0)
 
 
 class LibraryUpdateRequest(BaseModel):

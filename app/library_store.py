@@ -233,7 +233,9 @@ def _book_payload(user_id: str, book: dict[str, Any], status: str) -> dict[str, 
     if current_page is not None:
         payload["current_page"] = max(0, int(current_page))
     if total_pages is not None:
-        payload["total_pages"] = int(total_pages)
+        total_int = int(total_pages)
+        if total_int > 0:
+            payload["total_pages"] = total_int
 
     if status == "read":
         payload["finished_at"] = book.get("finished_at") or now
@@ -368,8 +370,15 @@ def update_book(
         if status not in VALID_STATUSES:
             raise LibraryStoreError(f"Invalid status: {status}")
         patch["status"] = status
+        if status == "read":
+            patch["finished_at"] = _utcnow_iso()
+        else:
+            patch["finished_at"] = None
     if progress is not None:
         patch["progress"] = max(0, min(100, int(progress)))
+        if int(progress) >= 100:
+            patch["status"] = "read"
+            patch["finished_at"] = _utcnow_iso()
     if favorite is not None:
         patch["favorite"] = bool(favorite)
 
