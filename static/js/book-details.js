@@ -127,12 +127,12 @@ function renderCover(aiBook, book) {
     img.src = coverUrl;
     img.alt = `${aiBook.title || "Book"} cover`;
     img.onerror = () => {
-      cover.innerHTML = `<div class="bd-cover-fallback">📖</div>`;
+      cover.innerHTML = `<div class="bd-cover-fallback"></div>`;
     };
     cover.innerHTML = "";
     cover.appendChild(img);
   } else {
-    cover.innerHTML = `<div class="bd-cover-fallback">📖</div>`;
+    cover.innerHTML = `<div class="bd-cover-fallback"></div>`;
   }
 }
 
@@ -370,11 +370,11 @@ function updateOpenAction() {
   fileWrap.hidden = true;
 
   const storeLinks = {
-    kindle: { label: "📖 Open in Kindle", url: `https://www.amazon.com/s?k=${title}&i=digital-text` },
-    apple_books: { label: "📖 Open in Apple Books", url: `https://books.apple.com/search?term=${title}` },
-    google_books: { label: "📖 Read on Google Books", url: `https://books.google.com/books?q=${title}` },
-    kobo: { label: "📖 Open in Kobo", url: `https://www.kobo.com/search?query=${title}` },
-    audiobook: { label: "🎧 Find Audiobook", url: `https://www.audible.com/search?keywords=${title}` }
+    kindle: { label: "Open in Kindle", url: `https://www.amazon.com/s?k=${title}&i=digital-text` },
+    apple_books: { label: "Open in Apple Books", url: `https://books.apple.com/search?term=${title}` },
+    google_books: { label: "Read on Google Books", url: `https://books.google.com/books?q=${title}` },
+    kobo: { label: "Open in Kobo", url: `https://www.kobo.com/search?query=${title}` },
+    audiobook: { label: "Find Audiobook", url: `https://www.audible.com/search?keywords=${title}` }
   };
 
   if (storeLinks[source]) {
