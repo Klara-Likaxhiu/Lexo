@@ -227,6 +227,8 @@ def _check_supabase_profiles_health() -> str:
             return "profiles table missing"
         if "profiles" in msg and ("relation" in msg or "not found" in msg):
             return "profiles table missing"
+        if "jwt" in msg or "3 parts" in msg:
+            return "SUPABASE_SERVICE_ROLE_KEY invalid"
         return exc.message or "profiles table missing"
 
 
