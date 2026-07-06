@@ -42,11 +42,16 @@ def supabase_configured() -> bool:
 
 
 def require_supabase() -> None:
-    if not supabase_configured():
-        raise SupabaseAuthError(
-            "Supabase is not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY in .env.",
-            status_code=503,
-        )
+    if not supabase_url():
+        raise SupabaseAuthError("SUPABASE_URL missing", status_code=503)
+    if not supabase_anon_key():
+        raise SupabaseAuthError("SUPABASE_ANON_KEY missing", status_code=503)
+
+
+def ping_auth() -> None:
+    """Verify Supabase Auth API is reachable."""
+    require_supabase()
+    _request("GET", "/settings")
 
 
 def _auth_url(path: str) -> str:
@@ -298,6 +303,29 @@ def email_redirect(path: str = "verify-email.html") -> str:
 def verification_redirect_url() -> str:
     """Canonical Supabase emailRedirectTo target for signup verification."""
     return email_redirect("verify-email.html")
+
+
+def get_user_by_id(user_id: str) -> dict[str, Any] | None:
+    """Fetch an auth user by UUID (service role)."""
+    service_key = supabase_service_role_key()
+    if not service_key or not user_id:
+        return None
+    try:
+        payload = _request("GET", f"/admin/users/{user_id}", api_key=service_key)
+    except SupabaseAuthError:
+        return None
+    if isinstance(payload, dict) and payload.get("id"):
+        return payload
+    return None
+
+
+def lookup_auth_user(email: str, profile: dict[str, Any] | None = None) -> dict[str, Any] | None:
+    """Resolve the Supabase auth user for an email (prefer profile id)."""
+    if profile and profile.get("id"):
+        user = get_user_by_id(profile["id"])
+        if user:
+            return user
+    return get_user_by_email(email)
 
 
 def get_user_by_email(email: str) -> dict[str, Any] | None:

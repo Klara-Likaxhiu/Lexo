@@ -12,13 +12,13 @@ from pydantic import BaseModel, EmailStr, Field
 from app import auth as auth_utils
 from app import auth_db
 from app import oauth as oauth_utils
+from app.supabase_rest import SupabaseRestError, request
 from app.supabase_client import (
     SupabaseAuthError,
     admin_delete_user,
     email_redirect,
     email_verification_enabled,
     get_user,
-    get_user_by_email,
     is_email_verified,
     merge_public_user,
     refresh_session,
@@ -31,9 +31,14 @@ from app.supabase_client import (
     sign_out,
     sign_up,
     supabase_configured,
+    supabase_anon_key,
+    supabase_service_role_key,
+    supabase_url,
+    ping_auth,
     update_user,
     verification_redirect_url,
     verify_otp,
+    lookup_auth_user,
 )
 
 router = APIRouter(prefix="/api/auth", tags=["Auth"])
@@ -106,6 +111,11 @@ def _username_from_email(email: str) -> str:
 
 def _raise_supabase_error(exc: SupabaseAuthError) -> None:
     raise HTTPException(status_code=exc.status_code, detail=exc.message) from exc
+
+
+def _raise_rest_error(exc: SupabaseRestError) -> None:
+    code = exc.status_code if exc.status_code >= 400 else status.HTTP_503_SERVICE_UNAVAILABLE
+    raise HTTPException(status_code=code, detail=exc.message) from exc
 
 
 def _resolve_login_email(login: str) -> str:
@@ -191,6 +201,47 @@ def public_config() -> dict:
     }
 
 
+def _check_supabase_auth_health() -> str:
+    if not supabase_url():
+        return "SUPABASE_URL missing"
+    if not supabase_anon_key():
+        return "SUPABASE_ANON_KEY missing"
+    try:
+        ping_auth()
+        return "ok"
+    except SupabaseAuthError as exc:
+        return exc.message or "Supabase Auth unreachable"
+
+
+def _check_supabase_profiles_health() -> str:
+    if not supabase_url():
+        return "SUPABASE_URL missing"
+    if not supabase_service_role_key():
+        return "SUPABASE_SERVICE_ROLE_KEY missing"
+    try:
+        request("GET", "profiles", params={"select": "id", "limit": "1"})
+        return "ok"
+    except SupabaseRestError as exc:
+        msg = (exc.message or "").lower()
+        if exc.status_code == 404 or "does not exist" in msg or "42p01" in msg:
+            return "profiles table missing"
+        if "profiles" in msg and ("relation" in msg or "not found" in msg):
+            return "profiles table missing"
+        return exc.message or "profiles table missing"
+
+
+@router.get("/health")
+def auth_health() -> dict:
+    """Check Supabase Auth and profiles table connectivity."""
+    supabase_auth = _check_supabase_auth_health()
+    supabase_profiles = _check_supabase_profiles_health()
+    return {
+        "ok": supabase_auth == "ok" and supabase_profiles == "ok",
+        "supabase_auth": supabase_auth,
+        "supabase_profiles": supabase_profiles,
+    }
+
+
 @router.post("/signup")
 def signup(data: SignupRequest) -> dict:
     try:
@@ -206,11 +257,14 @@ def signup(data: SignupRequest) -> dict:
     if password_err:
         raise HTTPException(status_code=400, detail=password_err)
 
-    if auth_db.get_profile_by_username(data.username):
-        raise HTTPException(status_code=409, detail="That username is already taken.")
+    try:
+        if auth_db.get_profile_by_username(data.username):
+            raise HTTPException(status_code=409, detail="That username is already taken.")
 
-    if auth_db.get_profile_by_email(str(data.email)):
-        raise HTTPException(status_code=409, detail="An account with this email already exists.")
+        if auth_db.get_profile_by_email(str(data.email)):
+            raise HTTPException(status_code=409, detail="An account with this email already exists.")
+    except SupabaseRestError as exc:
+        _raise_rest_error(exc)
 
     try:
         redirect_to = verification_redirect_url()
@@ -226,10 +280,13 @@ def signup(data: SignupRequest) -> dict:
         _raise_supabase_error(exc)
 
     user = result.get("user") or {}
-    if user.get("id"):
-        profile = _save_profile_from_supabase_user(user, username=data.username.strip())
-    else:
-        profile = None
+    try:
+        if user.get("id"):
+            profile = _save_profile_from_supabase_user(user, username=data.username.strip())
+        else:
+            profile = None
+    except SupabaseRestError as exc:
+        _raise_rest_error(exc)
 
     public = merge_public_user(user, profile)
     session = result.get("access_token")
@@ -355,8 +412,8 @@ def verify_email(data: VerifyEmailRequest) -> dict:
         _raise_supabase_error(exc)
 
     otp_type = (data.type or "signup").strip().lower()
-    if otp_type in ("email", "magiclink"):
-        otp_type = "signup"
+    if otp_type == "magiclink":
+        otp_type = "email"
 
     # Implicit / PKCE callback: Supabase redirects with access_token in the URL hash.
     if data.access_token:
@@ -375,29 +432,60 @@ def verify_email(data: VerifyEmailRequest) -> dict:
             supabase_user
         )
         public = merge_public_user(supabase_user, profile)
-        return {
+        response: dict = {
             "message": "Email verified successfully.",
             "verified": True,
             "user": public,
         }
+        if data.refresh_token:
+            response.update(
+                session_response(
+                    {
+                        "access_token": data.access_token,
+                        "refresh_token": data.refresh_token,
+                        "user": supabase_user,
+                    },
+                    remember_me=True,
+                    profile=profile,
+                )
+            )
+        return response
 
     token = (data.token_hash or data.token or "").strip()
     if not token:
         raise HTTPException(status_code=400, detail="Invalid verification link.")
 
-    try:
-        result = verify_otp(token, otp_type)
-    except SupabaseAuthError as exc:
-        _raise_supabase_error(exc)
+    result: dict | None = None
+    verify_types = [otp_type]
+    if otp_type == "signup":
+        verify_types.append("email")
+    elif otp_type == "email":
+        verify_types.append("signup")
+
+    last_exc: SupabaseAuthError | None = None
+    for attempt_type in verify_types:
+        try:
+            result = verify_otp(token, attempt_type)
+            break
+        except SupabaseAuthError as exc:
+            last_exc = exc
+            continue
+
+    if result is None:
+        assert last_exc is not None
+        _raise_supabase_error(last_exc)
 
     user = result.get("user") or {}
     profile = auth_db.get_profile_by_id(user.get("id", "")) or _save_profile_from_supabase_user(user)
     public = merge_public_user(user, profile)
-    return {
+    response = {
         "message": "Email verified successfully.",
         "verified": True,
         "user": public,
     }
+    if result.get("access_token") and result.get("refresh_token"):
+        response.update(session_response(result, remember_me=True, profile=profile))
+    return response
 
 
 @router.post("/resend-verification")
@@ -410,7 +498,7 @@ def resend_verification(data: ResendVerificationRequest) -> dict:
 
     email = str(data.email).strip().lower()
     profile = auth_db.get_profile_by_email(email)
-    supabase_user = get_user_by_email(email) if not profile else None
+    supabase_user = lookup_auth_user(email, profile)
 
     if not profile and not supabase_user:
         return {
@@ -446,19 +534,16 @@ def resend_verification(data: ResendVerificationRequest) -> dict:
 def verification_status(data: ResendVerificationRequest) -> dict:
     email = str(data.email).strip().lower()
     profile = auth_db.get_profile_by_email(email)
-    supabase_user = get_user_by_email(email)
-
-    if not profile and not supabase_user:
-        return {"account_exists": False, "verified": False}
 
     try:
         require_supabase()
-    except SupabaseAuthError:
-        return {
-            "account_exists": True,
-            "verified": False,
-            "email": profile["email"] if profile else email,
-        }
+    except SupabaseAuthError as exc:
+        _raise_supabase_error(exc)
+
+    supabase_user = lookup_auth_user(email, profile)
+
+    if not profile and not supabase_user:
+        return {"account_exists": False, "verified": False, "email": email}
 
     verified = bool(supabase_user and is_email_verified(supabase_user))
     return {

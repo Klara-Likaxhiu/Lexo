@@ -87,7 +87,11 @@
         BookMindAuthUI.showToast("Account created!");
         window.location.href = localStorage.getItem("readerProfile") ? "home.html" : "reader-quiz.html";
       } catch (error) {
-        BookMindAuth.showError("signupError", error.message || "Could not create account.");
+        console.error("[BookMindAuth] signup failed", error);
+        BookMindAuth.showError(
+          "signupError",
+          BookMindAuth.formatErrorForUser(error)
+        );
         BookMindAuthUI.setLoading(button, false, "Create Account");
       }
     });

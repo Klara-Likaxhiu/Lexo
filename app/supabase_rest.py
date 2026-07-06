@@ -19,10 +19,7 @@ class SupabaseRestError(Exception):
 def require_service_role() -> str:
     key = supabase_service_role_key()
     if not key:
-        raise SupabaseRestError(
-            "SUPABASE_SERVICE_ROLE_KEY is required.",
-            status_code=503,
-        )
+        raise SupabaseRestError("SUPABASE_SERVICE_ROLE_KEY missing", status_code=503)
     return key
 
 

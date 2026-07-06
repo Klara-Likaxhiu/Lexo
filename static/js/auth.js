@@ -15,6 +15,18 @@
  * BookMindAI authentication client.
  * JWT access tokens + server-side refresh tokens, email verification, OAuth.
  */
+class BookMindApiError extends Error {
+  constructor(message, { status, url, data, rawBody, method } = {}) {
+    super(message);
+    this.name = "BookMindApiError";
+    this.status = status ?? 0;
+    this.url = url ?? "";
+    this.data = data ?? {};
+    this.rawBody = rawBody ?? "";
+    this.method = method ?? "GET";
+  }
+}
+
 const BookMindAuth = {
   ACCESS_KEY: "bookmind_access_token",
   REFRESH_KEY: "bookmind_refresh_token",
@@ -246,8 +258,59 @@ const BookMindAuth = {
     return Boolean(this.getAccessToken());
   },
 
+  apiUrl(path) {
+    if (/^https?:\/\//i.test(path)) return path;
+    const normalized = path.startsWith("/") ? path : `/${path}`;
+    return `${window.location.origin}${normalized}`;
+  },
+
+  extractErrorMessage(data, rawBody, status) {
+    if (typeof data?.detail === "string" && data.detail.trim()) {
+      return data.detail;
+    }
+    if (Array.isArray(data?.detail)) {
+      return data.detail
+        .map(item => (typeof item === "string" ? item : item?.msg || JSON.stringify(item)))
+        .join("; ");
+    }
+    if (typeof data?.message === "string" && data.message.trim()) {
+      return data.message;
+    }
+    if (typeof data?.msg === "string" && data.msg.trim()) {
+      return data.msg;
+    }
+    if (typeof data?.error === "string" && data.error.trim()) {
+      return data.error;
+    }
+    if (data?.error && typeof data.error === "object") {
+      return JSON.stringify(data.error);
+    }
+    if (typeof data?.raw === "string" && data.raw.trim()) {
+      return data.raw.trim();
+    }
+    if (rawBody && rawBody.trim() && rawBody.length < 600) {
+      return rawBody.trim();
+    }
+    return `Request failed (HTTP ${status}).`;
+  },
+
+  formatErrorForUser(error) {
+    if (error instanceof BookMindApiError) {
+      const detail = this.extractErrorMessage(error.data, error.rawBody, error.status);
+      if (detail && !detail.startsWith("Request failed")) {
+        return `[HTTP ${error.status}] ${detail}`;
+      }
+      return error.message;
+    }
+    if (error?.message) {
+      return error.message;
+    }
+    return "Request failed.";
+  },
+
   async api(path, body, method = "POST") {
-    const response = await fetch(path, {
+    const url = this.apiUrl(path);
+    const response = await fetch(url, {
       method,
       headers: {
         "Content-Type": "application/json",
@@ -256,11 +319,38 @@ const BookMindAuth = {
       body: body == null ? undefined : JSON.stringify(body)
     });
 
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      const message = data.detail || "Request failed.";
-      throw new Error(typeof message === "string" ? message : JSON.stringify(message));
+    const rawBody = await response.text();
+    let data = {};
+    if (rawBody) {
+      try {
+        data = JSON.parse(rawBody);
+      } catch {
+        data = { raw: rawBody };
+      }
     }
+
+    if (!response.ok) {
+      const detail = this.extractErrorMessage(data, rawBody, response.status);
+      const message = `[HTTP ${response.status}] ${detail}`;
+      const error = new BookMindApiError(message, {
+        status: response.status,
+        url,
+        data,
+        rawBody,
+        method
+      });
+      console.error("[BookMindAuth] API error", {
+        method,
+        url,
+        status: response.status,
+        statusText: response.statusText,
+        requestBody: body,
+        responseBody: data,
+        rawBody
+      });
+      throw error;
+    }
+
     return data;
   },
 
@@ -270,6 +360,8 @@ const BookMindAuth = {
   },
 
   async signup(username, email, password) {
+    const endpoint = this.apiUrl("/api/auth/signup");
+    console.log("[BookMindAuth] signup →", endpoint, "(origin:", window.location.origin, ")");
     const data = await this.api("/api/auth/signup", { username, email, password });
     if (data.verification_required) {
       this.clearPendingSignupState();
@@ -341,8 +433,8 @@ const BookMindAuth = {
     return true;
   },
 
-  async completeEmailVerification() {
-    const params = this.parseAuthParams();
+  async completeEmailVerification(cachedParams) {
+    const params = cachedParams || this.parseAuthParams();
 
     if (params.error) {
       throw new Error(params.error || "Verification link is invalid or expired.");
@@ -367,10 +459,24 @@ const BookMindAuth = {
     });
   },
 
-  redirectAfterVerification(user) {
+  redirectAfterVerification(result) {
     this.clearPendingSignupState();
+    const user = result?.user;
+    if (result?.access_token && result?.refresh_token) {
+      this.saveSession({
+        access_token: result.access_token,
+        refresh_token: result.refresh_token,
+        remember_me: true,
+        user
+      });
+      console.log("[BookMindAuth] verification complete — session saved, redirect home");
+      window.location.href = "/home.html";
+      return;
+    }
+
     const email = user?.email ? encodeURIComponent(user.email) : "";
     const query = email ? `?verified=1&email=${email}` : "?verified=1";
+    console.log("[BookMindAuth] verification complete — redirect login");
     window.location.href = `/login.html${query}`;
   },
 
@@ -822,20 +928,20 @@ const BookMindAuth = {
             BookMindAuth.clearPendingSignupState();
             BookMindAuthUI.showStatusMessage(
               "statusMessage",
-              "Email verified! Redirecting you to log in…",
+              "Email verified! Redirecting…",
               "success"
             );
             BookMindAuthUI.showToast("Email verified! You can log in now.");
             setTimeout(() => {
-              window.location.href = `/login.html?verified=1&email=${encodeURIComponent(email)}`;
+              if (BookMindAuth.isLoggedIn()) {
+                window.location.href = "/home.html";
+              } else {
+                window.location.href = `/login.html?verified=1&email=${encodeURIComponent(email)}`;
+              }
             }, 900);
             return;
           }
-          BookMindAuthUI.showStatusMessage(
-            "statusMessage",
-            "Your email is not verified yet. Open the link in your inbox (check Spam/Junk), then try again.",
-            "warn"
-          );
+          BookMindAuthUI.showError("resendError", "Please verify your email first.");
         } catch (error) {
           BookMindAuthUI.showError(
             "resendError",
@@ -907,6 +1013,7 @@ const BookMindAuth = {
 
     if (goLoginBtn) {
       goLoginBtn.addEventListener("click", () => {
+        BookMindAuth.clearAllAuthState();
         window.location.href = pendingEmail
           ? `/login.html?email=${encodeURIComponent(pendingEmail)}`
           : "/login.html";
@@ -921,13 +1028,14 @@ const BookMindAuth = {
           pendingEmail = entered.trim();
         }
 
-        this.hideError("verifyError");
+        BookMindAuthUI.clearAuthMessages({ errorId: "verifyError", successId: "verifySuccess" });
         if (successEl) successEl.hidden = true;
         BookMindAuthUI.setLoading(resendBtn, true, "Resend verification email", "Sending…");
 
         try {
           const data = await this.resendVerification(pendingEmail);
           if (data.already_verified) {
+            BookMindAuth.clearPendingSignupState();
             window.location.href = `/login.html?verified=1&email=${encodeURIComponent(pendingEmail)}`;
             return;
           }
@@ -958,25 +1066,37 @@ const BookMindAuth = {
       return;
     }
 
-    if (window.history.replaceState) {
-      window.history.replaceState({}, "", this.currentPath());
-    }
+    if (title) title.textContent = "Verifying your email…";
+    if (message) message.textContent = "Please wait while we confirm your email address.";
+    if (actions) actions.hidden = true;
+    if (footer) footer.hidden = true;
 
-    this.completeEmailVerification()
+    this.completeEmailVerification(params)
       .then(result => {
         pendingEmail = result.user?.email || pendingEmail;
+        if (window.history.replaceState) {
+          window.history.replaceState({}, "", this.currentPath());
+        }
         if (title) title.textContent = "Email verified!";
         if (message) message.textContent = "Your email address has been confirmed.";
         if (successEl) {
-          successEl.textContent = "Redirecting you to log in…";
+          successEl.textContent = result.access_token
+            ? "Redirecting you to your library…"
+            : "Redirecting you to log in…";
           successEl.hidden = false;
         }
         const icon = document.getElementById("verifyIcon");
         if (icon) icon.classList.add("auth-status-icon-success");
         BookMindAuthUI.showToast("Email verified successfully!");
-        setTimeout(() => this.redirectAfterVerification(result.user), 1500);
+        setTimeout(() => this.redirectAfterVerification(result), 1500);
       })
       .catch(error => {
+        if (window.history.replaceState) {
+          const clean = pendingEmail
+            ? `${this.currentPath()}?email=${encodeURIComponent(pendingEmail)}`
+            : this.currentPath();
+          window.history.replaceState({}, "", clean);
+        }
         if (title) title.textContent = "Verification failed";
         if (message) {
           message.textContent = "We couldn't verify your email with this link.";

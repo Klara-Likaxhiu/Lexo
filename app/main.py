@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -23,6 +24,9 @@ from app.library_routes import router as library_router
 from app.user_routes import router as user_router
 from app.auth_db import init_db
 from app.extract import UnsupportedFileType, extract_text  # noqa: E402
+from app.supabase_rest import SupabaseRestError
+
+logger = logging.getLogger(__name__)
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 STATIC_DIR = BASE_DIR / "static"
@@ -190,6 +194,29 @@ def legacy_summarizer() -> FileResponse:
 
 # Static assets (CSS, JS, images, legacy .html files) — registered after explicit routes.
 app.mount("/", StaticFiles(directory=STATIC_DIR), name="static")
+
+
+@app.exception_handler(SupabaseRestError)
+async def supabase_rest_exception_handler(request, exc: SupabaseRestError):  # noqa: ANN001
+    code = exc.status_code if exc.status_code >= 400 else 503
+    logger.warning("Supabase REST error on %s: %s", request.url.path, exc.message)
+    return JSONResponse(
+        status_code=code,
+        content={"detail": exc.message, "source": "supabase_rest"},
+    )
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request, exc: Exception):  # noqa: ANN001
+    if isinstance(exc, HTTPException):
+        raise exc
+    if not request.url.path.startswith("/api/"):
+        raise exc
+    logger.exception("Unhandled API error on %s", request.url.path)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": str(exc) or "Internal server error.", "source": "server"},
+    )
 
 
 @app.exception_handler(404)
