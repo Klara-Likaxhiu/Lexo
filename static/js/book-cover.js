@@ -1,32 +1,48 @@
 /** Centralized book cover rendering, lookup, and caching for BookMindAI. */
 const BookMindCoverImage = {
   _memoryCache: new Map(),
+  _failedKeys: new Set(),
   _pending: new Map(),
-  _sessionKey: "bookmind_cover_cache_v1",
+  _batchQueue: new Map(),
+  _batchTimer: null,
+  _observer: null,
+  _storageKey: "bookmind_cover_cache_v2",
+  _failedStorageKey: "bookmind_cover_failed_v2",
 
-  _loadSessionCache() {
-    if (this._sessionCacheLoaded) return;
-    this._sessionCacheLoaded = true;
+  _loadCaches() {
+    if (this._cachesLoaded) return;
+    this._cachesLoaded = true;
     try {
-      const raw = sessionStorage.getItem(this._sessionKey);
-      if (!raw) return;
-      const entries = JSON.parse(raw);
-      if (entries && typeof entries === "object") {
-        Object.entries(entries).forEach(([key, url]) => {
-          if (url) this._memoryCache.set(key, url);
-        });
+      const raw = localStorage.getItem(this._storageKey) || sessionStorage.getItem(this._storageKey);
+      if (raw) {
+        const entries = JSON.parse(raw);
+        if (entries && typeof entries === "object") {
+          Object.entries(entries).forEach(([key, url]) => {
+            if (url) this._memoryCache.set(key, url);
+          });
+        }
+      }
+      const failedRaw =
+        localStorage.getItem(this._failedStorageKey) || sessionStorage.getItem(this._failedStorageKey);
+      if (failedRaw) {
+        const failed = JSON.parse(failedRaw);
+        if (Array.isArray(failed)) failed.forEach(key => this._failedKeys.add(key));
       }
     } catch {
       /* ignore */
     }
   },
 
-  _saveSessionCache() {
+  _persistCaches() {
     try {
-      const entries = Object.fromEntries(this._memoryCache);
-      sessionStorage.setItem(this._sessionKey, JSON.stringify(entries));
+      const payload = JSON.stringify(Object.fromEntries(this._memoryCache));
+      localStorage.setItem(this._storageKey, payload);
+      sessionStorage.setItem(this._storageKey, payload);
+      const failedPayload = JSON.stringify([...this._failedKeys]);
+      localStorage.setItem(this._failedStorageKey, failedPayload);
+      sessionStorage.setItem(this._failedStorageKey, failedPayload);
     } catch {
-      /* quota or private mode */
+      /* quota */
     }
   },
 
@@ -50,7 +66,7 @@ const BookMindCoverImage = {
       author: wrap.dataset.author || "Unknown Author",
       genre: wrap.dataset.genre || "Book",
       isbn: wrap.dataset.isbn || null,
-      cover_url: wrap.querySelector("img")?.src || null,
+      cover_url: wrap.dataset.coverUrl || null,
       google_id: wrap.dataset.googleId || null,
       open_library_key: wrap.dataset.openLibraryKey || null,
     };
@@ -63,6 +79,7 @@ const BookMindCoverImage = {
     wrap.dataset.author = ref.author || "";
     wrap.dataset.genre = ref.genre || "Book";
     wrap.dataset.isbn = ref.isbn || "";
+    if (ref.cover_url) wrap.dataset.coverUrl = ref.cover_url;
     if (options.imgClass) wrap.dataset.imgClass = options.imgClass;
   },
 
@@ -85,6 +102,36 @@ const BookMindCoverImage = {
       .replace(/"/g, "&quot;");
   },
 
+  seedFromBooks(books) {
+    this._loadCaches();
+    (books || []).forEach(book => {
+      const ref = this.bookRef(book);
+      const url = this.normalizeUrl(ref.cover_url);
+      if (!url) return;
+      this._rememberSuccess(this.cacheKey(ref), url);
+    });
+  },
+
+  getCachedUrl(ref) {
+    this._loadCaches();
+    const key = this.cacheKey(ref);
+    if (this._failedKeys.has(key)) return null;
+    return this.normalizeUrl(ref.cover_url) || this._memoryCache.get(key) || null;
+  },
+
+  _rememberSuccess(key, url) {
+    if (!url) return;
+    this._memoryCache.set(key, url);
+    this._failedKeys.delete(key);
+    this._persistCaches();
+  },
+
+  _rememberFailure(key) {
+    this._failedKeys.add(key);
+    this._memoryCache.delete(key);
+    this._persistCaches();
+  },
+
   placeholderHtml(ref, options = {}) {
     const phClass = options.placeholderClass || "book-cover-placeholder";
     const genre = ref.genre || "Book";
@@ -104,25 +151,27 @@ const BookMindCoverImage = {
   wrapHtml(inner, ref, options = {}) {
     const wrapClass = options.wrapClass || "book-cover-wrap";
     const imgClass = options.imgClass || "book-cover-img";
+    const key = this.cacheKey(ref);
+    const cachedUrl = this.getCachedUrl(ref);
     return `<div class="${wrapClass} book-cover-wrap"
-      data-cover-key="${this.escape(this.cacheKey(ref))}"
+      data-cover-key="${this.escape(key)}"
       data-title="${this.escape(ref.title)}"
       data-author="${this.escape(ref.author)}"
       data-genre="${this.escape(ref.genre || "Book")}"
       data-isbn="${this.escape(ref.isbn || "")}"
-      data-img-class="${this.escape(imgClass)}">${inner}</div>`;
+      data-img-class="${this.escape(imgClass)}"
+      ${cachedUrl ? `data-cover-url="${this.escape(cachedUrl)}" data-cover-resolved="true"` : ""}>${inner}</div>`;
   },
 
   html(book, options = {}) {
     const ref = this.bookRef(book);
     const imgClass = options.imgClass || "book-cover-img";
-    const lazy = options.lazy !== false;
-    const initialUrl = this.normalizeUrl(ref.cover_url);
+    const cachedUrl = this.getCachedUrl(ref);
 
-    if (initialUrl) {
+    if (cachedUrl) {
       return this.wrapHtml(
-        `<img class="${imgClass}" src="${this.escape(initialUrl)}" alt="${this.escape(ref.title)} cover" loading="${lazy ? "lazy" : "eager"}" decoding="async" onerror="BookMindCoverImage.onError(this)">`,
-        ref,
+        `<img class="${imgClass}" data-cover-src="${this.escape(cachedUrl)}" alt="${this.escape(ref.title)} cover" loading="lazy" decoding="async">`,
+        { ...ref, cover_url: cachedUrl },
         options
       );
     }
@@ -137,233 +186,302 @@ const BookMindCoverImage = {
       return;
     }
 
-    const book = this.refFromWrap(wrap);
-    book.cover_url = null;
-    wrap.dataset.coverResolved = "false";
+    const ref = this.refFromWrap(wrap);
+    const key = this.cacheKey(ref);
+    this._rememberFailure(key);
+    wrap.dataset.coverResolved = "failed";
 
-    if (wrap.dataset.coverRetry === "true") {
-      img.remove();
-      if (!wrap.querySelector(".premium-book-placeholder")) {
-        wrap.insertAdjacentHTML("beforeend", this.placeholderHtml(book));
-      }
-      return;
-    }
-
-    wrap.dataset.coverRetry = "true";
     img.remove();
-    this._memoryCache.delete(this.cacheKey(book));
-    this._saveSessionCache();
-
-    this.resolve(book, { skipCache: true }).then(url => {
-      if (url && wrap.isConnected) {
-        const imgClass = img.className || wrap.dataset.imgClass || "book-cover-img";
-        this.applyUrlToWrap(wrap, book, url, imgClass);
-        wrap.dataset.coverRetry = "false";
-        return;
-      }
-      if (!wrap.querySelector(".premium-book-placeholder")) {
-        wrap.insertAdjacentHTML("beforeend", this.placeholderHtml(book));
-      }
-    });
+    if (!wrap.querySelector(".premium-book-placeholder")) {
+      wrap.insertAdjacentHTML("beforeend", this.placeholderHtml(ref));
+    }
   },
 
-  async resolve(ref, options = {}) {
-    this._loadSessionCache();
+  _ensureImageObserver() {
+    if (this._imageObserver || typeof IntersectionObserver === "undefined") return;
+    this._imageObserver = new IntersectionObserver(
+      entries => {
+        entries.forEach(entry => {
+          if (!entry.isIntersecting) return;
+          const img = entry.target;
+          this._imageObserver.unobserve(img);
+          const src = img.dataset.coverSrc;
+          if (src && !img.src) {
+            img.src = src;
+            img.onerror = () => BookMindCoverImage.onError(img);
+          }
+        });
+      },
+      { rootMargin: "120px 0px", threshold: 0.01 }
+    );
+  },
+
+  _lazyLoadImage(img) {
+    if (!img) return;
+    const src = img.dataset.coverSrc;
+    if (!src) return;
+    this._ensureImageObserver();
+    if (this._imageObserver) {
+      this._imageObserver.observe(img);
+      return;
+    }
+    img.src = src;
+    img.onerror = () => BookMindCoverImage.onError(img);
+  },
+
+  applyUrlToWrap(wrap, ref, url, imgClass = "book-cover-img") {
+    if (!wrap || !url) return;
     const key = this.cacheKey(ref);
-    if (!options.skipCache && this._memoryCache.has(key)) {
-      const cached = this._memoryCache.get(key);
-      if (cached) return cached;
-    }
+    this._rememberSuccess(key, url);
 
-    const existing = this.normalizeUrl(ref.cover_url);
-    if (existing && !options.skipCache) {
-      this._memoryCache.set(key, existing);
-      this._saveSessionCache();
-      return existing;
-    }
+    wrap.innerHTML = "";
+    const img = document.createElement("img");
+    img.className = imgClass;
+    img.dataset.coverSrc = url;
+    img.alt = `${ref.title} cover`;
+    img.loading = "lazy";
+    img.decoding = "async";
+    wrap.appendChild(img);
+    this.attachRefToWrap(wrap, { ...ref, cover_url: url }, { imgClass });
+    wrap.dataset.coverResolved = "true";
+    wrap.classList.add("cover-loaded");
+    this._lazyLoadImage(img);
+  },
 
-    if (this._pending.has(key)) return this._pending.get(key);
+  showPlaceholder(wrap, ref) {
+    if (!wrap || wrap.querySelector(".premium-book-placeholder")) return;
+    wrap.innerHTML = "";
+    wrap.insertAdjacentHTML("beforeend", this.placeholderHtml(ref));
+    wrap.dataset.coverResolved = "failed";
+  },
 
-    const promise = fetch("/api/books/resolve-cover", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+  needsLookup(wrap) {
+    if (!wrap) return false;
+    if (wrap.dataset.coverResolved === "true") return false;
+    if (wrap.dataset.coverResolved === "failed") return false;
+
+    const ref = this.refFromWrap(wrap);
+    const key = this.cacheKey(ref);
+    if (this._failedKeys.has(key)) return false;
+    if (this.getCachedUrl(ref)) return false;
+    return Boolean(wrap.querySelector(".premium-book-placeholder"));
+  },
+
+  _batchResolveBooks(books) {
+    this._loadCaches();
+    const missing = [];
+    const refs = [];
+
+    books.forEach(book => {
+      const ref = typeof book.title === "string" ? book : this.bookRef(book);
+      const key = this.cacheKey(ref);
+      if (this._failedKeys.has(key)) return;
+      const cached = this.getCachedUrl(ref);
+      if (cached) {
+        ref.cover_url = cached;
+        return;
+      }
+      if (refs.some(item => this.cacheKey(item) === key)) return;
+      missing.push({
         title: ref.title,
         author: ref.author,
         isbn: ref.isbn,
         cover_url: ref.cover_url,
         google_id: ref.google_id,
         open_library_key: ref.open_library_key,
-      }),
+      });
+      refs.push(ref);
+    });
+
+    if (!missing.length) return Promise.resolve(refs);
+
+    const signature = missing
+      .map(b => `${b.title}|${b.author}`)
+      .sort()
+      .join(";;");
+    if (this._pending.has(signature)) return this._pending.get(signature);
+
+    const promise = fetch("/api/books/resolve-covers", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ books: missing }),
     })
-      .then(response => (response.ok ? response.json() : {}))
+      .then(response => (response.ok ? response.json() : { results: [] }))
       .then(data => {
-        const url = this.normalizeUrl(data.cover_url) || null;
-        if (url) {
-          this._memoryCache.set(key, url);
-          this._saveSessionCache();
-        }
-        this._pending.delete(key);
-        return url;
+        (data.results || []).forEach((result, index) => {
+          const ref = refs[index];
+          if (!ref) return;
+          const key = this.cacheKey(ref);
+          const url = this.normalizeUrl(result.cover_url);
+          if (url) {
+            ref.cover_url = url;
+            this._rememberSuccess(key, url);
+          } else {
+            this._rememberFailure(key);
+          }
+        });
+        refs.forEach(ref => {
+          if (!ref.cover_url) this._rememberFailure(this.cacheKey(ref));
+        });
+        return refs;
       })
-      .catch(() => {
-        this._pending.delete(key);
-        return null;
+      .catch(() => refs)
+      .finally(() => {
+        this._pending.delete(signature);
       });
 
-    this._pending.set(key, promise);
+    this._pending.set(signature, promise);
     return promise;
   },
 
-  applyUrlToWrap(wrap, ref, url, imgClass = "book-cover-img") {
-    if (!wrap || !url) return;
-    wrap.innerHTML = "";
-    const img = document.createElement("img");
-    img.className = imgClass;
-    img.src = url;
-    img.alt = `${ref.title} cover`;
-    img.loading = "lazy";
-    img.decoding = "async";
-    img.onerror = () => BookMindCoverImage.onError(img);
-    wrap.appendChild(img);
-    this.attachRefToWrap(wrap, { ...ref, cover_url: url }, { imgClass });
-    wrap.dataset.coverResolved = "true";
-    wrap.classList.add("cover-loaded");
+  _flushBatchQueue() {
+    this._batchTimer = null;
+    const wraps = [...this._batchQueue.values()];
+    this._batchQueue.clear();
+    if (!wraps.length) return;
+
+    const refs = wraps.map(wrap => this.refFromWrap(wrap));
+    this._batchResolveBooks(refs).then(() => {
+      wraps.forEach(wrap => {
+        if (!wrap.isConnected) return;
+        const ref = this.refFromWrap(wrap);
+        const url = this.getCachedUrl(ref);
+        const imgClass = wrap.dataset.imgClass || "book-cover-img";
+        if (url) {
+          this.applyUrlToWrap(wrap, ref, url, imgClass);
+        } else {
+          this.showPlaceholder(wrap, ref);
+        }
+        wrap.dataset.coverLoading = "false";
+      });
+    });
   },
 
-  needsLookup(wrap) {
-    if (!wrap) return false;
-    if (wrap.querySelector(".premium-book-placeholder")) return true;
-    const img = wrap.querySelector("img");
-    if (!img) return true;
-    if (wrap.dataset.coverResolved === "true") return false;
-    return !this.normalizeUrl(img.src);
-  },
+  _queueWrap(wrap) {
+    if (!wrap || !this.needsLookup(wrap)) return;
+    if (wrap.dataset.coverLoading === "true") return;
 
-  async hydrateWrap(wrap, book, options = {}) {
-    if (!wrap) return null;
-
-    const ref = book ? this.bookRef(book) : this.refFromWrap(wrap);
-    this.attachRefToWrap(wrap, ref, options);
-
-    const cachedUrl = this.normalizeUrl(ref.cover_url) || this._memoryCache.get(this.cacheKey(ref));
-    if (cachedUrl && this.needsLookup(wrap)) {
-      const imgClass = options.imgClass || wrap.dataset.imgClass || "book-cover-img";
-      this.applyUrlToWrap(wrap, ref, cachedUrl, imgClass);
-      return cachedUrl;
+    const ref = this.refFromWrap(wrap);
+    const cached = this.getCachedUrl(ref);
+    if (cached) {
+      this.applyUrlToWrap(wrap, ref, cached, wrap.dataset.imgClass || "book-cover-img");
+      return;
     }
 
-    if (!this.needsLookup(wrap) && wrap.querySelector("img")) {
-      return this.normalizeUrl(wrap.querySelector("img").src);
-    }
-
-    if (wrap.dataset.coverLoading === "true") return null;
     wrap.dataset.coverLoading = "true";
-
-    try {
-      const url = await this.resolve(ref);
-      if (url && wrap.isConnected) {
-        const imgClass = options.imgClass || wrap.dataset.imgClass || "book-cover-img";
-        this.applyUrlToWrap(wrap, ref, url, imgClass);
-        return url;
-      }
-    } finally {
-      wrap.dataset.coverLoading = "false";
-    }
-
-    return null;
+    this._batchQueue.set(this.cacheKey(ref), wrap);
+    clearTimeout(this._batchTimer);
+    this._batchTimer = setTimeout(() => this._flushBatchQueue(), 40);
   },
 
-  _collectWrapJobs(root, options = {}) {
-    const jobs = [];
+  _ensureCoverObserver() {
+    if (this._observer || typeof IntersectionObserver === "undefined") return;
+    this._observer = new IntersectionObserver(
+      entries => {
+        entries.forEach(entry => {
+          if (!entry.isIntersecting) return;
+          this._observer.unobserve(entry.target);
+          this._queueWrap(entry.target);
+        });
+      },
+      { rootMargin: "160px 0px", threshold: 0.01 }
+    );
+  },
+
+  hydrateLazy(root = document, options = {}) {
+    this._loadCaches();
+    this._ensureCoverObserver();
+
     root.querySelectorAll("[data-cover-key]").forEach(wrap => {
-      if (!this.needsLookup(wrap)) return;
       const ref = this.refFromWrap(wrap);
       this.attachRefToWrap(wrap, ref, options);
-      jobs.push({ wrap, ref, key: this.cacheKey(ref) });
-    });
-    return jobs;
-  },
 
-  async _batchResolveRefs(refs) {
-    this._loadSessionCache();
-    const missing = [];
-    const missingRefs = [];
-
-    refs.forEach(ref => {
-      const key = this.cacheKey(ref);
-      const cached = this.normalizeUrl(ref.cover_url) || this._memoryCache.get(key);
-      if (cached) {
-        this._memoryCache.set(key, cached);
-        ref.cover_url = cached;
+      const cached = this.getCachedUrl(ref);
+      if (cached && this.needsLookup(wrap)) {
+        this.applyUrlToWrap(wrap, ref, cached, options.imgClass || wrap.dataset.imgClass || "book-cover-img");
         return;
       }
-      if (!missingRefs.some(item => this.cacheKey(item) === key)) {
-        missing.push({
-          title: ref.title,
-          author: ref.author,
-          isbn: ref.isbn,
-          cover_url: ref.cover_url,
-          google_id: ref.google_id,
-          open_library_key: ref.open_library_key,
-        });
-        missingRefs.push(ref);
+
+      const img = wrap.querySelector("img[data-cover-src]");
+      if (img) this._lazyLoadImage(img);
+
+      if (!this.needsLookup(wrap)) return;
+
+      if (this._observer) {
+        this._observer.observe(wrap);
+      } else {
+        this._queueWrap(wrap);
       }
     });
-
-    if (!missing.length) return;
-
-    try {
-      const response = await fetch("/api/books/resolve-covers", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ books: missing }),
-      });
-
-      if (!response.ok) return;
-
-      const data = await response.json();
-      (data.results || []).forEach((result, index) => {
-        const url = this.normalizeUrl(result.cover_url);
-        if (!url) return;
-        const ref = missingRefs[index];
-        const key = this.cacheKey(ref);
-        this._memoryCache.set(key, url);
-        ref.cover_url = url;
-      });
-      this._saveSessionCache();
-    } catch {
-      /* offline */
-    }
   },
 
   async hydrate(root = document, options = {}) {
-    const jobs = this._collectWrapJobs(root, options);
-    if (!jobs.length) return;
+    if (options.lazy !== false) {
+      this.hydrateLazy(root, options);
+      return;
+    }
 
-    await this._batchResolveRefs(jobs.map(job => job.ref));
+    this._loadCaches();
+    const wraps = [...root.querySelectorAll("[data-cover-key]")].filter(w => this.needsLookup(w));
+    if (!wraps.length) return;
 
-    jobs.forEach(({ wrap, ref }) => {
-      const url = this.normalizeUrl(ref.cover_url);
-      if (url && wrap.isConnected) {
-        const imgClass = options.imgClass || wrap.dataset.imgClass || "book-cover-img";
-        this.applyUrlToWrap(wrap, ref, url, imgClass);
-      }
+    const refs = wraps.map(wrap => {
+      const ref = this.refFromWrap(wrap);
+      this.attachRefToWrap(wrap, ref, options);
+      return ref;
+    });
+
+    await this._batchResolveBooks(refs);
+    wraps.forEach(wrap => {
+      const ref = this.refFromWrap(wrap);
+      const url = this.getCachedUrl(ref);
+      const imgClass = options.imgClass || wrap.dataset.imgClass || "book-cover-img";
+      if (url) this.applyUrlToWrap(wrap, ref, url, imgClass);
+      else this.showPlaceholder(wrap, ref);
     });
   },
 
   async hydrateMany(books, root = document, options = {}) {
-    const refs = books.map(book => this.bookRef(book));
-    await this._batchResolveRefs(refs);
+    this.seedFromBooks(books);
 
-    refs.forEach((ref, index) => {
-      const book = books[index];
-      if (ref.cover_url) book.cover_url = ref.cover_url;
-      if (book.book_data && ref.cover_url) book.book_data.cover_url = ref.cover_url;
+    books.forEach((book, index) => {
+      const ref = this.bookRef(book);
+      const url = this.getCachedUrl(ref);
+      if (url) {
+        book.cover_url = url;
+        if (book.book_data) book.book_data.cover_url = url;
+      }
     });
 
-    await this.hydrate(root, options);
+    const needsApi = books.filter(book => !this.getCachedUrl(this.bookRef(book)));
+    if (needsApi.length) {
+      await this._batchResolveBooks(needsApi);
+      needsApi.forEach(book => {
+        const url = this.getCachedUrl(this.bookRef(book));
+        if (url) {
+          book.cover_url = url;
+          if (book.book_data) book.book_data.cover_url = url;
+        }
+      });
+    }
+
+    this.hydrateLazy(root, { ...options, lazy: true });
     return books;
+  },
+
+  /** @deprecated use hydrateLazy — kept for compatibility */
+  async hydrateWrap(wrap, book, options = {}) {
+    if (!wrap) return null;
+    const ref = book ? this.bookRef(book) : this.refFromWrap(wrap);
+    this.attachRefToWrap(wrap, ref, options);
+    const cached = this.getCachedUrl(ref);
+    if (cached) {
+      this.applyUrlToWrap(wrap, ref, cached, options.imgClass || wrap.dataset.imgClass || "book-cover-img");
+      return cached;
+    }
+    if (!this.needsLookup(wrap)) return null;
+    this._queueWrap(wrap);
+    return null;
   },
 };
 

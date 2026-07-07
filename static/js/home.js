@@ -310,7 +310,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         ...item.book_data,
         genre: item.ai_recommendation?.genre || "BookMindAI",
       }));
-      BookMindCoverImage.hydrateMany(coverBooks, container, {
+      BookMindCoverImage.seedFromBooks(coverBooks);
+      BookMindCoverImage.hydrateLazy(container, {
         imgClass: "recommendation-cover book-cover-img",
       });
     }
@@ -354,13 +355,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         genre: book.genre,
         reason: book.reason,
         difficulty: book.difficulty || "AI Pick",
+        cover_url: book.cover_url || null,
       }));
-
-      if (window.BookMindCoverImage) {
-        await BookMindCoverImage.hydrateMany(mergeItems, container, {
-          imgClass: "recommendation-cover book-cover-img",
-        });
-      }
 
       const newItems = mergeItems.map(book => ({
         ai_recommendation: {
@@ -369,6 +365,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           genre: book.genre,
           difficulty: book.difficulty || "AI Pick",
           reason: book.reason,
+          cover_url: book.cover_url || null,
         },
         book_data: book.cover_url
           ? {

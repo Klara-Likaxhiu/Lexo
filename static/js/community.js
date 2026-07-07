@@ -58,7 +58,8 @@ function renderFeed(reviews) {
       genre: review.genre,
       cover_url: review.cover_url,
     }));
-    BookMindCoverImage.hydrateMany(coverBooks, feed, {
+    BookMindCoverImage.seedFromBooks(coverBooks);
+    BookMindCoverImage.hydrateLazy(feed, {
       imgClass: "community-cover-img book-cover-img",
     });
   }

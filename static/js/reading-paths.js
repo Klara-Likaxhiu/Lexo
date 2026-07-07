@@ -359,7 +359,8 @@ function renderPaths(result) {
 
   if (window.BookMindCoverImage) {
     const allBooks = paths.flatMap(path => path.books || []);
-    BookMindCoverImage.hydrateMany(allBooks, pathsGrid, {
+    BookMindCoverImage.seedFromBooks(allBooks);
+    BookMindCoverImage.hydrateLazy(pathsGrid, {
       imgClass: "path-book-cover-img book-cover-img",
     });
   }

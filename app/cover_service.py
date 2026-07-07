@@ -575,4 +575,113 @@ def enrich_book_entry(book: dict) -> dict:
 def enrich_books_in_list(books: list | None) -> list:
     if not isinstance(books, list):
         return []
-    return [enrich_book_entry(book) for book in books if isinstance(book, dict)]
+
+    valid = [book for book in books if isinstance(book, dict)]
+    if not valid:
+        return []
+
+    needs_resolve: list[dict] = []
+    for book in valid:
+        if book.get("cover_url"):
+            normalized = normalize_cover_url(book["cover_url"])
+            if normalized and (_is_trusted_cover_url(normalized) or _cover_url_is_usable(normalized)):
+                book["cover_url"] = normalized
+                continue
+        needs_resolve.append(book)
+
+    if not needs_resolve:
+        return valid
+
+    batch_payload = [
+        {
+            "title": book.get("title") or "",
+            "author": book.get("author"),
+            "isbn": book.get("isbn"),
+            "cover_url": book.get("cover_url"),
+            "google_id": book.get("google_id"),
+            "open_library_key": book.get("open_library_key"),
+        }
+        for book in needs_resolve
+    ]
+    resolved = resolve_covers_batch(batch_payload)
+    for book, result in zip(needs_resolve, resolved):
+        if result.get("cover_url"):
+            book["cover_url"] = result["cover_url"]
+            book["cover_source"] = result.get("cover_source")
+
+    return valid
+
+
+def enrich_profile_recommendations(profile_data: dict | None, *, cache_only: bool = False) -> dict | None:
+    """Attach cover URLs to stored quiz recommendations (cache-first batch)."""
+    if not isinstance(profile_data, dict):
+        return profile_data
+
+    recommendations = profile_data.get("recommendations")
+    if not isinstance(recommendations, list) or not recommendations:
+        return profile_data
+
+    batch_input: list[dict] = []
+    targets: list[dict] = []
+
+    for item in recommendations:
+        if not isinstance(item, dict):
+            continue
+        ai = item.get("ai_recommendation") if isinstance(item.get("ai_recommendation"), dict) else item
+        book_data = item.get("book_data") if isinstance(item.get("book_data"), dict) else {}
+
+        existing = book_data.get("cover_url") or ai.get("cover_url")
+        if existing:
+            url = normalize_cover_url(existing)
+            if url:
+                if not book_data:
+                    item["book_data"] = {}
+                    book_data = item["book_data"]
+                book_data["cover_url"] = url
+                ai["cover_url"] = url
+            continue
+
+        title = ai.get("title") if isinstance(ai, dict) else None
+        if not title:
+            continue
+
+        author = ai.get("author") if isinstance(ai, dict) else None
+        isbn = ai.get("isbn") if isinstance(ai, dict) else None
+
+        if cache_only:
+            book_id = make_book_id(title, author, isbn)
+            cached = get_cached_cover(book_id) or get_cached_cover_by_isbn(isbn)
+            url = normalize_cover_url((cached or {}).get("cover_url"))
+            if url:
+                if not isinstance(item.get("book_data"), dict):
+                    item["book_data"] = {}
+                item["book_data"]["cover_url"] = url
+                item["book_data"]["title"] = title
+                item["book_data"]["author"] = author
+                item["book_data"]["genre"] = ai.get("genre") if isinstance(ai, dict) else None
+                if isinstance(ai, dict):
+                    ai["cover_url"] = url
+            continue
+
+        batch_input.append({"title": title, "author": author, "isbn": isbn})
+        targets.append(item)
+
+    if cache_only or not batch_input:
+        return profile_data
+
+    resolved = resolve_covers_batch(batch_input)
+    for item, result in zip(targets, resolved):
+        url = result.get("cover_url")
+        if not url:
+            continue
+        ai = item.get("ai_recommendation") if isinstance(item.get("ai_recommendation"), dict) else item
+        if not isinstance(item.get("book_data"), dict):
+            item["book_data"] = {}
+        item["book_data"]["cover_url"] = url
+        item["book_data"]["title"] = ai.get("title")
+        item["book_data"]["author"] = ai.get("author")
+        item["book_data"]["genre"] = ai.get("genre")
+        if isinstance(ai, dict):
+            ai["cover_url"] = url
+
+    return profile_data

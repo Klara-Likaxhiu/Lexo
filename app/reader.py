@@ -141,34 +141,28 @@ Return ONLY valid JSON in this exact structure:
 
 
 def recommend_with_book_data(data: ReaderProfileRequest) -> dict:
-    from app.cover_service import enrich_recommendation
+    from app.cover_service import enrich_profile_recommendations
 
     reader_result = analyze_reader_profile(data)
-    enriched_books = []
-
-    for book in reader_result.get("recommendations", []):
-        title = book.get("title")
-
-        if not title:
-            continue
-
-        enriched_books.append(
-            {
-                "ai_recommendation": book,
-                "book_data": enrich_recommendation(
-                    title,
-                    author=book.get("author"),
-                    genre=book.get("genre"),
-                ),
-            }
-        )
-
-    return {
+    profile_payload = {
         "reader_type": reader_result.get("reader_type"),
         "favorite_genres": reader_result.get("favorite_genres"),
         "confirmed_reading_level": reader_result.get("confirmed_reading_level"),
         "book_preferences": reader_result.get("book_preferences"),
-        "recommendations": enriched_books,
+        "recommendations": [
+            {"ai_recommendation": book, "book_data": None}
+            for book in reader_result.get("recommendations", [])
+            if book.get("title")
+        ],
+    }
+    enrich_profile_recommendations(profile_payload)
+
+    return {
+        "reader_type": profile_payload.get("reader_type"),
+        "favorite_genres": profile_payload.get("favorite_genres"),
+        "confirmed_reading_level": profile_payload.get("confirmed_reading_level"),
+        "book_preferences": profile_payload.get("book_preferences"),
+        "recommendations": profile_payload.get("recommendations", []),
         "engine": reader_result.get("engine"),
     }
 

@@ -500,7 +500,8 @@ const BookMindDiscovery = {
     });
 
     if (window.BookMindCoverImage) {
-      BookMindCoverImage.hydrateMany(books, this.els.results, {
+      BookMindCoverImage.seedFromBooks(books);
+      BookMindCoverImage.hydrateLazy(this.els.results, {
         imgClass: "discovery-card-img book-cover-img",
       });
     }

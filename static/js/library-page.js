@@ -208,7 +208,8 @@ function renderShelf(shelf) {
       cover_url: book.cover_url,
       isbn: book.isbn,
     }));
-    BookMindCoverImage.hydrateMany(coverBooks, libraryBooks, {
+    BookMindCoverImage.seedFromBooks(coverBooks);
+    BookMindCoverImage.hydrateLazy(libraryBooks, {
       imgClass: "shared-book-cover book-cover-img",
     });
   }

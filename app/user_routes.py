@@ -61,7 +61,13 @@ def save_settings(data: SettingsPayload, user: dict = Depends(get_verified_user)
 @router.get("/reader-profile")
 def read_reader_profile(user: dict = Depends(get_verified_user)) -> dict:
     try:
+        from app.cover_service import enrich_profile_recommendations
+
         profile = get_reader_profile(user["id"])
+        if profile and isinstance(profile.get("profile_data"), dict):
+            profile["profile_data"] = enrich_profile_recommendations(
+                profile["profile_data"], cache_only=True
+            )
         return {"profile": profile}
     except SupabaseRestError as exc:
         _handle_store_error(exc)
