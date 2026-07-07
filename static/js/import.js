@@ -36,6 +36,11 @@ const BookImport = {
     };
 
     this.bindEvents();
+    document.addEventListener("bookmind:auth-ready", () => {
+      if (!this.els.modal?.hidden) {
+        this.syncAuthState();
+      }
+    });
   },
 
   bindEvents() {
@@ -70,10 +75,38 @@ const BookImport = {
     if (e.addBtn) e.addBtn.addEventListener("click", () => this.addBook());
   },
 
-  open() {
+  async syncAuthState() {
+    const btn = this.els.addBtn;
+    if (!btn) return;
+
+    if (!window.BookMindAPI?.ensureAuth) {
+      btn.disabled = true;
+      this.setMessage("Sign in to add books to your library.", true);
+      return;
+    }
+
+    if (window.BookMindAuth?.whenReady) {
+      await BookMindAuth.whenReady();
+    }
+
+    const token = await BookMindAPI.ensureAuth({ redirect: false });
+    if (!token) {
+      btn.disabled = true;
+      this.setMessage("Sign in to add books to your library.", true);
+      return;
+    }
+
+    btn.disabled = false;
+    if (this.els.message?.classList.contains("error")) {
+      this.setMessage("");
+    }
+  },
+
+  async open() {
     this.els.modal.hidden = false;
     document.body.classList.add("import-open");
     this.setMessage("");
+    await this.syncAuthState();
     if (this.els.searchInput) this.els.searchInput.focus();
   },
 
@@ -112,7 +145,7 @@ const BookImport = {
       const data = await response.json();
       this.renderResults(data.results || []);
     } catch (error) {
-      this.showStatus(error.message || "Import search failed.", "error");
+      this.setMessage(error.message || "Search failed. Please try again.", true);
       this.els.searchResults.innerHTML = `<p class="import-hint">Search failed. Please try again.</p>`;
     }
   },
@@ -244,25 +277,34 @@ const BookImport = {
       return;
     }
 
-    if (!window.BookMindAuth?.isLoggedIn()) {
+    if (!window.BookMindAPI?.ensureAuth) {
       this.setMessage("Sign in to add books to your library.", true);
       return;
     }
-
-    const shelf = this.els.shelf.value;
-    const source = this.els.source.value || undefined;
-    const totalPages = this.els.totalPages.value || undefined;
 
     this.els.addBtn.disabled = true;
     this.setMessage("Saving to your library…");
 
     try {
+      if (window.BookMindAuth?.whenReady) {
+        await BookMindAuth.whenReady();
+      }
+
+      const token = await BookMindAPI.ensureAuth({ redirect: true });
+      if (!token) {
+        this.setMessage("Sign in to add books to your library.", true);
+        return;
+      }
+
       await BookMindLibrary.ensureLoaded();
       const existingShelf = BookMindLibrary.findShelf(book);
 
-      await BookMindLibrary.addBookWithMeta(book, shelf, { source, totalPages });
+      await BookMindLibrary.addBookWithMeta(book, this.els.shelf.value, {
+        source: this.els.source.value || undefined,
+        totalPages: this.els.totalPages.value || undefined,
+      });
 
-      const label = BookMindLibrary.getShelfLabel(shelf);
+      const label = BookMindLibrary.getShelfLabel(this.els.shelf.value);
       const verb = existingShelf ? "moved to" : "added to";
       const flash = `"${book.title}" ${verb} ${label}.`;
 
@@ -276,10 +318,9 @@ const BookImport = {
         location.reload();
       }
     } catch (error) {
-      this.showStatus(error.message || "Import search failed.", "error");
       this.setMessage(error.message || "Could not save book.", true);
     } finally {
-      this.els.addBtn.disabled = false;
+      await this.syncAuthState();
     }
   },
 
@@ -298,4 +339,6 @@ const BookImport = {
   },
 };
 
-BookImport.init();
+document.addEventListener("DOMContentLoaded", () => {
+  BookImport.init();
+});

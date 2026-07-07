@@ -1530,3 +1530,6 @@ function whenDomReady(fn) {
   );
   whenDomReady(() => BookMindAuth.setupLogoutLinks());
 })();
+
+window.BookMindAuth = BookMindAuth;
+window.BookMindApiError = BookMindApiError;
