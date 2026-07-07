@@ -46,6 +46,7 @@ const BookMindAuth = {
   },
 
   _sessionReadyPromise: null,
+  _refreshPromise: null,
 
   _readStorageItem(key) {
     return localStorage.getItem(key) || sessionStorage.getItem(key);
@@ -374,6 +375,14 @@ const BookMindAuth = {
       return null;
     }
 
+    if (this.isAccessTokenExpired(this._session.accessToken)) {
+      console.log("[BookMindAuth] restoreSession: access token expired, refreshing");
+      const refreshed = await this.ensureFreshSession({ clearOnFailure: false });
+      if (!refreshed) {
+        console.warn("[BookMindAuth] restoreSession: refresh failed for expired token");
+      }
+    }
+
     try {
       const user = await this.fetchCurrentUser({ allowRefresh: true });
       this._syncSessionFromStorage();
@@ -408,7 +417,17 @@ const BookMindAuth = {
       headers: { Authorization: `Bearer ${token}` },
     });
 
-    if (response.status === 401 && allowRefresh) {
+    let rawBody = await response.text();
+    let data = {};
+    if (rawBody) {
+      try {
+        data = JSON.parse(rawBody);
+      } catch {
+        data = { raw: rawBody };
+      }
+    }
+
+    if (allowRefresh && this.isAuthExpiredError(response.status, data, rawBody)) {
       const refreshed = await this.refreshSession({ clearOnFailure: false });
       if (!refreshed) {
         console.warn("[BookMindAuth] fetchCurrentUser: refresh failed, keeping stored token");
@@ -417,6 +436,12 @@ const BookMindAuth = {
       response = await fetch(this.apiUrl("/api/auth/me"), {
         headers: this.getAuthHeaders(),
       });
+      rawBody = await response.text();
+      try {
+        data = rawBody ? JSON.parse(rawBody) : {};
+      } catch {
+        data = { raw: rawBody };
+      }
     }
 
     if (!response.ok) {
@@ -426,7 +451,6 @@ const BookMindAuth = {
       throw new Error(`Failed to load user (HTTP ${response.status})`);
     }
 
-    const data = await response.json();
     if (data.user) {
       this._persistUser(data.user);
     }
@@ -536,6 +560,61 @@ const BookMindAuth = {
   getAccessToken() {
     this._syncSessionFromStorage();
     return this._session.accessToken;
+  },
+
+  decodeAccessToken(token) {
+    if (!token) return null;
+    try {
+      const parts = String(token).split(".");
+      if (parts.length < 2) return null;
+      const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+      const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
+      return JSON.parse(atob(padded));
+    } catch {
+      return null;
+    }
+  },
+
+  isAccessTokenExpired(token, skewSeconds = 30) {
+    const payload = this.decodeAccessToken(token);
+    if (!payload?.exp) return false;
+    return Date.now() >= payload.exp * 1000 - skewSeconds * 1000;
+  },
+
+  isAuthExpiredError(status, data, rawBody = "") {
+    if (status === 401) return true;
+    const message = this.extractErrorMessage(data, rawBody, status).toLowerCase();
+    if (status === 403 && message.includes("verify your email")) return false;
+    return (
+      message.includes("token is expired") ||
+      message.includes("jwt expired") ||
+      (message.includes("jwt") && message.includes("expired")) ||
+      message.includes("invalid token") ||
+      message.includes("session expired") ||
+      message.includes("not authenticated")
+    );
+  },
+
+  handleAuthFailure() {
+    this.clearAllAuthState();
+    const next = encodeURIComponent(window.location.pathname + window.location.search);
+    window.location.replace(`/login.html?next=${next}`);
+  },
+
+  async ensureFreshSession({ clearOnFailure = false } = {}) {
+    this._syncSessionFromStorage();
+    const token = this.getAccessToken();
+    if (!token) return false;
+    if (!this.isAccessTokenExpired(token)) return true;
+
+    const refreshToken = this.getRefreshToken();
+    if (!refreshToken) {
+      console.warn("[BookMindAuth] ensureFreshSession: access token expired, no refresh token");
+      if (clearOnFailure) this.handleAuthFailure();
+      return false;
+    }
+
+    return this.refreshSession({ clearOnFailure });
   },
 
   getRefreshToken() {
@@ -919,9 +998,21 @@ const BookMindAuth = {
   },
 
   async refreshSession({ clearOnFailure = false } = {}) {
+    if (this._refreshPromise) {
+      return this._refreshPromise;
+    }
+
+    this._refreshPromise = this._performRefresh({ clearOnFailure }).finally(() => {
+      this._refreshPromise = null;
+    });
+    return this._refreshPromise;
+  },
+
+  async _performRefresh({ clearOnFailure = false } = {}) {
     const refreshToken = this.getRefreshToken();
     if (!refreshToken) {
       console.warn("[BookMindAuth] refreshSession: no refresh token in storage");
+      if (clearOnFailure) this.handleAuthFailure();
       return false;
     }
 
@@ -929,27 +1020,45 @@ const BookMindAuth = {
       const response = await fetch(this.apiUrl("/api/auth/refresh"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refresh_token: refreshToken })
+        body: JSON.stringify({ refresh_token: refreshToken }),
       });
 
+      const rawBody = await response.text();
+      let data = {};
+      if (rawBody) {
+        try {
+          data = JSON.parse(rawBody);
+        } catch {
+          data = {};
+        }
+      }
+
       if (!response.ok) {
-        if (clearOnFailure && response.status === 401) {
-          this.clearSession();
+        console.warn("[BookMindAuth] refreshSession failed", response.status, rawBody);
+        if (clearOnFailure) {
+          this.handleAuthFailure();
         }
         return false;
       }
 
-      const data = await response.json();
+      if (!data.access_token) {
+        console.warn("[BookMindAuth] refreshSession: missing access_token in response");
+        if (clearOnFailure) this.handleAuthFailure();
+        return false;
+      }
+
       this._updateSession({
         access_token: data.access_token,
-        refresh_token: data.refresh_token,
-        user: data.user
+        refresh_token: data.refresh_token || refreshToken,
+        user: data.user,
       });
       this._session.ready = true;
       this._sessionReadyPromise = Promise.resolve(data.user || this.getCurrentUser());
-      return Boolean(data.access_token);
+      console.log("[BookMindAuth] refreshSession: ok");
+      return true;
     } catch (error) {
       console.error("[BookMindAuth] refreshSession failed", error);
+      if (clearOnFailure) this.handleAuthFailure();
       return false;
     }
   },

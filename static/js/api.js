@@ -1,5 +1,6 @@
 /**
  * BookMindAI API client — attaches Supabase Bearer token to protected requests.
+ * Refreshes expired sessions automatically via BookMindAuth.refreshSession().
  * Requires js/auth.js loaded first.
  */
 const BookMindAPI = {
@@ -11,6 +12,34 @@ const BookMindAPI = {
     return `${window.location.origin}${normalized}`;
   },
 
+  _parseJsonBody(rawBody) {
+    if (!rawBody) return {};
+    try {
+      return JSON.parse(rawBody);
+    } catch {
+      return { raw: rawBody };
+    }
+  },
+
+  _isAuthExpired(status, data, rawBody) {
+    if (window.BookMindAuth?.isAuthExpiredError) {
+      return BookMindAuth.isAuthExpiredError(status, data, rawBody);
+    }
+    return status === 401;
+  },
+
+  async _refreshAndRetry({ redirect = false } = {}) {
+    if (!window.BookMindAuth?.refreshSession) return false;
+    const refreshed = await BookMindAuth.refreshSession({ clearOnFailure: false });
+    if (refreshed) return true;
+
+    if (redirect && BookMindAuth.handleAuthFailure) {
+      BookMindAuth.handleAuthFailure();
+      return false;
+    }
+    return false;
+  },
+
   async ensureAuth({ redirect = false } = {}) {
     if (window.BookMindAuth?.whenReady) {
       await BookMindAuth.whenReady();
@@ -19,14 +48,29 @@ const BookMindAPI = {
       BookMindAuth._syncSessionFromStorage();
     }
 
-    const token =
-      localStorage.getItem(BookMindAuth?.ACCESS_KEY || "bookmind_access_token") ||
+    let token =
       window.BookMindAuth?.getAccessToken?.() ||
+      localStorage.getItem(BookMindAuth?.ACCESS_KEY || "bookmind_access_token") ||
       null;
-    if (!token && redirect) {
-      const next = encodeURIComponent(window.location.pathname + window.location.search);
-      window.location.replace(`/login.html?next=${next}`);
+
+    if (!token) {
+      if (redirect && BookMindAuth?.handleAuthFailure) {
+        BookMindAuth.handleAuthFailure();
+      }
+      return null;
     }
+
+    if (window.BookMindAuth?.isAccessTokenExpired?.(token)) {
+      const fresh = await BookMindAuth.ensureFreshSession({ clearOnFailure: redirect });
+      if (!fresh) {
+        if (redirect && BookMindAuth.handleAuthFailure) {
+          BookMindAuth.handleAuthFailure();
+        }
+        return null;
+      }
+      token = BookMindAuth.getAccessToken();
+    }
+
     return token;
   },
 
@@ -69,27 +113,16 @@ const BookMindAPI = {
       body: body == null ? undefined : JSON.stringify(body),
     });
 
-    if (response.status === 401 && auth && !_retried && window.BookMindAuth?.refreshSession) {
-      const refreshed = await BookMindAuth.refreshSession();
+    const rawBody = await response.text();
+    const data = this._parseJsonBody(rawBody);
+
+    if (auth && !_retried && this._isAuthExpired(response.status, data, rawBody)) {
+      const refreshed = await this._refreshAndRetry({ redirect });
       if (refreshed) {
         return this.request(path, { method, body, auth, redirect, _retried: true });
       }
-      if (redirect) {
-        const next = encodeURIComponent(window.location.pathname + window.location.search);
-        window.location.replace(`/login.html?next=${next}`);
-        return null;
-      }
+      if (redirect) return null;
       throw new Error("Your session has expired. Please sign in again.");
-    }
-
-    const rawBody = await response.text();
-    let data = {};
-    if (rawBody) {
-      try {
-        data = JSON.parse(rawBody);
-      } catch {
-        data = { raw: rawBody };
-      }
     }
 
     if (!response.ok) {
