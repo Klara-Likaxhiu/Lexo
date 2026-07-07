@@ -3908,6 +3908,10 @@ html.theme-dark .quiz-custom-tag {
   border: 1px solid #E5DFD4;
 }
 
+.dna-progress-card[hidden] {
+  display: none !important;
+}
+
 .dna-progress-card .eyebrow {
   color: #7A6F5E;
 }

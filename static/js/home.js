@@ -11,6 +11,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     await BookMindAuth.whenReady();
   }
 
+  if (window.BookMindUserData?.hydrate) {
+    try {
+      await BookMindUserData.hydrate();
+    } catch {
+      /* offline */
+    }
+  }
+
   const user = window.BookMindAuth?.getCurrentUser();
   const name = user?.username || "Reader";
   let profile = JSON.parse(localStorage.getItem("readerProfile"));
@@ -79,26 +87,34 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  function updateDNAProgress() {
+  function isReaderDnaComplete() {
     const completion = Number(localStorage.getItem("reader_profile_completion")) || 0;
-    const progressCard = document.querySelector(".dna-progress-card");
+    if (completion >= 100) return true;
+
+    try {
+      const storedProfile = JSON.parse(localStorage.getItem("readerProfile") || "null");
+      if (storedProfile?.quiz_state?.completion >= 100) return true;
+    } catch {
+      /* ignore */
+    }
+
+    return false;
+  }
+
+  function updateDNAProgress() {
+    const progressCard = document.getElementById("dnaProgressCard");
     const continueButtons = ["continueDiscoveryTop", "continueDiscoveryMain"];
 
-    if (completion >= 100) {
-      if (progressCard) progressCard.hidden = true;
-
-      continueButtons.forEach(id => {
-        const button = document.getElementById(id);
-        if (button) button.hidden = true;
-      });
+    if (isReaderDnaComplete()) {
+      progressCard?.remove();
+      continueButtons.forEach(id => document.getElementById(id)?.remove());
       return;
     }
 
-    if (progressCard) progressCard.hidden = false;
+    const completion = Number(localStorage.getItem("reader_profile_completion")) || 0;
 
     document.getElementById("dnaProgressTitle").textContent =
       completion > 0 ? `${completion}% Complete` : "Start Your Reader DNA";
-
     document.getElementById("dnaProgressFill").style.width = `${completion}%`;
 
     const subtitle = document.getElementById("dnaProgressSubtitle");
@@ -106,10 +122,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (completion <= 0) {
       continueButtons.forEach(id => {
         const button = document.getElementById(id);
-        if (button) {
-          button.hidden = false;
-          button.textContent = "Start Reader DNA Quiz";
-        }
+        if (button) button.textContent = "Start Reader DNA Quiz";
       });
 
       if (subtitle) {
@@ -120,10 +133,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     continueButtons.forEach(id => {
       const button = document.getElementById(id);
-      if (button) {
-        button.hidden = false;
-        button.textContent = "Continue Quiz";
-      }
+      if (button) button.textContent = "Continue Quiz";
     });
 
     if (subtitle) {
