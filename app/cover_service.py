@@ -8,7 +8,13 @@ from difflib import SequenceMatcher
 
 import httpx
 
-from app.cover_store import format_source, get_cached_cover, get_cached_cover_by_isbn, upsert_cover
+from app.cover_store import (
+    format_source,
+    get_cover_row,
+    is_lookup_blocked,
+    record_lookup_failure,
+    upsert_cover,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -370,6 +376,30 @@ def _from_isbn(isbn: str | None) -> str | None:
     return None
 
 
+def _result_from_row(
+    cached: dict,
+    *,
+    cover_url: str,
+    cover_source: str,
+    cached_flag: bool = True,
+) -> dict:
+    return {
+        "cover_url": cover_url,
+        "cover_source": cover_source,
+        "source": format_source(cover_source),
+        "cached": cached_flag,
+        "book_id": cached.get("book_id"),
+        "cache_key": cached.get("book_id"),
+        "manual_cover_url": cached.get("manual_cover_url"),
+    }
+
+
+def _manual_cover_from_row(cached: dict | None) -> str | None:
+    if not cached:
+        return None
+    return normalize_cover_url(cached.get("manual_cover_url"))
+
+
 def resolve_cover(
     *,
     title: str,
@@ -379,7 +409,19 @@ def resolve_cover(
     google_id: str | None = None,
     open_library_key: str | None = None,
 ) -> dict:
-    """Resolve a cover URL using cache → provided URL → Google → Open Library → ISBN."""
+    """Hybrid cover resolution.
+
+    Priority:
+      1. Existing cover_url on the book payload
+      2. Cached auto success in Supabase (prior Google / Open Library / ISBN)
+      3. Google Books (skipped when lookup_failed_at is within TTL)
+      4. Open Library (+ ISBN CDN)
+      5. Supabase manual_cover_url admin override
+      6. None → frontend shows placeholder
+
+    Every successful auto result is cached in Supabase. Failed auto lookups are
+    recorded with lookup_failed_at to avoid hammering external APIs.
+    """
     title = (title or "").strip()
     if not title:
         result = {"cover_url": None, "cover_source": None, "cached": False, "cache_key": ""}
@@ -388,22 +430,9 @@ def resolve_cover(
 
     author = (author or "").strip() or None
     book_id = make_book_id(title, author, isbn)
+    row = get_cover_row(book_id=book_id, isbn=isbn, title=title, author=author)
 
-    cached = get_cached_cover(book_id) or get_cached_cover_by_isbn(isbn)
-    if cached and cached.get("cover_url"):
-        url = normalize_cover_url(cached["cover_url"])
-        if url:
-            result = {
-                "cover_url": url,
-                "cover_source": "cache",
-                "source": cached.get("source") or "Cache",
-                "cached": True,
-                "book_id": cached.get("book_id") or book_id,
-                "cache_key": cached.get("book_id") or book_id,
-            }
-            _log_cover_result(title, author, result)
-            return result
-
+    # 1. Existing cover_url on the book.
     if cover_url:
         normalized = normalize_cover_url(cover_url)
         if normalized and _cover_url_is_usable(normalized):
@@ -418,51 +447,90 @@ def resolve_cover(
             _log_cover_result(title, author, result)
             return result
 
-    google_url, google_book = _from_google(title, author, google_id)
-    resolved_isbn = isbn or (google_book or {}).get("isbn")
-    save_id = make_book_id(title, author, resolved_isbn)
+    # Cached auto success from a previous lookup (fast path — no external APIs).
+    if row and row.get("cover_url"):
+        cached_url = normalize_cover_url(row["cover_url"])
+        if cached_url and _cover_url_is_usable(cached_url):
+            result = _result_from_row(
+                row,
+                cover_url=cached_url,
+                cover_source=row.get("source") or "cache",
+            )
+            _log_cover_result(title, author, result)
+            return result
 
-    if google_url:
-        result = _cache_and_return(
-            book_id=save_id,
-            title=title,
-            author=author,
-            isbn=resolved_isbn,
-            cover_url=google_url,
-            cover_source="google_books",
-        )
-        _log_cover_result(title, author, result)
-        return result
+    resolved_isbn = isbn
+    save_id = book_id
 
-    ol_url, ol_book = _from_open_library(title, author, open_library_key)
-    resolved_isbn = resolved_isbn or (ol_book or {}).get("isbn")
-    save_id = make_book_id(title, author, resolved_isbn)
-
-    if ol_url:
-        result = _cache_and_return(
-            book_id=save_id,
-            title=title,
-            author=author,
-            isbn=resolved_isbn,
-            cover_url=ol_url,
-            cover_source="open_library",
-        )
-        _log_cover_result(title, author, result)
-        return result
-
-    isbn_url = _from_isbn(resolved_isbn)
-    if isbn_url:
+    # Skip Google / Open Library when a recent automatic lookup already failed.
+    if not is_lookup_blocked(row):
+        google_url, google_book = _from_google(title, author, google_id)
+        resolved_isbn = resolved_isbn or (google_book or {}).get("isbn")
         save_id = make_book_id(title, author, resolved_isbn)
-        result = _cache_and_return(
-            book_id=save_id,
-            title=title,
-            author=author,
-            isbn=resolved_isbn,
-            cover_url=isbn_url,
-            cover_source="isbn",
-        )
+
+        if google_url:
+            result = _cache_and_return(
+                book_id=save_id,
+                title=title,
+                author=author,
+                isbn=resolved_isbn,
+                cover_url=google_url,
+                cover_source="google_books",
+            )
+            _log_cover_result(title, author, result)
+            return result
+
+        ol_url, ol_book = _from_open_library(title, author, open_library_key)
+        resolved_isbn = resolved_isbn or (ol_book or {}).get("isbn")
+        save_id = make_book_id(title, author, resolved_isbn)
+
+        if ol_url:
+            result = _cache_and_return(
+                book_id=save_id,
+                title=title,
+                author=author,
+                isbn=resolved_isbn,
+                cover_url=ol_url,
+                cover_source="open_library",
+            )
+            _log_cover_result(title, author, result)
+            return result
+
+        isbn_url = _from_isbn(resolved_isbn)
+        if isbn_url:
+            save_id = make_book_id(title, author, resolved_isbn)
+            result = _cache_and_return(
+                book_id=save_id,
+                title=title,
+                author=author,
+                isbn=resolved_isbn,
+                cover_url=isbn_url,
+                cover_source="isbn",
+            )
+            _log_cover_result(title, author, result)
+            return result
+
+    # 5. Admin manual override stored in Supabase.
+    manual_url = _manual_cover_from_row(row)
+    if manual_url:
+        result = {
+            "cover_url": manual_url,
+            "cover_source": "manual",
+            "source": format_source("manual"),
+            "cached": True,
+            "book_id": (row or {}).get("book_id") or book_id,
+            "cache_key": (row or {}).get("book_id") or book_id,
+            "manual_cover_url": manual_url,
+        }
         _log_cover_result(title, author, result)
         return result
+
+    record_lookup_failure(
+        book_id=book_id,
+        title=title,
+        author=author,
+        isbn=isbn,
+    )
 
     result = {
         "cover_url": None,
@@ -471,6 +539,7 @@ def resolve_cover(
         "cached": False,
         "book_id": book_id,
         "cache_key": book_id,
+        "lookup_failed": True,
     }
     _log_cover_result(title, author, result)
     return result
@@ -650,8 +719,10 @@ def enrich_profile_recommendations(profile_data: dict | None, *, cache_only: boo
 
         if cache_only:
             book_id = make_book_id(title, author, isbn)
-            cached = get_cached_cover(book_id) or get_cached_cover_by_isbn(isbn)
-            url = normalize_cover_url((cached or {}).get("cover_url"))
+            cached = get_cover_row(book_id=book_id, isbn=isbn, title=title, author=author)
+            auto_url = normalize_cover_url((cached or {}).get("cover_url"))
+            manual_url = normalize_cover_url((cached or {}).get("manual_cover_url"))
+            url = auto_url or manual_url
             if url:
                 if not isinstance(item.get("book_data"), dict):
                     item["book_data"] = {}

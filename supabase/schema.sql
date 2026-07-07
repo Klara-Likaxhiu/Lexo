@@ -250,7 +250,9 @@ create table if not exists public.book_covers (
   isbn text,
   title text not null,
   author text,
-  cover_url text not null,
+  cover_url text,
+  manual_cover_url text,
+  lookup_failed_at timestamptz,
   source text not null default 'Unknown',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()

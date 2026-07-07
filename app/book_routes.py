@@ -1,11 +1,18 @@
+import os
 import re
 from typing import Literal
 
 import httpx
-from fastapi import APIRouter, HTTPException, Query
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Header, HTTPException, Query
+from pydantic import BaseModel, Field, HttpUrl
 
-from app.cover_service import resolve_cover, resolve_covers_batch
+from app.cover_service import (
+    make_book_id,
+    normalize_cover_url,
+    resolve_cover,
+    resolve_covers_batch,
+)
+from app.cover_store import get_cover_row, upsert_manual_cover
 
 router = APIRouter(prefix="/api/books", tags=["Books"])
 
@@ -25,6 +32,25 @@ class CoverBatchRequest(BaseModel):
     books: list[CoverResolveRequest] = Field(default_factory=list, max_length=24)
 
 
+class ManualCoverRequest(BaseModel):
+    title: str = Field(min_length=1)
+    author: str | None = None
+    isbn: str | None = None
+    book_id: str | None = None
+    manual_cover_url: HttpUrl
+
+
+def _require_cover_admin(x_cover_admin_key: str | None) -> None:
+    expected = os.getenv("BOOKMIND_COVER_ADMIN_KEY", "").strip()
+    if not expected:
+        raise HTTPException(
+            status_code=503,
+            detail="Manual cover admin key is not configured on the server.",
+        )
+    if not x_cover_admin_key or x_cover_admin_key.strip() != expected:
+        raise HTTPException(status_code=403, detail="Invalid cover admin key.")
+
+
 @router.post("/resolve-cover")
 def resolve_cover_endpoint(data: CoverResolveRequest) -> dict:
     """Resolve the best available cover for a single book."""
@@ -36,6 +62,60 @@ def resolve_covers_endpoint(data: CoverBatchRequest) -> dict:
     """Resolve covers for multiple books in one request."""
     books = resolve_covers_batch([book.model_dump() for book in data.books])
     return {"results": books}
+
+
+@router.get("/covers/record")
+def get_cover_record(
+    title: str = Query(..., min_length=1),
+    author: str | None = Query(default=None),
+    isbn: str | None = Query(default=None),
+    x_cover_admin_key: str | None = Header(default=None, alias="X-Cover-Admin-Key"),
+) -> dict:
+    """Admin: inspect cached auto cover, manual override, and lookup failure state."""
+    _require_cover_admin(x_cover_admin_key)
+    book_id = make_book_id(title, author, isbn)
+    row = get_cover_row(book_id=book_id, isbn=isbn, title=title, author=author)
+    return {
+        "book_id": book_id,
+        "record": row,
+        "resolved": resolve_cover(title=title, author=author, isbn=isbn),
+    }
+
+
+@router.put("/covers/manual")
+def set_manual_cover(
+    data: ManualCoverRequest,
+    x_cover_admin_key: str | None = Header(default=None, alias="X-Cover-Admin-Key"),
+) -> dict:
+    """Admin: set a manual cover URL for books automatic lookup cannot find."""
+    _require_cover_admin(x_cover_admin_key)
+
+    manual_url = normalize_cover_url(str(data.manual_cover_url))
+    if not manual_url:
+        raise HTTPException(status_code=400, detail="manual_cover_url is required.")
+
+    book_id = (data.book_id or "").strip() or make_book_id(data.title, data.author, data.isbn)
+    row = upsert_manual_cover(
+        book_id=book_id,
+        title=data.title.strip(),
+        author=(data.author or "").strip() or None,
+        isbn=data.isbn,
+        manual_cover_url=manual_url,
+    )
+
+    resolved = resolve_cover(
+        title=data.title.strip(),
+        author=data.author,
+        isbn=data.isbn,
+        cover_url=None,
+    )
+
+    return {
+        "book_id": book_id,
+        "manual_cover_url": manual_url,
+        "record": row,
+        "resolved": resolved,
+    }
 
 
 def _strip_html(text: str) -> str:
