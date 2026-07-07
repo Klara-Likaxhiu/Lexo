@@ -1,5 +1,6 @@
 import os
 import re
+import time
 from typing import Literal
 
 import httpx
@@ -452,7 +453,24 @@ def _fetch_open_library_author_name(author_key: str) -> str | None:
     return data.get("name") or data.get("personal_name")
 
 
+_GOOGLE_BOOKS_COOLDOWN_UNTIL = 0.0
+_GOOGLE_BOOKS_COOLDOWN_SECONDS = 30 * 60
+
+
+def google_books_available() -> bool:
+    """False while Google Books API is in a rate-limit cooldown."""
+    return time.time() >= _GOOGLE_BOOKS_COOLDOWN_UNTIL
+
+
+def _mark_google_books_rate_limited() -> None:
+    global _GOOGLE_BOOKS_COOLDOWN_UNTIL
+    _GOOGLE_BOOKS_COOLDOWN_UNTIL = time.time() + _GOOGLE_BOOKS_COOLDOWN_SECONDS
+
+
 def search_google_books(q: str, limit: int = 6, mode: SearchMode = "all") -> list[dict]:
+    if not google_books_available():
+        return []
+
     url = "https://www.googleapis.com/books/v1/volumes"
     params = {
         "q": _build_google_query(q, mode),
@@ -464,6 +482,10 @@ def search_google_books(q: str, limit: int = 6, mode: SearchMode = "all") -> lis
     try:
         response = httpx.get(url, params=params, timeout=12.0)
     except httpx.HTTPError:
+        return []
+
+    if response.status_code == 429:
+        _mark_google_books_rate_limited()
         return []
 
     if response.status_code != 200:

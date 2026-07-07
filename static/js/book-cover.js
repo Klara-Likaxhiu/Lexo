@@ -8,7 +8,7 @@ const BookMindCoverImage = {
   _imageObserver: null,
   _storageKey: "bookmind_cover_cache_v3",
   _failedStorageKey: "bookmind_cover_failed_v3",
-  _failedTtlMs: 5 * 60 * 1000,
+  _failedTtlMs: 30 * 60 * 1000,
 
   _loadCaches() {
     if (this._cachesLoaded) return;

@@ -66,11 +66,55 @@ _KNOWN_AUTHOR_ALIASES: dict[str, list[str]] = {
     "v.e. schwab": ["VE Schwab", "Victoria Schwab", "V E Schwab", "Schwab"],
     "v e schwab": ["VE Schwab", "Victoria Schwab", "V.E. Schwab", "Schwab"],
     "ve schwab": ["Victoria Schwab", "V.E. Schwab", "V E Schwab", "Schwab"],
+    "victoria schwab": ["V.E. Schwab", "VE Schwab", "V E Schwab"],
+    "neil gaiman": ["Gaiman"],
+    "markus zusak": ["Zusak"],
+    "jane austen": ["Austen"],
+    "matt haig": ["Haig"],
 }
+
+_SUBTITLE_SEPARATORS = (":", " – ", " — ", " - ")
+_HIGH_CONFIDENCE_SCORE = 0.88
+_MAX_GOOGLE_QUERIES = 8
+_MAX_OPEN_LIBRARY_QUERIES = 10
 
 
 def _normalize_author_key(author: str) -> str:
-    return re.sub(r"\s+", " ", author.lower().strip())
+    cleaned = re.sub(r"[^\w\s]", " ", author.lower())
+    return re.sub(r"\s+", " ", cleaned).strip()
+
+
+def _title_search_variants(title: str) -> list[str]:
+    """Build title variants: strip subtitles, parentheticals, and extra punctuation."""
+    base = (title or "").strip()
+    if not base:
+        return []
+
+    variants: list[str] = []
+
+    def add(value: str) -> None:
+        cleaned = re.sub(r"\s+", " ", (value or "").strip())
+        if cleaned and cleaned not in variants:
+            variants.append(cleaned)
+
+    add(base)
+
+    for sep in _SUBTITLE_SEPARATORS:
+        if sep in base:
+            add(base.split(sep, 1)[0])
+
+    no_paren = re.sub(r"\([^)]*\)", "", base)
+    no_paren = re.sub(r"\s+", " ", no_paren).strip()
+    add(no_paren)
+    for sep in _SUBTITLE_SEPARATORS:
+        if sep in no_paren:
+            add(no_paren.split(sep, 1)[0])
+
+    plain = re.sub(r"[^\w\s']", " ", base)
+    plain = re.sub(r"\s+", " ", plain).strip()
+    add(plain)
+
+    return variants
 
 
 def _author_search_variants(author: str | None) -> list[str]:
@@ -86,17 +130,28 @@ def _author_search_variants(author: str | None) -> list[str]:
     if no_dots and no_dots not in variants:
         variants.append(no_dots)
 
-    compact = re.sub(r"[\.\s]+", "", base)
-    if compact:
-        last = base.split()[-1] if base.split() else ""
-        if last and last.lower() != compact.lower():
-            spaced_compact = f"{compact[: len(compact) - len(last)]} {last}".strip()
-            spaced_compact = re.sub(r"\s+", " ", spaced_compact)
-            if spaced_compact and spaced_compact not in variants:
-                variants.append(spaced_compact)
+    spaced_initials = re.sub(
+        r"\b([A-Za-z])\.(?=[A-Za-z])",
+        r"\1. ",
+        base,
+    )
+    spaced_initials = re.sub(r"\s+", " ", spaced_initials).strip()
+    if spaced_initials and spaced_initials not in variants:
+        variants.append(spaced_initials)
 
-    if base.split():
-        last_name = base.split()[-1]
+    parts = base.split()
+    if len(parts) >= 2:
+        last_name = parts[-1]
+        initials = "".join(part.replace(".", "") for part in parts[:-1] if part)
+        if initials and last_name:
+            compact = f"{initials} {last_name}".strip()
+            if compact not in variants:
+                variants.append(compact)
+            spaced = f"{' '.join(part.replace('.', '') for part in parts[:-1])} {last_name}".strip()
+            spaced = re.sub(r"\s+", " ", spaced)
+            if spaced and spaced not in variants:
+                variants.append(spaced)
+
         if last_name and last_name not in variants and len(last_name) > 2:
             variants.append(last_name)
 
@@ -108,21 +163,60 @@ def _author_search_variants(author: str | None) -> list[str]:
     return variants
 
 
-def _google_queries(title: str, author: str | None) -> list[str]:
-    """Build aggressive Google Books queries, quoted intitle/inauthor first."""
-    queries: list[str] = []
-    safe_title = title.replace('"', "")
+def _author_match_score(candidate: str | None, target: str | None) -> float:
+    if not target:
+        return 0.5
+    if not candidate:
+        return 0.0
 
-    for author_variant in _author_search_variants(author) or [None]:
-        if author_variant:
-            safe_author = author_variant.replace('"', "")
-            queries.append(f'intitle:"{safe_title}" inauthor:"{safe_author}"')
-            queries.append(f"intitle:{safe_title} inauthor:{safe_author}")
-            queries.append(f"{safe_title} {safe_author}")
-        else:
-            queries.append(f'intitle:"{safe_title}"')
-            queries.append(f"intitle:{safe_title}")
-            queries.append(safe_title)
+    target_variants = {_normalize_author_key(v) for v in _author_search_variants(target)}
+    target_variants.add(_normalize_author_key(target))
+    candidate_key = _normalize_author_key(candidate)
+
+    if candidate_key in target_variants:
+        return 1.0
+
+    target_last = _normalize_author_key(target).split()[-1]
+    candidate_last = candidate_key.split()[-1]
+    if target_last and candidate_last == target_last:
+        return 0.85
+
+    best = max(_similarity(candidate_key, variant) for variant in target_variants)
+    return best * 0.75
+
+
+def _combined_match_score(
+    candidate_title: str | None,
+    candidate_author: str | None,
+    target_title: str,
+    target_author: str | None,
+) -> float:
+    title_score = _title_match_score(candidate_title, target_title)
+    author_score = _author_match_score(candidate_author, target_author)
+    return title_score * 0.72 + author_score * 0.28
+
+
+def _google_queries(title: str, author: str | None) -> list[str]:
+    """Build Google Books queries — primary title + author variants first."""
+    queries: list[str] = []
+    titles = _title_search_variants(title) or [title]
+    authors = _author_search_variants(author) or [None]
+
+    for title_variant in titles[:3]:
+        safe_title = title_variant.replace('"', "")
+        for author_variant in authors[:4]:
+            if author_variant:
+                safe_author = author_variant.replace('"', "")
+                queries.append(f'intitle:"{safe_title}" inauthor:"{safe_author}"')
+                queries.append(f"intitle:{safe_title} inauthor:{safe_author}")
+            else:
+                queries.append(f'intitle:"{safe_title}"')
+                queries.append(f"intitle:{safe_title}")
+
+    if author:
+        safe_title = titles[0].replace('"', "")
+        safe_author = author.replace('"', "")
+        queries.append(f"{safe_title} {safe_author}")
 
     seen: set[str] = set()
     unique: list[str] = []
@@ -130,16 +224,21 @@ def _google_queries(title: str, author: str | None) -> list[str]:
         if query not in seen:
             seen.add(query)
             unique.append(query)
-    return unique
+    return unique[:_MAX_GOOGLE_QUERIES]
 
 
 def _open_library_queries(title: str, author: str | None) -> list[str]:
-    """Build Open Library queries — title first, then title + author variants."""
-    queries: list[str] = [title, f"title:{title}"]
+    """Build Open Library queries — normalized title + author variants."""
+    queries: list[str] = []
+    titles = _title_search_variants(title) or [title]
+    authors = _author_search_variants(author)
 
-    for author_variant in _author_search_variants(author):
-        queries.append(f"{title} {author_variant}")
-        queries.append(f"title:{title} author:{author_variant}")
+    for title_variant in titles[:3]:
+        queries.append(title_variant)
+        queries.append(f"title:{title_variant}")
+        for author_variant in authors[:4]:
+            queries.append(f"{title_variant} {author_variant}")
+            queries.append(f"title:{title_variant} author:{author_variant}")
 
     seen: set[str] = set()
     unique: list[str] = []
@@ -147,7 +246,7 @@ def _open_library_queries(title: str, author: str | None) -> list[str]:
         if query not in seen:
             seen.add(query)
             unique.append(query)
-    return unique
+    return unique[:_MAX_OPEN_LIBRARY_QUERIES]
 
 
 def _log_cover_result(title: str, author: str | None, result: dict) -> None:
@@ -281,12 +380,36 @@ def _cache_and_return(
     }
 
 
+def _pick_best_cover_candidate(
+    candidates: list[tuple[float, dict]],
+    *,
+    target_title: str,
+    target_author: str | None,
+) -> dict | None:
+    if not candidates:
+        return None
+    rescored: list[tuple[float, dict]] = []
+    for _, book in candidates:
+        score = _combined_match_score(
+            book.get("title"),
+            book.get("author"),
+            target_title,
+            target_author,
+        )
+        rescored.append((score, book))
+    rescored.sort(key=lambda item: item[0], reverse=True)
+    best_score, best_book = rescored[0]
+    if best_score < 0.68:
+        return None
+    return best_book
+
+
 def _from_google(
     title: str,
     author: str | None,
     google_id: str | None = None,
 ) -> tuple[str | None, dict | None]:
-    from app.book_routes import fetch_google_volume, search_google_books
+    from app.book_routes import fetch_google_volume, google_books_available, search_google_books
 
     if google_id:
         book = fetch_google_volume(google_id)
@@ -295,6 +418,9 @@ def _from_google(
             if url and _cover_url_is_usable(url):
                 return url, book
 
+    if not google_books_available():
+        return None, None
+
     queries = _google_queries(title, author)
 
     seen_ids: set[str] = set()
@@ -302,22 +428,36 @@ def _from_google(
 
     for query in queries:
         for book in search_google_books(query, limit=5):
+            if not google_books_available():
+                break
+
             book_id = book.get("id") or book.get("title")
             if book_id in seen_ids:
                 continue
             seen_ids.add(book_id)
             if _is_junk_title(book.get("title")):
                 continue
-            score = _title_match_score(book.get("title"), title)
+
+            score = _combined_match_score(
+                book.get("title"),
+                book.get("author"),
+                title,
+                author,
+            )
             if score < 0.68:
                 continue
+
             url = normalize_cover_url(book.get("cover_url"))
             if url and _cover_url_is_usable(url):
+                if score >= _HIGH_CONFIDENCE_SCORE:
+                    return url, book
                 candidates.append((score, book))
 
-    if candidates:
-        candidates.sort(key=lambda item: item[0], reverse=True)
-        best = candidates[0][1]
+        if candidates:
+            break
+
+    best = _pick_best_cover_candidate(candidates, target_title=title, target_author=author)
+    if best:
         return normalize_cover_url(best.get("cover_url")), best
 
     return None, None
@@ -350,16 +490,29 @@ def _from_open_library(
             seen_keys.add(key)
             if _is_junk_title(book.get("title")):
                 continue
-            score = _title_match_score(book.get("title"), title)
+
+            score = _combined_match_score(
+                book.get("title"),
+                book.get("author"),
+                title,
+                author,
+            )
             if score < 0.68:
                 continue
+
             url = normalize_cover_url(book.get("cover_url"))
+            if not url and book.get("open_library_key"):
+                continue
             if url and _cover_url_is_usable(url):
+                if score >= _HIGH_CONFIDENCE_SCORE:
+                    return url, book
                 candidates.append((score, book))
 
-    if candidates:
-        candidates.sort(key=lambda item: item[0], reverse=True)
-        best = candidates[0][1]
+        if candidates:
+            break
+
+    best = _pick_best_cover_candidate(candidates, target_title=title, target_author=author)
+    if best:
         return normalize_cover_url(best.get("cover_url")), best
 
     return None, None
@@ -464,6 +617,7 @@ def resolve_cover(
 
     # Skip Google / Open Library when a recent automatic lookup already failed.
     if not is_lookup_blocked(row):
+        # 2. Google Books (title + author, with normalized variants).
         google_url, google_book = _from_google(title, author, google_id)
         resolved_isbn = resolved_isbn or (google_book or {}).get("isbn")
         save_id = make_book_id(title, author, resolved_isbn)
@@ -480,6 +634,7 @@ def resolve_cover(
             _log_cover_result(title, author, result)
             return result
 
+        # 3. Open Library (title + author variants).
         ol_url, ol_book = _from_open_library(title, author, open_library_key)
         resolved_isbn = resolved_isbn or (ol_book or {}).get("isbn")
         save_id = make_book_id(title, author, resolved_isbn)
@@ -496,7 +651,8 @@ def resolve_cover(
             _log_cover_result(title, author, result)
             return result
 
-        isbn_url = _from_isbn(resolved_isbn)
+        # 4. ISBN cover CDN when an ISBN is known.
+        isbn_url = _from_isbn(resolved_isbn or isbn)
         if isbn_url:
             save_id = make_book_id(title, author, resolved_isbn)
             result = _cache_and_return(
@@ -510,7 +666,7 @@ def resolve_cover(
             _log_cover_result(title, author, result)
             return result
 
-    # 5. Admin manual override stored in Supabase.
+    # 5. Manual override — only when automatic sources fail.
     manual_url = _manual_cover_from_row(row)
     if manual_url:
         result = {
