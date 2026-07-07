@@ -42,3 +42,9 @@ class ReaderIntelligenceRequest(BaseModel):
     library: dict | None = None
     today_mood: str | None = None
     today_goal: str | None = None
+
+
+class ReaderBadgesRequest(BaseModel):
+    reader_profile: dict | None = None
+    library: dict | None = None
+    stats: dict | None = None

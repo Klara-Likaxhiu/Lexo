@@ -13,7 +13,9 @@ from app.reader_models import (
     ReadingCompanionRequest,
     ReadingPathsRequest,
     ReaderIntelligenceRequest,
+    ReaderBadgesRequest,
 )
+from app.badge_service import generate_personalized_badges
 
 router = APIRouter(prefix="/api/reader", tags=["Reader"])
 
@@ -63,3 +65,13 @@ def reader_intelligence(data: ReaderIntelligenceRequest) -> dict:
         today_mood=data.today_mood,
         today_goal=data.today_goal,
     )
+
+
+@router.post("/badges")
+def reader_badges(data: ReaderBadgesRequest) -> dict:
+    badges = generate_personalized_badges(
+        stats=data.stats or {},
+        library=data.library,
+        reader_profile=data.reader_profile,
+    )
+    return {"badges": badges}

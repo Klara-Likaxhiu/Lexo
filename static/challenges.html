@@ -6,6 +6,8 @@
   <script src="js/auth.js"></script>
   <script src="js/api.js"></script>
   <script src="js/library.js" defer></script>
+  <script src="js/badge-catalog.js" defer></script>
+  <script src="js/badge-engine.js" defer></script>
   <script src="js/challenges.js" defer></script>
 </head>
 <body>
@@ -32,7 +34,7 @@
     <div class="dashboard-header">
       <div>
         <h1>Challenges &amp; Achievements</h1>
-        <p>Set reading goals, keep your streak alive, and earn badges as you read.</p>
+        <p>Set reading goals, keep your streak alive, and earn personalized badges as you read.</p>
       </div>
     </div>
 
@@ -55,10 +57,51 @@
       <p id="goalMessage" class="small-muted"></p>
     </section>
 
+    <section class="badge-stats-bar card" id="badgeStatsBar"></section>
+
+    <section class="newest-badges card" id="newestBadgesSection" hidden>
+      <p class="eyebrow">Recently Earned</p>
+      <h2>Your newest badges</h2>
+      <div class="newest-badges-row" id="newestBadgesRow"></div>
+    </section>
+
     <section class="achievements-section">
-      <p class="eyebrow">Achievements</p>
-      <h2 class="achievements-title">Badges</h2>
-      <div class="badge-grid" id="badgeGrid"></div>
+      <div class="achievements-header">
+        <div>
+          <p class="eyebrow">Achievements</p>
+          <h2 class="achievements-title">Badge Collection</h2>
+        </div>
+        <p class="badge-completion" id="badgeCompletion"></p>
+      </div>
+
+      <div class="badge-toolbar">
+        <div class="badge-tabs" role="tablist">
+          <button type="button" class="badge-tab active" data-tab="all">All</button>
+          <button type="button" class="badge-tab" data-tab="earned">Earned</button>
+          <button type="button" class="badge-tab" data-tab="locked">Locked</button>
+        </div>
+        <div class="badge-filters">
+          <label>
+            <span class="sr-only">Category</span>
+            <select id="filterCategory">
+              <option value="">All categories</option>
+            </select>
+          </label>
+          <label>
+            <span class="sr-only">Rarity</span>
+            <select id="filterRarity">
+              <option value="">All rarities</option>
+              <option value="common">Common</option>
+              <option value="rare">Rare</option>
+              <option value="epic">Epic</option>
+              <option value="legendary">Legendary</option>
+            </select>
+          </label>
+        </div>
+      </div>
+
+      <div class="badge-grid badge-grid-v2" id="badgeGrid"></div>
+      <p class="badge-empty" id="badgeEmpty" hidden>No badges match your filters.</p>
     </section>
 
   </main>

@@ -1,14 +1,17 @@
-/* Reading challenges & achievements: goals, streaks, monthly/yearly counts, badges. */
+/* Reading challenges & achievements: goals, streaks, badges via BookMindBadgeEngine. */
 
 const ICONS = {
   book: '<path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/>',
   calendar: '<rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="M8 2v4"/><path d="M16 2v4"/>',
   flame: '<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>',
   trophy: '<path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0z"/>',
-  compass: '<circle cx="12" cy="12" r="10"/><path d="m16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z"/>',
-  message: '<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22z"/>',
-  target: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
-  check: '<path d="M21.801 10A10 10 0 1 1 17 3.335"/><path d="m9 11 3 3L22 4"/>'
+};
+
+const state = {
+  badges: [],
+  tab: "all",
+  category: "",
+  rarity: "",
 };
 
 function svg(name, cls) {
@@ -38,12 +41,9 @@ function computeStreak(activity) {
   return streak;
 }
 
-function gatherStats() {
+function gatherGoalStats() {
   const library = BookMindLibrary.getLibrary();
   const data = BookMindLibrary.getReadingData();
-  const reviews = JSON.parse(localStorage.getItem("book_reviews")) || [];
-
-  const totalFinished = (library.read || []).length;
 
   const now = new Date();
   const year = now.getFullYear();
@@ -51,7 +51,7 @@ function gatherStats() {
 
   let booksThisYear = 0;
   let booksThisMonth = 0;
-  Object.values(data.finishes).forEach(iso => {
+  Object.values(data.finishes || {}).forEach(iso => {
     const d = new Date(iso);
     if (d.getFullYear() === year) {
       booksThisYear += 1;
@@ -59,23 +59,12 @@ function gatherStats() {
     }
   });
 
-  const genres = new Set(
-    (library.read || [])
-      .map(book => (book.genre || "").trim())
-      .filter(Boolean)
-  );
-
-  const publicReviews = reviews.filter(r => r.visibility === "public").length;
-
   return {
-    totalFinished,
+    totalFinished: (library.read || []).length,
     booksThisYear,
     booksThisMonth,
     streak: computeStreak(data.activity),
     goals: data.goals,
-    genreCount: genres.size,
-    reviewCount: reviews.length,
-    publicReviews
   };
 }
 
@@ -97,81 +86,201 @@ function progressCard({ icon, label, value, goal, unit }) {
 }
 
 function renderProgressCards(stats) {
-  const container = document.getElementById("progressCards");
-  container.innerHTML = [
+  document.getElementById("progressCards").innerHTML = [
     progressCard({
       icon: "calendar",
       label: "This year",
       value: stats.booksThisYear,
       goal: stats.goals.yearly,
-      unit: stats.goals.yearly ? "books" : "books finished this year"
+      unit: stats.goals.yearly ? "books" : "books finished this year",
     }),
     progressCard({
       icon: "book",
       label: "This month",
       value: stats.booksThisMonth,
       goal: stats.goals.monthly,
-      unit: stats.goals.monthly ? "books" : "books finished this month"
+      unit: stats.goals.monthly ? "books" : "books finished this month",
     }),
     progressCard({
       icon: "flame",
       label: "Current streak",
       value: stats.streak,
       goal: 0,
-      unit: stats.streak === 1 ? "day of reading" : "days of reading"
+      unit: stats.streak === 1 ? "day of reading" : "days of reading",
     }),
     progressCard({
       icon: "trophy",
       label: "All time",
       value: stats.totalFinished,
       goal: 0,
-      unit: stats.totalFinished === 1 ? "book finished" : "books finished"
-    })
+      unit: stats.totalFinished === 1 ? "book finished" : "books finished",
+    }),
   ].join("");
 }
 
-function buildBadges(stats) {
-  return [
-    { icon: "book", label: "First Finish", desc: "Finish your first book", value: stats.totalFinished, goal: 1 },
-    { icon: "book", label: "Bookworm", desc: "Finish 5 books", value: stats.totalFinished, goal: 5 },
-    { icon: "book", label: "Bibliophile", desc: "Finish 10 books", value: stats.totalFinished, goal: 10 },
-    { icon: "trophy", label: "Scholar", desc: "Finish 25 books", value: stats.totalFinished, goal: 25 },
-    { icon: "compass", label: "Genre Explorer", desc: "Read across 3 genres", value: stats.genreCount, goal: 3 },
-    { icon: "message", label: "Reviewer", desc: "Write your first review", value: stats.reviewCount, goal: 1 },
-    { icon: "message", label: "Critic", desc: "Write 5 reviews", value: stats.reviewCount, goal: 5 },
-    { icon: "compass", label: "Community Voice", desc: "Share a public review", value: stats.publicReviews, goal: 1 },
-    { icon: "flame", label: "On Fire", desc: "Reach a 3-day streak", value: stats.streak, goal: 3 },
-    { icon: "flame", label: "Consistent", desc: "Reach a 7-day streak", value: stats.streak, goal: 7 },
-    { icon: "target", label: "Goal Crusher", desc: "Hit your yearly goal", value: stats.booksThisYear, goal: stats.goals.yearly || 0 }
-  ];
+function formatUnlockDate(iso) {
+  if (!iso) return "";
+  try {
+    return new Date(iso).toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  } catch {
+    return "";
+  }
 }
 
-function renderBadges(stats) {
-  const grid = document.getElementById("badgeGrid");
-  const badges = buildBadges(stats);
+function rarityLabel(rarity) {
+  return String(rarity || "common").charAt(0).toUpperCase() + String(rarity || "common").slice(1);
+}
 
-  grid.innerHTML = badges
-    .map(badge => {
-      const target = badge.goal && badge.goal > 0 ? badge.goal : null;
-      const earned = target != null && badge.value >= target;
-      const status = target == null
-        ? "Set a yearly goal to unlock"
-        : earned
-          ? "Earned"
-          : `${Math.min(badge.value, target)} / ${target}`;
+function categoryLabel(category) {
+  const meta = BookMindBadgeCatalog.CATEGORIES[category];
+  return meta ? `${meta.emoji} ${meta.label}` : category;
+}
 
-      return `
-        <div class="badge ${earned ? "earned" : "locked"}">
-          <div class="badge-icon">${svg(badge.icon)}</div>
-          <div class="badge-body">
-            <strong>${badge.label}</strong>
-            <p>${badge.desc}</p>
-            <span class="badge-status">${earned ? svg("check", "icon-inline") + " " : ""}${status}</span>
-          </div>
+function renderBadgeCard(badge, compact) {
+  const engine = BookMindBadgeEngine;
+  const earned = badge.earned;
+  const animate = badge.isNew ? " badge-pop" : "";
+  const rarity = badge.rarity || "common";
+  const cat = BookMindBadgeCatalog.CATEGORIES[badge.category];
+
+  const progressHtml = !earned
+    ? `
+      <div class="badge-progress">
+        <div class="badge-progress-fill" style="width:${badge.progress}%"></div>
+      </div>
+      <span class="badge-progress-label">${Math.min(badge.value, badge.goal)} / ${badge.goal}</span>
+    `
+    : "";
+
+  const unlockHtml = earned && badge.unlockedAt
+    ? `<span class="badge-unlock">Unlocked ${formatUnlockDate(badge.unlockedAt)}</span>`
+    : "";
+
+  const bodyClass = compact ? "badge-v2 badge-v2-compact" : "badge-v2";
+
+  return `
+    <article class="${bodyClass} ${earned ? "earned" : "locked"} rarity-${rarity}${animate}" data-id="${badge.id}">
+      <div class="badge-icon badge-icon-v2">${engine.svg(badge.icon)}</div>
+      <div class="badge-body">
+        <div class="badge-meta-row">
+          <span class="badge-rarity rarity-${rarity}">${rarityLabel(rarity)}</span>
+          ${cat ? `<span class="badge-category">${cat.emoji}</span>` : ""}
         </div>
-      `;
-    })
-    .join("");
+        <strong>${badge.title}</strong>
+        <p>${badge.description}</p>
+        ${progressHtml}
+        ${unlockHtml}
+      </div>
+    </article>
+  `;
+}
+
+function filterBadges(badges) {
+  return badges.filter(b => {
+    if (state.tab === "earned" && !b.earned) return false;
+    if (state.tab === "locked" && b.earned) return false;
+    if (state.category && b.category !== state.category) return false;
+    if (state.rarity && b.rarity !== state.rarity) return false;
+    return true;
+  });
+}
+
+function renderBadgeStats(summary) {
+  const bar = document.getElementById("badgeStatsBar");
+  const rarityItems = BookMindBadgeCatalog.RARITIES.map(r => {
+    const count = summary.byRarity[r] || 0;
+    return `<span class="badge-stat-pill rarity-${r}">${rarityLabel(r)}: ${count}</span>`;
+  }).join("");
+
+  bar.innerHTML = `
+    <div class="badge-stats-grid">
+      <div class="badge-stat">
+        <strong>${summary.earned}</strong>
+        <span>Earned</span>
+      </div>
+      <div class="badge-stat">
+        <strong>${summary.locked}</strong>
+        <span>Locked</span>
+      </div>
+      <div class="badge-stat">
+        <strong>${summary.total}</strong>
+        <span>Total</span>
+      </div>
+      <div class="badge-stat badge-stat-wide">
+        <div class="badge-overall-bar">
+          <div style="width:${summary.percent}%"></div>
+        </div>
+        <span>${summary.percent}% collection complete</span>
+      </div>
+    </div>
+    <div class="badge-rarity-stats">${rarityItems}</div>
+  `;
+
+  document.getElementById("badgeCompletion").textContent =
+    `${summary.earned} of ${summary.total} badges earned (${summary.percent}%)`;
+}
+
+function renderNewestBadges(newest) {
+  const section = document.getElementById("newestBadgesSection");
+  const row = document.getElementById("newestBadgesRow");
+
+  if (!newest.length) {
+    section.hidden = true;
+    return;
+  }
+
+  section.hidden = false;
+  row.innerHTML = newest.map(b => renderBadgeCard(b, true)).join("");
+}
+
+function renderBadges() {
+  const filtered = filterBadges(state.badges);
+  const grid = document.getElementById("badgeGrid");
+  const empty = document.getElementById("badgeEmpty");
+
+  grid.innerHTML = filtered.map(b => renderBadgeCard(b, false)).join("");
+  empty.hidden = filtered.length > 0;
+
+  if (state.badges.some(b => b.isNew)) {
+    setTimeout(() => {
+      BookMindBadgeEngine.markSeen(state.badges.filter(b => b.isNew).map(b => b.id));
+    }, 1200);
+  }
+}
+
+function populateCategoryFilter() {
+  const select = document.getElementById("filterCategory");
+  Object.entries(BookMindBadgeCatalog.CATEGORIES).forEach(([key, meta]) => {
+    const opt = document.createElement("option");
+    opt.value = key;
+    opt.textContent = `${meta.emoji} ${meta.label}`;
+    select.appendChild(opt);
+  });
+}
+
+function setupFilters() {
+  document.querySelectorAll(".badge-tab").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".badge-tab").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      state.tab = btn.dataset.tab;
+      renderBadges();
+    });
+  });
+
+  document.getElementById("filterCategory").addEventListener("change", e => {
+    state.category = e.target.value;
+    renderBadges();
+  });
+
+  document.getElementById("filterRarity").addEventListener("change", e => {
+    state.rarity = e.target.value;
+    renderBadges();
+  });
 }
 
 function setupGoals() {
@@ -186,20 +295,32 @@ function setupGoals() {
   document.getElementById("saveGoalsBtn").addEventListener("click", () => {
     BookMindLibrary.setGoals({
       yearly: yearlyInput.value,
-      monthly: monthlyInput.value
+      monthly: monthlyInput.value,
     });
     message.textContent = "Goals saved.";
-    render();
+    refresh();
     setTimeout(() => (message.textContent = ""), 2500);
   });
 }
 
-function render() {
-  const stats = gatherStats();
-  renderProgressCards(stats);
-  renderBadges(stats);
+async function refresh() {
+  const goalStats = gatherGoalStats();
+  renderProgressCards(goalStats);
+
+  const ctx = BookMindBadgeEngine.buildContext();
+  await BookMindBadgeEngine.fetchAiBadgesFromServer(ctx);
+
+  const { badges } = BookMindBadgeEngine.evaluateAll(ctx);
+  state.badges = badges;
+
+  const summary = BookMindBadgeEngine.stats(badges);
+  renderBadgeStats(summary);
+  renderNewestBadges(summary.newest);
+  renderBadges();
 }
 
+populateCategoryFilter();
+setupFilters();
 setupGoals();
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -208,5 +329,5 @@ document.addEventListener("DOMContentLoaded", async () => {
   } catch {
     /* library optional on challenges page */
   }
-  render();
+  await refresh();
 });
