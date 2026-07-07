@@ -63,11 +63,6 @@ const BookMindAPI = {
       headers.Authorization = `Bearer ${token}`;
     }
 
-    if (auth) {
-      console.log("[BookMindAPI] request", { method, path, authHeader: headers.Authorization || "(missing)" });
-      console.log("auth header:", headers.Authorization);
-    }
-
     const response = await fetch(url, {
       method,
       headers,
@@ -162,16 +157,45 @@ const BookMindAPI = {
     };
   },
 
-  async getReaderIntelligence() {
+  _intelligenceCacheKey(context) {
+    return `${context.today_mood || ""}|${context.today_goal || ""}`;
+  },
+
+  _readIntelligenceCache(context) {
+    try {
+      const meta = JSON.parse(localStorage.getItem("bookmind_intelligence_meta") || "null");
+      if (!meta || meta.key !== this._intelligenceCacheKey(context)) return null;
+      if (Date.now() - meta.at > 30 * 60 * 1000) return null;
+      return JSON.parse(localStorage.getItem("bookmind_reader_intelligence") || "null");
+    } catch {
+      return null;
+    }
+  },
+
+  _writeIntelligenceCache(context, intelligence) {
+    localStorage.setItem("bookmind_reader_intelligence", JSON.stringify(intelligence));
+    localStorage.setItem(
+      "bookmind_intelligence_meta",
+      JSON.stringify({ key: this._intelligenceCacheKey(context), at: Date.now() })
+    );
+  },
+
+  async getReaderIntelligence({ force = false } = {}) {
     const context = await this.getReaderContext();
-    return this.post("/api/reader/intelligence", {
+    if (!force) {
+      const cached = this._readIntelligenceCache(context);
+      if (cached) return cached;
+    }
+
+    const intelligence = await this.post("/api/reader/intelligence", {
       reader_profile: context,
       library: context.library,
       today_mood: context.today_mood,
       today_goal: context.today_goal,
     });
+    this._writeIntelligenceCache(context, intelligence);
+    return intelligence;
   },
 };
 
 window.BookMindAPI = BookMindAPI;
-console.log("BookMindAPI created", window.BookMindAPI);

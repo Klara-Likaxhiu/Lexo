@@ -496,17 +496,12 @@ Use this exact structure:
     excluded = _collect_excluded_titles(reader_profile, library)
     _apply_intelligence_exclusions(parsed, excluded)
 
-    from app.cover_service import enrich_book_entry, enrich_books_in_list
+    from app.cover_service import enrich_book_entry
 
     dashboard = parsed.get("dashboard") or {}
     top_pick = dashboard.get("top_pick")
     if isinstance(top_pick, dict):
         dashboard["top_pick"] = enrich_book_entry(top_pick)
-
-    discover = parsed.get("discover") or {}
-    for section in discover.get("sections", []) or []:
-        if isinstance(section, dict):
-            section["books"] = enrich_books_in_list(section.get("books"))
 
     parsed["engine"] = ai.engine_name()
     return parsed

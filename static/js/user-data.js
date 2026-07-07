@@ -1,5 +1,9 @@
 /** Sync user settings and reader profile with Supabase via API. */
 const BookMindUserData = {
+  _hydratePromise: null,
+  _hydratedAt: 0,
+  _hydrateTtlMs: 5 * 60 * 1000,
+
   async loadSettings() {
     if (!BookMindAuth.isLoggedIn()) return null;
     const data = await BookMindAPI.get("/api/user/settings");
@@ -87,6 +91,7 @@ const BookMindUserData = {
     });
 
     localStorage.setItem("readerProfile", JSON.stringify(profileData));
+    this._hydratedAt = 0;
     return { answers, currentStep, completion };
   },
 
@@ -99,24 +104,31 @@ const BookMindUserData = {
       reading_level: profile.reading_level || profile.readingLevel || "",
       profile_data: profile,
     });
+    this._hydratedAt = 0;
     return data.profile || profile;
   },
 
-  async hydrate() {
+  async hydrate({ force = false } = {}) {
     if (!BookMindAuth.isLoggedIn()) return;
-    try {
-      await Promise.all([this.loadSettings(), this.loadReaderProfile()]);
-    } catch {
-      /* offline or unverified */
-    }
+
+    const freshEnough = !force && this._hydratedAt && Date.now() - this._hydratedAt < this._hydrateTtlMs;
+    if (freshEnough) return;
+
+    if (this._hydratePromise) return this._hydratePromise;
+
+    this._hydratePromise = Promise.all([this.loadSettings(), this.loadReaderProfile()])
+      .then(() => {
+        this._hydratedAt = Date.now();
+      })
+      .catch(() => {
+        /* offline or unverified */
+      })
+      .finally(() => {
+        this._hydratePromise = null;
+      });
+
+    return this._hydratePromise;
   },
 };
 
-document.addEventListener("DOMContentLoaded", async () => {
-  if (window.BookMindAuth?.whenReady) {
-    await BookMindAuth.whenReady();
-  }
-  if (window.BookMindAuth?.isLoggedIn()) {
-    BookMindUserData.hydrate();
-  }
-});
+window.BookMindUserData = BookMindUserData;

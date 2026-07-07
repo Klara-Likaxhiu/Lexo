@@ -2,6 +2,33 @@
 const BookMindCoverImage = {
   _memoryCache: new Map(),
   _pending: new Map(),
+  _sessionKey: "bookmind_cover_cache_v1",
+
+  _loadSessionCache() {
+    if (this._sessionCacheLoaded) return;
+    this._sessionCacheLoaded = true;
+    try {
+      const raw = sessionStorage.getItem(this._sessionKey);
+      if (!raw) return;
+      const entries = JSON.parse(raw);
+      if (entries && typeof entries === "object") {
+        Object.entries(entries).forEach(([key, url]) => {
+          if (url) this._memoryCache.set(key, url);
+        });
+      }
+    } catch {
+      /* ignore */
+    }
+  },
+
+  _saveSessionCache() {
+    try {
+      const entries = Object.fromEntries(this._memoryCache);
+      sessionStorage.setItem(this._sessionKey, JSON.stringify(entries));
+    } catch {
+      /* quota or private mode */
+    }
+  },
 
   bookRef(book) {
     const ai = book?.ai_recommendation || {};
@@ -56,15 +83,6 @@ const BookMindCoverImage = {
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;");
-  },
-
-  logLookup(ref, data, url) {
-    console.log("[BookMindCover]", ref.title, "by", ref.author, "->", {
-      cover_url: url,
-      source: data?.source || data?.cover_source || null,
-      cached: data?.cached ?? false,
-      book_id: data?.book_id || data?.cache_key || null,
-    });
   },
 
   placeholderHtml(ref, options = {}) {
@@ -134,6 +152,7 @@ const BookMindCoverImage = {
     wrap.dataset.coverRetry = "true";
     img.remove();
     this._memoryCache.delete(this.cacheKey(book));
+    this._saveSessionCache();
 
     this.resolve(book, { skipCache: true }).then(url => {
       if (url && wrap.isConnected) {
@@ -149,6 +168,7 @@ const BookMindCoverImage = {
   },
 
   async resolve(ref, options = {}) {
+    this._loadSessionCache();
     const key = this.cacheKey(ref);
     if (!options.skipCache && this._memoryCache.has(key)) {
       const cached = this._memoryCache.get(key);
@@ -158,6 +178,7 @@ const BookMindCoverImage = {
     const existing = this.normalizeUrl(ref.cover_url);
     if (existing && !options.skipCache) {
       this._memoryCache.set(key, existing);
+      this._saveSessionCache();
       return existing;
     }
 
@@ -178,13 +199,14 @@ const BookMindCoverImage = {
       .then(response => (response.ok ? response.json() : {}))
       .then(data => {
         const url = this.normalizeUrl(data.cover_url) || null;
-        this.logLookup(ref, data, url);
-        if (url) this._memoryCache.set(key, url);
+        if (url) {
+          this._memoryCache.set(key, url);
+          this._saveSessionCache();
+        }
         this._pending.delete(key);
         return url;
       })
-      .catch(err => {
-        console.warn("[BookMindCover] lookup failed", ref.title, err);
+      .catch(() => {
         this._pending.delete(key);
         return null;
       });
@@ -211,12 +233,11 @@ const BookMindCoverImage = {
 
   needsLookup(wrap) {
     if (!wrap) return false;
-    const placeholder = wrap.querySelector(".premium-book-placeholder");
+    if (wrap.querySelector(".premium-book-placeholder")) return true;
     const img = wrap.querySelector("img");
-    if (placeholder) return true;
     if (!img) return true;
-    if (wrap.dataset.coverResolved !== "true") return true;
-    return false;
+    if (wrap.dataset.coverResolved === "true") return false;
+    return !this.normalizeUrl(img.src);
   },
 
   async hydrateWrap(wrap, book, options = {}) {
@@ -224,6 +245,13 @@ const BookMindCoverImage = {
 
     const ref = book ? this.bookRef(book) : this.refFromWrap(wrap);
     this.attachRefToWrap(wrap, ref, options);
+
+    const cachedUrl = this.normalizeUrl(ref.cover_url) || this._memoryCache.get(this.cacheKey(ref));
+    if (cachedUrl && this.needsLookup(wrap)) {
+      const imgClass = options.imgClass || wrap.dataset.imgClass || "book-cover-img";
+      this.applyUrlToWrap(wrap, ref, cachedUrl, imgClass);
+      return cachedUrl;
+    }
 
     if (!this.needsLookup(wrap) && wrap.querySelector("img")) {
       return this.normalizeUrl(wrap.querySelector("img").src);
@@ -233,7 +261,7 @@ const BookMindCoverImage = {
     wrap.dataset.coverLoading = "true";
 
     try {
-      const url = await this.resolve(ref, { skipCache: false });
+      const url = await this.resolve(ref);
       if (url && wrap.isConnected) {
         const imgClass = options.imgClass || wrap.dataset.imgClass || "book-cover-img";
         this.applyUrlToWrap(wrap, ref, url, imgClass);
@@ -246,51 +274,87 @@ const BookMindCoverImage = {
     return null;
   },
 
-  hydrate(root = document, options = {}) {
-    const wraps = root.querySelectorAll("[data-cover-key]");
-    wraps.forEach(wrap => {
-      if (this.needsLookup(wrap)) {
-        this.hydrateWrap(wrap, null, options);
+  _collectWrapJobs(root, options = {}) {
+    const jobs = [];
+    root.querySelectorAll("[data-cover-key]").forEach(wrap => {
+      if (!this.needsLookup(wrap)) return;
+      const ref = this.refFromWrap(wrap);
+      this.attachRefToWrap(wrap, ref, options);
+      jobs.push({ wrap, ref, key: this.cacheKey(ref) });
+    });
+    return jobs;
+  },
+
+  async _batchResolveRefs(refs) {
+    this._loadSessionCache();
+    const missing = [];
+    const missingRefs = [];
+
+    refs.forEach(ref => {
+      const key = this.cacheKey(ref);
+      const cached = this.normalizeUrl(ref.cover_url) || this._memoryCache.get(key);
+      if (cached) {
+        this._memoryCache.set(key, cached);
+        ref.cover_url = cached;
+        return;
+      }
+      if (!missingRefs.some(item => this.cacheKey(item) === key)) {
+        missing.push({
+          title: ref.title,
+          author: ref.author,
+          isbn: ref.isbn,
+          cover_url: ref.cover_url,
+          google_id: ref.google_id,
+          open_library_key: ref.open_library_key,
+        });
+        missingRefs.push(ref);
+      }
+    });
+
+    if (!missing.length) return;
+
+    try {
+      const response = await fetch("/api/books/resolve-covers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ books: missing }),
+      });
+
+      if (!response.ok) return;
+
+      const data = await response.json();
+      (data.results || []).forEach((result, index) => {
+        const url = this.normalizeUrl(result.cover_url);
+        if (!url) return;
+        const ref = missingRefs[index];
+        const key = this.cacheKey(ref);
+        this._memoryCache.set(key, url);
+        ref.cover_url = url;
+      });
+      this._saveSessionCache();
+    } catch {
+      /* offline */
+    }
+  },
+
+  async hydrate(root = document, options = {}) {
+    const jobs = this._collectWrapJobs(root, options);
+    if (!jobs.length) return;
+
+    await this._batchResolveRefs(jobs.map(job => job.ref));
+
+    jobs.forEach(({ wrap, ref }) => {
+      const url = this.normalizeUrl(ref.cover_url);
+      if (url && wrap.isConnected) {
+        const imgClass = options.imgClass || wrap.dataset.imgClass || "book-cover-img";
+        this.applyUrlToWrap(wrap, ref, url, imgClass);
       }
     });
   },
 
   async hydrateMany(books, root = document, options = {}) {
     const refs = books.map(book => this.bookRef(book));
-    const missing = refs.filter(ref => !this.normalizeUrl(ref.cover_url));
-
-    if (missing.length) {
-      try {
-        const response = await fetch("/api/books/resolve-covers", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            books: missing.map(ref => ({
-              title: ref.title,
-              author: ref.author,
-              isbn: ref.isbn,
-              cover_url: ref.cover_url,
-              google_id: ref.google_id,
-              open_library_key: ref.open_library_key,
-            })),
-          }),
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          (data.results || []).forEach((result, index) => {
-            const url = this.normalizeUrl(result.cover_url);
-            this.logLookup(missing[index], result, url);
-            if (url) {
-              this._memoryCache.set(this.cacheKey(missing[index]), url);
-              missing[index].cover_url = url;
-            }
-          });
-        }
-      } catch (err) {
-        console.warn("[BookMindCover] batch lookup failed", err);
-      }
-    }
+    await this._batchResolveRefs(refs);
 
     refs.forEach((ref, index) => {
       const book = books[index];
@@ -298,13 +362,7 @@ const BookMindCoverImage = {
       if (book.book_data && ref.cover_url) book.book_data.cover_url = ref.cover_url;
     });
 
-    const wraps = root.querySelectorAll("[data-cover-key]");
-    wraps.forEach(wrap => {
-      if (this.needsLookup(wrap)) {
-        this.hydrateWrap(wrap, null, options);
-      }
-    });
-
+    await this.hydrate(root, options);
     return books;
   },
 };

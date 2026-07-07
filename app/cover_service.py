@@ -145,12 +145,14 @@ def _open_library_queries(title: str, author: str | None) -> list[str]:
 
 
 def _log_cover_result(title: str, author: str | None, result: dict) -> None:
-    message = (
-        f"[BookMindCover] {title!r} by {author or 'Unknown'} -> "
-        f"cover_url={result.get('cover_url')!r} source={result.get('source')} cached={result.get('cached')}"
+    logger.debug(
+        "[BookMindCover] %r by %s -> cover_url=%r source=%s cached=%s",
+        title,
+        author or "Unknown",
+        result.get("cover_url"),
+        result.get("source"),
+        result.get("cached"),
     )
-    logger.info(message)
-    print(message, flush=True)
 
 
 _JUNK_TITLE_RE = re.compile(
@@ -475,8 +477,11 @@ def resolve_cover(
 
 
 def resolve_covers_batch(books: list[dict]) -> list[dict]:
-    results = []
-    for book in books:
+    if not books:
+        return []
+
+    if len(books) == 1:
+        book = books[0]
         resolved = resolve_cover(
             title=book.get("title") or "",
             author=book.get("author"),
@@ -485,8 +490,24 @@ def resolve_covers_batch(books: list[dict]) -> list[dict]:
             google_id=book.get("google_id") or book.get("id"),
             open_library_key=book.get("open_library_key"),
         )
-        results.append({**book, **resolved})
-    return results
+        return [{**book, **resolved}]
+
+    from concurrent.futures import ThreadPoolExecutor
+
+    def _resolve_one(book: dict) -> dict:
+        resolved = resolve_cover(
+            title=book.get("title") or "",
+            author=book.get("author"),
+            isbn=book.get("isbn"),
+            cover_url=book.get("cover_url"),
+            google_id=book.get("google_id") or book.get("id"),
+            open_library_key=book.get("open_library_key"),
+        )
+        return {**book, **resolved}
+
+    workers = min(8, len(books))
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        return list(pool.map(_resolve_one, books))
 
 
 def enrich_recommendation(title: str, author: str | None = None, genre: str | None = None) -> dict | None:
@@ -532,7 +553,7 @@ def enrich_book_entry(book: dict) -> dict:
 
     if book.get("cover_url"):
         normalized = normalize_cover_url(book["cover_url"])
-        if normalized and _cover_url_is_usable(normalized):
+        if normalized and (_is_trusted_cover_url(normalized) or _cover_url_is_usable(normalized)):
             book["cover_url"] = normalized
             return book
 

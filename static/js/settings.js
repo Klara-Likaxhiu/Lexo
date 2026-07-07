@@ -111,9 +111,7 @@ const BookMindSettings = {
         throw new Error("BookMindAPI is not loaded.");
       }
       user = await BookMindAPI.getMe({ redirect: true });
-      console.log("[BookMindSettings] loadAccount user:", user?.username, user?.email);
     } catch (error) {
-      console.error("[BookMindSettings] loadAccount", error);
       user = window.BookMindAuth?.getCurrentUser() || null;
     }
 

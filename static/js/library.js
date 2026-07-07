@@ -251,7 +251,7 @@ const BookMindLibrary = {
     return data;
   },
 
-  async recordBookOpened(libraryId) {
+  async recordBookOpened(libraryId, options = {}) {
     if (!libraryId || !(await this._hasAuth())) return null;
 
     try {
@@ -259,10 +259,11 @@ const BookMindLibrary = {
         `/api/library/${encodeURIComponent(libraryId)}/open`,
         { method: "POST" }
       );
-      await this.refresh();
+      if (!options.skipRefresh) {
+        await this.refresh();
+      }
       return data.book;
-    } catch (error) {
-      console.error("[BookMindLibrary] recordBookOpened failed", error);
+    } catch {
       return null;
     }
   },

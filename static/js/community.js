@@ -7,14 +7,26 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 async function loadCommunityFeed() {
-  feed.innerHTML = `<p class="community-loading">Loading community reviews…</p>`;
+  feed.innerHTML = `
+    <div class="community-skeleton-grid" aria-hidden="true">
+      ${Array.from({ length: 6 }, () => `
+        <div class="community-card card skeleton-card">
+          <div class="skeleton skeleton-cover community-card-cover"></div>
+          <div class="community-card-body">
+            <div class="skeleton skeleton-line skeleton-line-lg"></div>
+            <div class="skeleton skeleton-line"></div>
+            <div class="skeleton skeleton-line skeleton-line-sm"></div>
+          </div>
+        </div>
+      `).join("")}
+    </div>`;
 
   try {
     if (!window.BookMindAPI?.get) {
       throw new Error("BookMindAPI is not loaded. Include js/api.js before js/community.js.");
     }
 
-    const data = await BookMindAPI.get("/api/reviews/community?limit=100", { auth: false });
+    const data = await BookMindAPI.get("/api/reviews/community?limit=30", { auth: false });
     renderFeed(data.reviews || []);
   } catch (error) {
     console.error(error);
@@ -40,7 +52,15 @@ function renderFeed(reviews) {
 
   feed.innerHTML = reviews.map(renderCard).join("");
   if (window.BookMindCoverImage) {
-    BookMindCoverImage.hydrate(feed, { imgClass: "community-cover-img book-cover-img" });
+    const coverBooks = reviews.map(review => ({
+      title: review.book_title,
+      author: review.author,
+      genre: review.genre,
+      cover_url: review.cover_url,
+    }));
+    BookMindCoverImage.hydrateMany(coverBooks, feed, {
+      imgClass: "community-cover-img book-cover-img",
+    });
   }
 
   feed.querySelectorAll(".community-card").forEach(card => {

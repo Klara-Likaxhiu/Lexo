@@ -376,8 +376,6 @@ const BookMindDetailModal = {
             : `"${entry.title}" moved to ${shelfLabel}.`)
       );
 
-      await BookMindLibrary.refresh();
-
       this.els.shelfBtns?.forEach(btn => {
         btn.disabled = false;
         btn.classList.toggle("active-shelf", btn.dataset.shelf === status);
@@ -387,7 +385,6 @@ const BookMindDetailModal = {
 
       window.BookMindLibraryPage?.refresh?.();
     } catch (error) {
-      console.error("[BookMindDiscovery] saveShelf failed", error);
       this.showToast(error.message || "Could not save book.", true);
       this.els.shelfBtns?.forEach(btn => {
         btn.disabled = false;
@@ -503,7 +500,9 @@ const BookMindDiscovery = {
     });
 
     if (window.BookMindCoverImage) {
-      BookMindCoverImage.hydrate(this.els.results, { imgClass: "discovery-card-img book-cover-img" });
+      BookMindCoverImage.hydrateMany(books, this.els.results, {
+        imgClass: "discovery-card-img book-cover-img",
+      });
     }
   },
 

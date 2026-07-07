@@ -117,11 +117,7 @@ function findPath(pathId) {
 
 function showPathToast(message, isError = false) {
   const toast = document.getElementById("pathsToast");
-  if (!toast) {
-    if (isError) console.error("[ReadingPaths]", message);
-    else console.log("[ReadingPaths]", message);
-    return;
-  }
+  if (!toast) return;
   toast.textContent = message;
   toast.hidden = false;
   toast.classList.toggle("error", isError);
@@ -189,7 +185,6 @@ function toggleComplete(pathId, bookId) {
 
       savePaths(state);
       renderPaths(state);
-      await BookMindLibrary.refresh();
       window.BookMindLibraryPage?.refresh?.();
     } catch (error) {
       console.error("[ReadingPaths] toggleComplete failed", error);
@@ -363,7 +358,10 @@ function renderPaths(result) {
   datalist.innerHTML = datalistOptions;
 
   if (window.BookMindCoverImage) {
-    BookMindCoverImage.hydrate(pathsGrid, { imgClass: "path-book-cover-img book-cover-img" });
+    const allBooks = paths.flatMap(path => path.books || []);
+    BookMindCoverImage.hydrateMany(allBooks, pathsGrid, {
+      imgClass: "path-book-cover-img book-cover-img",
+    });
   }
 }
 

@@ -13,14 +13,8 @@ document.addEventListener("DOMContentLoaded", () => {
   initLibraryPage();
 });
 
-document.addEventListener("bookmind:library-changed", async () => {
-  try {
-    await BookMindLibrary.ensureLoaded(true);
-    renderAll();
-  } catch (error) {
-    console.error("[BookMindLibrary] refresh after library change failed", error);
-    showToast(error.message || "Could not refresh library.", true);
-  }
+document.addEventListener("bookmind:library-changed", () => {
+  renderAll();
 });
 
 async function initLibraryPage() {
@@ -66,8 +60,17 @@ function showState(type, message = "") {
 
   if (type === "loading") {
     libraryBooks.innerHTML = `
-      <div class="library-state card">
-        <p class="library-state-message">Loading your library…</p>
+      <div class="library-skeleton-grid" aria-hidden="true">
+        ${Array.from({ length: 4 }, () => `
+          <div class="shared-book-card card skeleton-card">
+            <div class="skeleton skeleton-cover shared-book-cover"></div>
+            <div class="shared-book-info">
+              <div class="skeleton skeleton-line skeleton-line-lg"></div>
+              <div class="skeleton skeleton-line"></div>
+              <div class="skeleton skeleton-line skeleton-line-sm"></div>
+            </div>
+          </div>
+        `).join("")}
       </div>
     `;
     return;
@@ -168,7 +171,7 @@ function renderShelf(shelf) {
       if (e.target.closest(".library-progress-form, .book-actions")) return;
 
       if (book.library_id) {
-        BookMindLibrary.recordBookOpened(book.library_id);
+        BookMindLibrary.recordBookOpened(book.library_id, { skipRefresh: true });
       }
 
       localStorage.setItem(
@@ -182,8 +185,7 @@ function renderShelf(shelf) {
     });
 
     BookMindBookCard.attachActions(card, book, {
-      onChanged: async () => {
-        await BookMindLibrary.ensureLoaded(true);
+      onChanged: () => {
         renderAll();
       },
       onError: msg => showToast(msg, true),
@@ -199,7 +201,16 @@ function renderShelf(shelf) {
   });
 
   if (window.BookMindCoverImage) {
-    BookMindCoverImage.hydrate(libraryBooks, { imgClass: "shared-book-cover book-cover-img" });
+    const coverBooks = books.map(book => ({
+      title: book.title,
+      author: book.author,
+      genre: book.genre,
+      cover_url: book.cover_url,
+      isbn: book.isbn,
+    }));
+    BookMindCoverImage.hydrateMany(coverBooks, libraryBooks, {
+      imgClass: "shared-book-cover book-cover-img",
+    });
   }
 }
 

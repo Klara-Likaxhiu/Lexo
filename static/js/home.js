@@ -6,31 +6,41 @@ const BookMindIcons = {
   cart: '<svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>',
 };
 
+function recommendationsSkeleton(count = 3) {
+  return Array.from({ length: count }, () => `
+    <div class="recommendation-card-modern card skeleton-card" aria-hidden="true">
+      <div class="skeleton skeleton-cover recommendation-cover-wrap"></div>
+      <div class="recommendation-info">
+        <div class="skeleton skeleton-line skeleton-line-lg"></div>
+        <div class="skeleton skeleton-line"></div>
+        <div class="skeleton skeleton-line skeleton-line-sm"></div>
+      </div>
+    </div>
+  `).join("");
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
   if (window.BookMindAuth?.whenReady) {
     await BookMindAuth.whenReady();
   }
 
-  if (window.BookMindUserData?.hydrate) {
-    try {
-      await BookMindUserData.hydrate();
-    } catch {
-      /* offline */
-    }
-  }
-
   const user = window.BookMindAuth?.getCurrentUser();
   const name = user?.username || "Reader";
-  let profile = JSON.parse(localStorage.getItem("readerProfile"));
 
   document.getElementById("welcomeText").textContent =
     window.BookMindAuth?.isLoggedIn() ? `Welcome back, ${name}` : "Welcome to BookMindAI";
 
-  try {
-    await BookMindLibrary.ensureLoaded();
-  } catch (error) {
-    console.error(error);
+  const recommendationsEl = document.getElementById("recommendations");
+  if (recommendationsEl) {
+    recommendationsEl.innerHTML = recommendationsSkeleton(3);
   }
+
+  await Promise.all([
+    window.BookMindUserData?.hydrate?.().catch(() => {}),
+    BookMindLibrary.ensureLoaded().catch(() => {}),
+  ]);
+
+  let profile = JSON.parse(localStorage.getItem("readerProfile"));
 
   const stats = BookMindLibrary.getStats();
   document.getElementById("readCount").textContent = stats.read;
@@ -39,51 +49,69 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   updateDNAProgress();
   setupMoodAndGoal();
-  loadHomeIntelligence().finally(updateDNAProgress);
-  renderRecommendations();
+  renderRecommendations(profile);
+  loadHomeIntelligence();
 
-  async function loadHomeIntelligence() {
+  function applyIntelligence(intelligence) {
     const subtitle = document.getElementById("homeSubtitle");
     const mission = document.getElementById("todayMission");
     const topPickTitle = document.getElementById("topPickTitle");
     const topPickReason = document.getElementById("topPickReason");
     const topPickLabel = document.getElementById("topPickLabel");
 
-    try {
-      subtitle.textContent = "BookMindAI is personalizing your dashboard...";
-      mission.textContent = "Building today's mission...";
+    const dashboard = intelligence?.dashboard || {};
+    const topPick = dashboard.top_pick || {};
 
-      const intelligence = await BookMindAPI.getReaderIntelligence();
-      localStorage.setItem("bookmind_reader_intelligence", JSON.stringify(intelligence));
+    subtitle.textContent = dashboard.greeting_subtitle || "Your personalized reading world is ready.";
+    mission.textContent = dashboard.today_mission || "Choose a book that matches your current mood.";
+    topPickLabel.textContent = "Today's AI Pick";
+    topPickTitle.textContent = topPick.title || "Ask BookMindAI for a recommendation";
+    topPickReason.textContent = topPick.reason || "Your AI pick will appear here.";
 
-      const dashboard = intelligence.dashboard || {};
-      const topPick = dashboard.top_pick || {};
-
-      subtitle.textContent = dashboard.greeting_subtitle || "Your personalized reading world is ready.";
-      mission.textContent = dashboard.today_mission || "Choose a book that matches your current mood.";
-
-      topPickLabel.textContent = "Today's AI Pick";
-      topPickTitle.textContent = topPick.title || "Ask BookMindAI for a recommendation";
-      topPickReason.textContent = topPick.reason || "Your AI pick will appear here.";
-
-      document.getElementById("topPickBtn").onclick = function () {
-        const item = {
-          ai_recommendation: {
-            title: topPick.title,
-            author: topPick.author,
-            genre: topPick.genre,
-            difficulty: "AI Pick",
-            reason: topPick.reason,
-          },
-          book_data: null,
-        };
-
-        localStorage.setItem("selectedBook", JSON.stringify(item));
-        window.location.href = "book-details.html";
+    document.getElementById("topPickBtn").onclick = function () {
+      const item = {
+        ai_recommendation: {
+          title: topPick.title,
+          author: topPick.author,
+          genre: topPick.genre,
+          difficulty: "AI Pick",
+          reason: topPick.reason,
+        },
+        book_data: topPick.cover_url ? { cover_url: topPick.cover_url } : null,
       };
-    } catch (error) {
+
+      localStorage.setItem("selectedBook", JSON.stringify(item));
+      window.location.href = "book-details.html";
+    };
+  }
+
+  async function loadHomeIntelligence({ force = false } = {}) {
+    const subtitle = document.getElementById("homeSubtitle");
+    const mission = document.getElementById("todayMission");
+
+    if (!force) {
+      try {
+        const cached = JSON.parse(localStorage.getItem("bookmind_reader_intelligence") || "null");
+        if (cached?.dashboard) {
+          applyIntelligence(cached);
+          return;
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+
+    subtitle.textContent = "BookMindAI is personalizing your dashboard…";
+    mission.textContent = "Building today's mission…";
+
+    try {
+      const intelligence = await BookMindAPI.getReaderIntelligence({ force });
+      applyIntelligence(intelligence);
+    } catch {
       subtitle.textContent = "Your personalized reading world is ready.";
       mission.textContent = "Choose a mood and ask BookMindAI for suggestions.";
+    } finally {
+      updateDNAProgress();
     }
   }
 
@@ -142,7 +170,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         this.classList.add("active-mood");
         localStorage.setItem("bookmind_today_mood", this.dataset.mood);
         localStorage.removeItem("bookmind_reader_intelligence");
-        loadHomeIntelligence();
+        localStorage.removeItem("bookmind_intelligence_meta");
+        loadHomeIntelligence({ force: true });
       });
     });
 
@@ -154,25 +183,29 @@ document.addEventListener("DOMContentLoaded", async () => {
         this.classList.add("active-mood");
         localStorage.setItem("bookmind_today_goal", this.dataset.goal);
         localStorage.removeItem("bookmind_reader_intelligence");
-        loadHomeIntelligence();
+        localStorage.removeItem("bookmind_intelligence_meta");
+        loadHomeIntelligence({ force: true });
       });
     });
   }
 
-  function renderRecommendations() {
-    if (!profile) return;
+  async function renderRecommendations(currentProfile = profile) {
+    if (!currentProfile) {
+      currentProfile = JSON.parse(localStorage.getItem("readerProfile"));
+    }
+    if (!currentProfile) return;
 
-    document.getElementById("readerType").textContent = profile.reader_type || "Not available";
+    document.getElementById("readerType").textContent = currentProfile.reader_type || "Not available";
     document.getElementById("readingLevel").textContent =
-      profile.confirmed_reading_level || "Not available";
-    document.getElementById("genres").textContent = (profile.favorite_genres || []).join(", ");
+      currentProfile.confirmed_reading_level || "Not available";
+    document.getElementById("genres").textContent = (currentProfile.favorite_genres || []).join(", ");
 
     const container = document.getElementById("recommendations");
     container.innerHTML = "";
 
-    if (!profile.recommendations) return;
+    if (!currentProfile.recommendations) return;
 
-    const visibleRecommendations = profile.recommendations.filter(item => {
+    const visibleRecommendations = currentProfile.recommendations.filter(item => {
       const rec = item.ai_recommendation || item;
       return !BookMindLibrary.findShelf(rec);
     });
@@ -211,7 +244,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         : bookData && bookData.cover_url
         ? `
           <div class="recommendation-cover-wrap">
-            <img class="recommendation-cover" src="${bookData.cover_url}" alt="${aiBook.title} cover" loading="lazy">
+            <img class="recommendation-cover" src="${bookData.cover_url}" alt="${aiBook.title} cover" loading="lazy" decoding="async">
           </div>`
         : `<div class="recommendation-cover-wrap"><div class="recommendation-cover fallback-cover"></div></div>`;
 
@@ -250,9 +283,10 @@ document.addEventListener("DOMContentLoaded", async () => {
           button.disabled = true;
           try {
             await BookMindLibrary.addBook(aiBook, this.dataset.status);
-            renderRecommendations();
-          } catch (error) {
-            alert(error.message);
+            profile = JSON.parse(localStorage.getItem("readerProfile"));
+            renderRecommendations(profile);
+          } catch {
+            /* shelf update failed */
           } finally {
             button.disabled = false;
           }
@@ -268,17 +302,17 @@ document.addEventListener("DOMContentLoaded", async () => {
       });
 
       container.appendChild(card);
-
-      const coverWrap = card.querySelector("[data-cover-key]");
-      if (coverWrap && window.BookMindCoverImage) {
-        BookMindCoverImage.attachRefToWrap(coverWrap, { ...aiBook, ...bookData, genre }, {
-          imgClass: "recommendation-cover book-cover-img",
-        });
-      }
     });
 
     if (window.BookMindCoverImage) {
-      BookMindCoverImage.hydrate(container, { imgClass: "recommendation-cover book-cover-img" });
+      const coverBooks = visibleRecommendations.map(item => ({
+        ...item.ai_recommendation,
+        ...item.book_data,
+        genre: item.ai_recommendation?.genre || "BookMindAI",
+      }));
+      BookMindCoverImage.hydrateMany(coverBooks, container, {
+        imgClass: "recommendation-cover book-cover-img",
+      });
     }
   }
 
@@ -290,6 +324,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       button.disabled = true;
       button.textContent = "Finding books…";
     }
+
+    container.innerHTML = recommendationsSkeleton(3);
 
     try {
       const result = await BookMindAPI.post("/api/reader/companion", {
@@ -349,9 +385,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       localStorage.setItem("readerProfile", JSON.stringify(stored));
 
       profile = stored;
-      renderRecommendations();
-    } catch (error) {
-      console.error(error);
+      renderRecommendations(profile);
+    } catch {
       container.innerHTML = `
       <div class="empty-library card">
         <h2>Couldn't generate more.</h2>
