@@ -81,31 +81,33 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   function updateDNAProgress() {
     const completion = Number(localStorage.getItem("reader_profile_completion")) || 0;
-
-    document.getElementById("dnaProgressTitle").textContent =
-      completion >= 100 ? "Discovery Complete" : `${completion}% Complete`;
-    document.getElementById("dnaProgressFill").style.width = `${completion}%`;
-
-    const subtitle = document.getElementById("dnaProgressSubtitle");
+    const progressCard = document.querySelector(".dna-progress-card");
     const continueButtons = ["continueDiscoveryTop", "continueDiscoveryMain"];
 
     if (completion >= 100) {
+      if (progressCard) progressCard.hidden = true;
+
       continueButtons.forEach(id => {
         const button = document.getElementById(id);
-        if (button) button.style.display = "none";
+        if (button) button.hidden = true;
       });
-
-      if (subtitle) {
-        subtitle.textContent = "Your reading profile is ready — explore personalized picks.";
-      }
       return;
     }
+
+    if (progressCard) progressCard.hidden = false;
+
+    document.getElementById("dnaProgressTitle").textContent =
+      completion > 0 ? `${completion}% Complete` : "Start Your Reader DNA";
+
+    document.getElementById("dnaProgressFill").style.width = `${completion}%`;
+
+    const subtitle = document.getElementById("dnaProgressSubtitle");
 
     if (completion <= 0) {
       continueButtons.forEach(id => {
         const button = document.getElementById(id);
         if (button) {
-          button.style.display = "";
+          button.hidden = false;
           button.textContent = "Start Reader DNA Quiz";
         }
       });
@@ -119,7 +121,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     continueButtons.forEach(id => {
       const button = document.getElementById(id);
       if (button) {
-        button.style.display = "";
+        button.hidden = false;
         button.textContent = "Continue Quiz";
       }
     });

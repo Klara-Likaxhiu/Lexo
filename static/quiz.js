@@ -8,173 +8,209 @@ const allGenres = window.BookMindGenres?.ALL || [
 
 const quizQuestions = [
   {
-    key: "readingExperience",
-    title: "How would you describe yourself as a reader?",
-    hint: "This helps BookMindAI understand your starting point.",
-    type: "single",
-    options: [
-      "Just getting into reading",
-      "I read occasionally",
-      "I read regularly",
-      "Reading is part of my daily life"
-    ]
-  },
-  {
     key: "favoriteGenres",
-    title: "Which genres do you enjoy most?",
-    hint: "Choose up to 4, or add your own below.",
+    dimension: "Genre",
+    title: "Which shelves do you browse first?",
+    hint: "Choose up to 4 genres — or add your own.",
     type: "multi",
     max: 4,
-    allowCustom: true,
-    options: allGenres
-  },
-  {
-    key: "dislikedGenres",
-    title: "Which genres rarely interest you?",
-    hint: "Your favorites and custom genres won't appear here.",
-    type: "multi",
-    max: 3,
-    dynamicOptions: true
+    allowCustomGenre: true
   },
   {
     key: "preferredMood",
-    title: "What mood do you want from a book?",
-    hint: "Think about the atmosphere you crave most often.",
+    dimension: "Mood",
+    title: "What atmosphere are you chasing when you open a book?",
+    hint: "Think vibe, not plot — the feeling in the air.",
     type: "single",
+    allowCustomAnswer: true,
+    customPlaceholder: "Describe your ideal reading mood (optional)",
     options: [
-      "Cozy and comforting",
-      "Dark and atmospheric",
-      "Hopeful and uplifting",
-      "Playful and witty",
-      "Thoughtful and reflective",
-      "Depends on the day"
+      "Rainy-day cozy",
+      "High-stakes tension",
+      "Sunlit optimism",
+      "Dreamy and surreal",
+      "Gritty and grounded",
+      "Playful and mischievous"
     ]
   },
   {
     key: "pacing",
-    title: "How do you like your stories paced?",
-    hint: "Match the rhythm that keeps you turning pages.",
+    dimension: "Pacing",
+    title: "How fast should the story move?",
+    hint: "Page-turner sprint or slow-burn soak?",
     type: "single",
     options: [
-      "Fast and propulsive",
-      "Steady and balanced",
-      "Slow and immersive",
-      "Varies by genre"
-    ]
-  },
-  {
-    key: "favoriteThemes",
-    title: "Which themes draw you in?",
-    hint: "Choose up to 3.",
-    type: "multi",
-    max: 3,
-    options: [
-      "Love and connection",
-      "Identity and self-discovery",
-      "Justice and moral choices",
-      "Adventure and survival",
-      "Family and belonging",
-      "Power, politics, and society",
-      "Science, ideas, and discovery",
-      "Grief, healing, and transformation"
-    ]
-  },
-  {
-    key: "characterTypes",
-    title: "What kinds of characters do you connect with?",
-    hint: "Choose up to 2.",
-    type: "multi",
-    max: 2,
-    options: [
-      "Complex antiheroes",
-      "Quiet, observant narrators",
-      "Bold leaders and changemakers",
-      "Found-family ensembles",
-      "Outsiders finding their place",
-      "Unreliable or secretive voices"
-    ]
-  },
-  {
-    key: "writingStyle",
-    title: "Which writing style feels most satisfying?",
-    hint: "There is no wrong answer.",
-    type: "single",
-    options: [
-      "Lyrical and descriptive",
-      "Crisp and direct",
-      "Witty and conversational",
-      "Rich and layered",
-      "Minimal and spare"
-    ]
-  },
-  {
-    key: "emotionalPreference",
-    title: "How should a book make you feel by the end?",
-    hint: "Choose the emotional payoff you enjoy most.",
-    type: "single",
-    options: [
-      "Moved and fulfilled",
-      "Energized and inspired",
-      "Calm and satisfied",
-      "Surprised and unsettled",
-      "Comforted like a warm blanket"
+      "Breathless — I want momentum",
+      "Balanced — peaks and valleys",
+      "Leisurely — let scenes breathe",
+      "It depends on the book"
     ]
   },
   {
     key: "bookLength",
-    title: "What book length feels best for you?",
-    hint: "This helps avoid books that feel too long or too short.",
+    dimension: "Book length",
+    title: "How much story do you want on your plate?",
+    hint: "Pick the commitment level that feels right.",
     type: "single",
     options: [
-      "Short — under 250 pages",
-      "Medium — 250 to 450 pages",
-      "Long — 450+ pages",
-      "Length doesn't matter"
+      "Quick read — under 250 pages",
+      "Standard — 250 to 450 pages",
+      "Epic — 450+ pages",
+      "Length never bothers me"
+    ]
+  },
+  {
+    key: "writingStyle",
+    dimension: "Writing style",
+    title: "Which prose voice feels like home?",
+    hint: "The way sentences sound matters as much as the story.",
+    type: "single",
+    allowCustomAnswer: true,
+    customPlaceholder: "Name an author or style you love (optional)",
+    options: [
+      "Lyrical and poetic",
+      "Clean and straightforward",
+      "Wry and conversational",
+      "Dense and literary",
+      "Sparse and punchy"
+    ]
+  },
+  {
+    key: "characterTypes",
+    dimension: "Character type",
+    title: "Who do you follow through the pages?",
+    hint: "Choose up to 2 character archetypes.",
+    type: "multi",
+    max: 2,
+    allowCustomAnswer: true,
+    customPlaceholder: "Describe a character type you love (optional)",
+    options: [
+      "Flawed antiheroes",
+      "Reluctant everypeople",
+      "Fierce protectors",
+      "Sharp-witted observers",
+      "Ensemble casts",
+      "Enigmatic outsiders"
+    ]
+  },
+  {
+    key: "plotStyle",
+    dimension: "Plot style",
+    title: "What kind of engine drives the story for you?",
+    hint: "The shape of the narrative — not the genre.",
+    type: "single",
+    allowCustomAnswer: true,
+    customPlaceholder: "Describe your ideal plot shape (optional)",
+    options: [
+      "A mystery to unravel",
+      "A journey with a clear destination",
+      "Character choices over events",
+      "Escalating chaos and stakes",
+      "Quiet moments that build meaning",
+      "Parallel storylines weaving together"
+    ]
+  },
+  {
+    key: "emotionalIntensity",
+    dimension: "Emotional intensity",
+    title: "How much should a book demand from your heart?",
+    hint: "Separate from mood — this is about emotional stakes and depth.",
+    type: "single",
+    options: [
+      "Light — keep it breezy",
+      "Moderate — some feels, not devastation",
+      "Deep — I want to be changed",
+      "Raw — tear me apart, then rebuild me",
+      "Varies with what I need that week"
+    ]
+  },
+  {
+    key: "worldbuilding",
+    dimension: "Worldbuilding",
+    title: "How immersive should the fictional world feel?",
+    hint: "From sketchy backdrop to fully built universes.",
+    type: "single",
+    options: [
+      "Minimal — the characters matter most",
+      "Selective — vivid details where it counts",
+      "Rich — I want maps in my head",
+      "Total immersion — lore, history, rules",
+      "Real-world settings done authentically"
     ]
   },
   {
     key: "endingPreference",
-    title: "What kind of endings do you enjoy?",
-    hint: "Pick the finish that leaves you happiest.",
+    dimension: "Endings",
+    title: "How do you like a story to land?",
+    hint: "The last chapter sets the aftertaste.",
     type: "single",
     options: [
-      "Satisfying and resolved",
-      "Bittersweet but meaningful",
-      "Open to interpretation",
-      "Shocking twists welcome",
-      "Happy and hopeful"
+      "Neat and satisfying",
+      "Bittersweet but earned",
+      "Ambiguous — let me interpret",
+      "Shocking twist",
+      "Hopeful and open-hearted"
     ]
   },
   {
     key: "readingGoals",
-    title: "What are you looking for in books right now?",
-    hint: "Choose up to 2.",
+    dimension: "Reading goal",
+    title: "Why are you picking up a book right now?",
+    hint: "Choose up to 2, or describe your own.",
     type: "multi",
     max: 2,
+    allowCustomAnswer: true,
+    customPlaceholder: "Add your own reading goal (optional)",
     options: [
-      "Escape into another world",
-      "Learn something new",
-      "Relax and unwind",
-      "Feel deeply",
-      "Challenge my thinking",
-      "Get inspired to act",
-      "Discover literary classics",
-      "Laugh out loud"
+      "Pure escapism",
+      "Learn or grow",
+      "Unwind after a long day",
+      "Feel something real",
+      "Stretch my perspective",
+      "Be entertained and laugh"
+    ]
+  },
+  {
+    key: "dislikedTropes",
+    dimension: "Disliked tropes",
+    title: "What makes you put a book down?",
+    hint: "Choose up to 3 tropes you avoid — or name your own.",
+    type: "multi",
+    max: 3,
+    allowCustomAnswer: true,
+    customPlaceholder: "Add a trope or dealbreaker (optional)",
+    options: [
+      "Love triangles",
+      "Chosen-one prophecies",
+      "Info-dump exposition",
+      "Miscommunication conflicts",
+      "Gratuitous violence",
+      "Flat villain with no motive",
+      "Insta-love romance",
+      "Nothing — I'm open to most tropes"
     ]
   }
 ];
 
 const LEGACY_KEY_MAP = {
-  readingExperience: "readingExperience",
   favoriteGenres: "favoriteGenres",
-  dislikedGenres: "dislikedGenres",
-  readingGoals: "readingGoals",
-  unexpectedEndings: "endingPreference",
-  characterStyle: "characterTypes",
-  bookLength: "bookLength",
+  dislikedGenres: "dislikedTropes",
+  preferredMood: "preferredMood",
+  pacing: "pacing",
   pacePreference: "pacing",
+  bookLength: "bookLength",
+  writingStyle: "writingStyle",
+  characterTypes: "characterTypes",
+  characterStyle: "characterTypes",
+  plotStyle: "plotStyle",
+  favoriteThemes: "plotStyle",
+  emotionalIntensity: "emotionalIntensity",
+  emotionalPreference: "emotionalIntensity",
   emotionalTone: "preferredMood",
-  themeInterest: "favoriteThemes"
+  worldbuilding: "worldbuilding",
+  endingPreference: "endingPreference",
+  unexpectedEndings: "endingPreference",
+  readingGoals: "readingGoals"
 };
 
 let currentStep = 0;
@@ -182,20 +218,34 @@ let answers = createEmptyAnswers();
 
 function createEmptyAnswers() {
   return {
-    readingExperience: "",
     favoriteGenres: [],
     customGenres: [],
-    dislikedGenres: [],
     preferredMood: "",
     pacing: "",
-    favoriteThemes: [],
-    characterTypes: [],
-    writingStyle: "",
-    emotionalPreference: "",
     bookLength: "",
+    writingStyle: "",
+    characterTypes: [],
+    plotStyle: "",
+    emotionalIntensity: "",
+    worldbuilding: "",
     endingPreference: "",
-    readingGoals: []
+    readingGoals: [],
+    dislikedTropes: [],
+    customNotes: {}
   };
+}
+
+function getCustomNote(key) {
+  return answers.customNotes?.[key] || "";
+}
+
+function setCustomNote(key, value) {
+  if (!answers.customNotes) answers.customNotes = {};
+  if (value.trim()) {
+    answers.customNotes[key] = value.trim();
+  } else {
+    delete answers.customNotes[key];
+  }
 }
 
 function getAllFavoriteGenres() {
@@ -204,15 +254,17 @@ function getAllFavoriteGenres() {
 
 function isQuestionAnswered(question) {
   if (question.key === "favoriteGenres") {
-    const merged = [...(answers.favoriteGenres || []), ...(answers.customGenres || [])];
-    return merged.length > 0;
+    return getAllFavoriteGenres().length > 0;
   }
 
   const value = answers[question.key];
+  const hasCustom = Boolean(getCustomNote(question.key));
+
   if (question.type === "multi") {
-    return Array.isArray(value) && value.length > 0;
+    return (Array.isArray(value) && value.length > 0) || hasCustom;
   }
-  return Boolean(value);
+
+  return Boolean(value) || hasCustom;
 }
 
 function countAnsweredSteps() {
@@ -235,7 +287,8 @@ function loadLocalAnswers() {
   try {
     const raw = localStorage.getItem("reader_quiz_answers");
     if (raw) {
-      return { ...createEmptyAnswers(), ...JSON.parse(raw) };
+      const parsed = JSON.parse(raw);
+      return { ...createEmptyAnswers(), ...parsed, customNotes: parsed.customNotes || {} };
     }
   } catch {
     /* ignore */
@@ -289,22 +342,24 @@ function safeParse(raw) {
 }
 
 function syncLegacyStorageKeys(answerObj, completion) {
-  const firstPhaseKeys = ["readingExperience", "favoriteGenres", "dislikedGenres", "readingGoals"];
-  const firstPhase = {};
+  const firstPhase = {
+    favoriteGenres: answerObj.favoriteGenres,
+    dislikedGenres: answerObj.dislikedTropes,
+    readingGoals: answerObj.readingGoals,
+    readingExperience: answerObj.pacing || ""
+  };
   const extraPhase = {};
 
-  Object.entries(answerObj).forEach(([key, value]) => {
-    if (key === "customGenres") return;
-    if (firstPhaseKeys.includes(key)) {
-      firstPhase[key] = value;
-    } else if (value !== "" && !(Array.isArray(value) && !value.length)) {
-      extraPhase[key] = value;
-    }
-  });
+  ["preferredMood", "pacing", "bookLength", "writingStyle", "characterTypes",
+    "plotStyle", "emotionalIntensity", "worldbuilding", "endingPreference", "dislikedTropes"]
+    .forEach(key => {
+      const value = answerObj[key];
+      if (value !== "" && !(Array.isArray(value) && !value.length)) {
+        extraPhase[key] = value;
+      }
+    });
 
-  if (Object.keys(firstPhase).length) {
-    localStorage.setItem("reader_discovery_answers", JSON.stringify(firstPhase));
-  }
+  localStorage.setItem("reader_discovery_answers", JSON.stringify(firstPhase));
   if (Object.keys(extraPhase).length) {
     localStorage.setItem("reader_extra_discovery_answers", JSON.stringify(extraPhase));
   }
@@ -313,20 +368,21 @@ function syncLegacyStorageKeys(answerObj, completion) {
 
 function formatQuizAnswersForAI(answerObj) {
   const genres = [...(answerObj.favoriteGenres || []), ...(answerObj.customGenres || [])];
+  const notes = answerObj.customNotes || {};
+
   return [
-    `Reading experience: ${answerObj.readingExperience || "Unknown"}`,
     `Favorite genres: ${genres.join(", ") || "Unknown"}`,
-    `Custom genres: ${(answerObj.customGenres || []).join(", ") || "None"}`,
-    `Less interesting genres: ${(answerObj.dislikedGenres || []).join(", ") || "None"}`,
-    `Preferred mood: ${answerObj.preferredMood || "Unknown"}`,
-    `Pacing preference: ${answerObj.pacing || "Unknown"}`,
-    `Favorite themes: ${(answerObj.favoriteThemes || []).join(", ") || "Unknown"}`,
-    `Character types: ${(answerObj.characterTypes || []).join(", ") || "Unknown"}`,
-    `Writing style: ${answerObj.writingStyle || "Unknown"}`,
-    `Emotional preference: ${answerObj.emotionalPreference || "Unknown"}`,
+    `Reading mood: ${answerObj.preferredMood || "Unknown"}${notes.preferredMood ? ` (${notes.preferredMood})` : ""}`,
+    `Pacing: ${answerObj.pacing || "Unknown"}`,
     `Book length: ${answerObj.bookLength || "Unknown"}`,
+    `Writing style: ${answerObj.writingStyle || "Unknown"}${notes.writingStyle ? ` (${notes.writingStyle})` : ""}`,
+    `Character types: ${(answerObj.characterTypes || []).join(", ") || "Unknown"}${notes.characterTypes ? ` (${notes.characterTypes})` : ""}`,
+    `Plot style: ${answerObj.plotStyle || "Unknown"}${notes.plotStyle ? ` (${notes.plotStyle})` : ""}`,
+    `Emotional intensity: ${answerObj.emotionalIntensity || "Unknown"}`,
+    `Worldbuilding preference: ${answerObj.worldbuilding || "Unknown"}`,
     `Ending preference: ${answerObj.endingPreference || "Unknown"}`,
-    `Reading goals: ${(answerObj.readingGoals || []).join(", ") || "Unknown"}`
+    `Reading goals: ${(answerObj.readingGoals || []).join(", ") || "Unknown"}${notes.readingGoals ? ` (${notes.readingGoals})` : ""}`,
+    `Disliked tropes: ${(answerObj.dislikedTropes || []).join(", ") || "None"}${notes.dislikedTropes ? ` (${notes.dislikedTropes})` : ""}`
   ];
 }
 
@@ -366,11 +422,7 @@ function getResumeStep() {
 }
 
 function resolveQuestionOptions(question) {
-  if (question.dynamicOptions) {
-    const excluded = new Set(getAllFavoriteGenres());
-    return allGenres.filter(genre => !excluded.has(genre));
-  }
-  return question.options;
+  return question.options || allGenres;
 }
 
 function renderQuestion() {
@@ -378,7 +430,7 @@ function renderQuestion() {
   const stepNumber = currentStep + 1;
 
   document.getElementById("progressText").textContent =
-    `Step ${stepNumber} of ${TOTAL_STEPS}`;
+    `Step ${stepNumber} of ${TOTAL_STEPS} · ${question.dimension}`;
 
   document.getElementById("progressFill").style.width =
     `${(stepNumber / TOTAL_STEPS) * 100}%`;
@@ -431,8 +483,12 @@ function renderQuestion() {
     container.appendChild(button);
   });
 
-  if (question.allowCustom) {
+  if (question.allowCustomGenre) {
     renderCustomGenreInput(container);
+  }
+
+  if (question.allowCustomAnswer) {
+    renderCustomAnswerInput(container, question);
   }
 
   document.getElementById("backBtn").style.visibility =
@@ -444,7 +500,7 @@ function renderQuestion() {
 
 function renderCustomGenreInput(container) {
   const wrapper = document.createElement("div");
-  wrapper.className = "quiz-custom-genre";
+  wrapper.className = "quiz-custom-field";
 
   wrapper.innerHTML = `
     <label class="quiz-custom-label" for="customGenreInput">Add your own genre (optional)</label>
@@ -459,7 +515,11 @@ function renderCustomGenreInput(container) {
 
   const tagsEl = wrapper.querySelector("#customGenreTags");
   (answers.customGenres || []).forEach(genre => {
-    tagsEl.appendChild(createCustomGenreTag(genre));
+    tagsEl.appendChild(createCustomTag(genre, () => {
+      answers.customGenres = (answers.customGenres || []).filter(item => item !== genre);
+      renderQuestion();
+      saveProgress(currentStep);
+    }));
   });
 
   const input = wrapper.querySelector("#customGenreInput");
@@ -469,17 +529,11 @@ function renderCustomGenreInput(container) {
     const value = input.value.trim();
     if (!value) return;
 
-    if (!Array.isArray(answers.customGenres)) {
-      answers.customGenres = [];
-    }
+    if (!Array.isArray(answers.customGenres)) answers.customGenres = [];
 
-    const exists = answers.customGenres.some(
+    const exists = getAllFavoriteGenres().some(
       genre => genre.toLowerCase() === value.toLowerCase()
-    ) || answers.favoriteGenres.some(
-      genre => genre.toLowerCase() === value.toLowerCase()
-    ) || allGenres.some(
-      genre => genre.toLowerCase() === value.toLowerCase()
-    );
+    ) || allGenres.some(genre => genre.toLowerCase() === value.toLowerCase());
 
     if (exists) {
       showQuizToast("That genre is already selected.");
@@ -506,22 +560,37 @@ function renderCustomGenreInput(container) {
   });
 }
 
-function createCustomGenreTag(genre) {
+function renderCustomAnswerInput(container, question) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "quiz-custom-field";
+
+  const inputId = `customAnswer_${question.key}`;
+  wrapper.innerHTML = `
+    <label class="quiz-custom-label" for="${inputId}">${question.customPlaceholder || "Add your own answer (optional)"}</label>
+    <input type="text" id="${inputId}" class="quiz-custom-input" placeholder="${escapeHtml(question.customPlaceholder || "Type here…")}" maxlength="80" autocomplete="off" value="${escapeHtml(getCustomNote(question.key))}">
+  `;
+
+  container.appendChild(wrapper);
+
+  const input = wrapper.querySelector(`#${inputId}`);
+  input.addEventListener("input", () => {
+    setCustomNote(question.key, input.value);
+    saveProgress(currentStep);
+  });
+}
+
+function createCustomTag(label, onRemove) {
   const tag = document.createElement("button");
   tag.type = "button";
   tag.className = "quiz-custom-tag";
-  tag.innerHTML = `${escapeHtml(genre)} <span aria-hidden="true">&times;</span>`;
-  tag.setAttribute("aria-label", `Remove ${genre}`);
-  tag.addEventListener("click", () => {
-    answers.customGenres = (answers.customGenres || []).filter(item => item !== genre);
-    renderQuestion();
-    saveProgress(currentStep);
-  });
+  tag.innerHTML = `${escapeHtml(label)} <span aria-hidden="true">&times;</span>`;
+  tag.setAttribute("aria-label", `Remove ${label}`);
+  tag.addEventListener("click", onRemove);
   return tag;
 }
 
 function escapeHtml(value) {
-  return value
+  return String(value)
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
@@ -552,14 +621,8 @@ document.getElementById("backBtn").addEventListener("click", () => {
 
 document.getElementById("nextBtn").addEventListener("click", async () => {
   const question = quizQuestions[currentStep];
-  const answer = answers[question.key];
 
-  if (question.key === "favoriteGenres") {
-    if (getAllFavoriteGenres().length === 0) {
-      showQuizToast("Choose at least one genre or add your own.");
-      return;
-    }
-  } else if (!answer || (Array.isArray(answer) && answer.length === 0)) {
+  if (!isQuestionAnswered(question)) {
     showQuizToast("Please answer this question first.");
     return;
   }
@@ -590,7 +653,7 @@ async function finishQuiz() {
       body: JSON.stringify({
         quiz_answers: formatQuizAnswersForAI(answers),
         books_read: [],
-        reading_level: answers.readingExperience
+        reading_level: answers.emotionalIntensity || "Regular reader"
       })
     });
 
@@ -609,7 +672,7 @@ async function finishQuiz() {
         await BookMindUserData.saveReaderProfile({
           quiz_answers: formatQuizAnswersForAI(answers).join("\n"),
           books_read: profile.books_read || "",
-          reading_level: answers.readingExperience,
+          reading_level: answers.emotionalIntensity || "",
           profile_data: profile
         });
       }
@@ -623,112 +686,76 @@ async function finishQuiz() {
 
 function showLoadingScreen() {
   document.querySelector(".quiz-card").innerHTML = `
-    <div class="dna-summary dna-summary-loading">
-      <div class="dna-summary-badge">Reader DNA</div>
-      <div class="dna-summary-spinner" aria-hidden="true"></div>
-      <h1>Building your profile…</h1>
-      <p>BookMindAI is analyzing your reading taste.</p>
+    <div class="dna-profile-card dna-profile-loading">
+      <div class="dna-profile-spinner" aria-hidden="true"></div>
+      <h1>Building your Reader DNA…</h1>
+      <p>BookMindAI is mapping your unique reading taste.</p>
     </div>
   `;
 }
 
-function deriveReadingStyle() {
-  const parts = [answers.pacing, answers.writingStyle].filter(Boolean);
-  return parts.length ? parts.join(" · ") : "Personalized mix";
+function deriveStoryPreference() {
+  const parts = [answers.plotStyle, answers.worldbuilding, answers.pacing].filter(Boolean);
+  const note = getCustomNote("plotStyle");
+  if (note) parts.push(note);
+  return parts.length ? parts.slice(0, 2).join(" · ") : "Eclectic storyteller";
 }
 
-function deriveRecommendationPersonality(profile) {
-  return profile?.reader_type
-    || profile?.book_preferences?.[0]
-    || "Thoughtful explorer";
-}
-
-function renderSuggestedBooks(recommendations) {
-  if (!Array.isArray(recommendations) || !recommendations.length) {
-    return `<p class="dna-summary-empty">Your personalized picks will appear on Discovery.</p>`;
+function deriveRecommendedNextStep(profile) {
+  const topRec = profile?.recommendations?.[0]?.ai_recommendation;
+  if (topRec?.title) {
+    return `Start with <strong>${escapeHtml(topRec.title)}</strong> — matched to your taste profile.`;
   }
-
-  return recommendations.slice(0, 3).map((item, index) => {
-    const rec = item.ai_recommendation || item;
-    const book = item.book_data || {};
-    const title = rec.title || book.title || "Recommended read";
-    const author = rec.author || book.author_name?.[0] || "Unknown author";
-    const reason = rec.reason || rec.description || "Matched to your Reader DNA.";
-
-    return `
-      <article class="dna-book-card" style="animation-delay:${index * 0.12}s">
-        <div class="dna-book-meta">
-          <h4>${escapeHtml(title)}</h4>
-          <p class="dna-book-author">${escapeHtml(author)}</p>
-          <p class="dna-book-reason">${escapeHtml(reason)}</p>
-        </div>
-      </article>
-    `;
-  }).join("");
+  return "Browse Discovery for books hand-picked from your Reader DNA.";
 }
 
 function showCompletionScreen(profile) {
-  const favoriteGenres = [
+  const topGenres = [
     ...(answers.favoriteGenres || []),
     ...(answers.customGenres || []),
     ...(profile?.favorite_genres || [])
-  ].filter((genre, index, list) => list.indexOf(genre) === index);
+  ].filter((genre, index, list) => list.indexOf(genre) === index).slice(0, 5);
 
   const readerType = profile?.reader_type || "Curious Reader";
-  const mood = answers.preferredMood || "Varied";
-  const readingStyle = deriveReadingStyle();
-  const personality = deriveRecommendationPersonality(profile);
-  const recommendations = profile?.recommendations || [];
+  const mood = [answers.preferredMood, getCustomNote("preferredMood")].filter(Boolean).join(" · ") || "Open-minded";
+  const storyPreference = deriveStoryPreference();
+  const nextStep = deriveRecommendedNextStep(profile);
 
   document.querySelector(".quiz-card").innerHTML = `
-    <div class="dna-summary">
-      <div class="dna-summary-hero">
-        <div class="dna-summary-badge dna-summary-badge-complete">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M12 3l1.9 5.8H20l-4.9 3.6 1.9 5.8L12 14.6 7 18.2l1.9-5.8L4 8.8h6.1z"/></svg>
-          100% Complete
+    <div class="dna-profile-card">
+      <header class="dna-profile-header">
+        <p class="eyebrow">Reader DNA Profile</p>
+        <h1>${escapeHtml(readerType)}</h1>
+        <p class="dna-profile-subtitle">Your reading taste, mapped.</p>
+      </header>
+
+      <div class="dna-profile-body">
+        <div class="dna-profile-stat">
+          <span class="dna-profile-stat-label">Top genres</span>
+          <div class="dna-profile-tags">
+            ${topGenres.length
+              ? topGenres.map(g => `<span class="dna-profile-tag">${escapeHtml(g)}</span>`).join("")
+              : `<span class="dna-profile-tag">Eclectic</span>`}
+          </div>
         </div>
-        <h1>Your Reader DNA</h1>
-        <p class="dna-summary-lead">A personalized snapshot of how you read, feel, and discover stories.</p>
+
+        <div class="dna-profile-stat">
+          <span class="dna-profile-stat-label">Reading mood</span>
+          <p class="dna-profile-stat-value">${escapeHtml(mood)}</p>
+        </div>
+
+        <div class="dna-profile-stat">
+          <span class="dna-profile-stat-label">Story preference</span>
+          <p class="dna-profile-stat-value">${escapeHtml(storyPreference)}</p>
+        </div>
+
+        <div class="dna-profile-next">
+          <span class="dna-profile-stat-label">Recommended next step</span>
+          <p class="dna-profile-next-text">${nextStep}</p>
+        </div>
       </div>
 
-      <div class="dna-summary-grid">
-        <article class="dna-summary-card dna-summary-card-featured">
-          <p class="dna-summary-label">Reader type</p>
-          <h3>${escapeHtml(readerType)}</h3>
-        </article>
-        <article class="dna-summary-card">
-          <p class="dna-summary-label">Preferred mood</p>
-          <h3>${escapeHtml(mood)}</h3>
-        </article>
-        <article class="dna-summary-card">
-          <p class="dna-summary-label">Reading style</p>
-          <h3>${escapeHtml(readingStyle)}</h3>
-        </article>
-        <article class="dna-summary-card">
-          <p class="dna-summary-label">Recommendation personality</p>
-          <h3>${escapeHtml(personality)}</h3>
-        </article>
-      </div>
-
-      <section class="dna-summary-section">
-        <p class="dna-summary-label">Favorite genres</p>
-        <div class="dna-summary-tags">
-          ${favoriteGenres.length
-            ? favoriteGenres.map(genre => `<span class="dna-summary-tag">${escapeHtml(genre)}</span>`).join("")
-            : `<span class="dna-summary-tag">Open to anything</span>`}
-        </div>
-      </section>
-
-      <section class="dna-summary-section">
-        <div class="dna-summary-section-head">
-          <p class="dna-summary-label">Suggested next books</p>
-        </div>
-        <div class="dna-book-grid">
-          ${renderSuggestedBooks(recommendations)}
-        </div>
-      </section>
-
-      <div class="dna-summary-actions">
+      <div class="dna-profile-actions">
         <a href="home.html" class="btn btn-primary">Go to Home</a>
         <a href="discovery.html" class="btn btn-secondary">View Recommendations</a>
         <button type="button" class="btn btn-ghost" id="retakeQuizBtn">Retake Quiz</button>

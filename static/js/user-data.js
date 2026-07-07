@@ -82,7 +82,7 @@ const BookMindUserData = {
             .join("\n")
         : "",
       books_read: existing.books_read || "",
-      reading_level: answers.readingExperience || existing.confirmed_reading_level || "",
+      reading_level: answers.emotionalIntensity || answers.pacing || existing.confirmed_reading_level || "",
       profile_data: profileData,
     });
 
