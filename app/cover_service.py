@@ -603,7 +603,7 @@ def resolve_cover(
     # Cached auto success from a previous lookup (fast path — no external APIs).
     if row and row.get("cover_url"):
         cached_url = normalize_cover_url(row["cover_url"])
-        if cached_url and _cover_url_is_usable(cached_url):
+        if cached_url:
             result = _result_from_row(
                 row,
                 cover_url=cached_url,
@@ -797,7 +797,7 @@ def enrich_book_entry(book: dict) -> dict:
     return book
 
 
-def enrich_books_in_list(books: list | None) -> list:
+def enrich_books_in_list(books: list | None, *, cache_only: bool = False) -> list:
     if not isinstance(books, list):
         return []
 
@@ -809,12 +809,32 @@ def enrich_books_in_list(books: list | None) -> list:
     for book in valid:
         if book.get("cover_url"):
             normalized = normalize_cover_url(book["cover_url"])
-            if normalized and (_is_trusted_cover_url(normalized) or _cover_url_is_usable(normalized)):
-                book["cover_url"] = normalized
-                continue
+            if normalized:
+                if _is_trusted_cover_url(normalized):
+                    book["cover_url"] = normalized
+                    continue
+                if not cache_only and _cover_url_is_usable(normalized):
+                    book["cover_url"] = normalized
+                    continue
+
+        if cache_only:
+            book_id = make_book_id(book.get("title"), book.get("author"), book.get("isbn"))
+            cached = get_cover_row(
+                book_id=book_id,
+                isbn=book.get("isbn"),
+                title=book.get("title"),
+                author=book.get("author"),
+            )
+            auto_url = normalize_cover_url((cached or {}).get("cover_url"))
+            manual_url = normalize_cover_url((cached or {}).get("manual_cover_url"))
+            url = auto_url or manual_url
+            if url:
+                book["cover_url"] = url
+            continue
+
         needs_resolve.append(book)
 
-    if not needs_resolve:
+    if cache_only or not needs_resolve:
         return valid
 
     batch_payload = [

@@ -14,6 +14,38 @@ const state = {
   rarity: "",
 };
 
+function showLoadingSkeletons() {
+  const cards = document.getElementById("progressCards");
+  const stats = document.getElementById("badgeStatsBar");
+  const grid = document.getElementById("badgeGrid");
+
+  if (cards) {
+    cards.innerHTML = Array.from({ length: 4 }, () => `
+      <div class="progress-card card skeleton-card" aria-hidden="true">
+        <div class="skeleton skeleton-line skeleton-line-lg"></div>
+        <div class="skeleton skeleton-line"></div>
+        <div class="skeleton skeleton-line skeleton-line-sm"></div>
+      </div>
+    `).join("");
+  }
+
+  if (stats) {
+    stats.innerHTML = `
+      <div class="skeleton skeleton-line skeleton-line-lg"></div>
+      <div class="skeleton skeleton-line"></div>
+    `;
+  }
+
+  if (grid) {
+    grid.innerHTML = Array.from({ length: 8 }, () => `
+      <div class="badge-card skeleton-card" aria-hidden="true">
+        <div class="skeleton skeleton-line skeleton-line-lg"></div>
+        <div class="skeleton skeleton-line"></div>
+      </div>
+    `).join("");
+  }
+}
+
 function svg(name, cls) {
   return `<svg class="icon ${cls || ""}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">${ICONS[name] || ""}</svg>`;
 }
@@ -324,6 +356,7 @@ setupFilters();
 setupGoals();
 
 document.addEventListener("DOMContentLoaded", async () => {
+  showLoadingSkeletons();
   try {
     await BookMindLibrary.ensureLoaded();
   } catch {

@@ -6,6 +6,8 @@ const BookMindCoverImage = {
   _batchQueue: new Map(),
   _batchTimer: null,
   _imageObserver: null,
+  _resolveObserver: null,
+  _persistTimer: null,
   _storageKey: "bookmind_cover_cache_v3",
   _failedStorageKey: "bookmind_cover_failed_v3",
   _failedTtlMs: 30 * 60 * 1000,
@@ -53,13 +55,18 @@ const BookMindCoverImage = {
     }
   },
 
+  _schedulePersist() {
+    clearTimeout(this._persistTimer);
+    this._persistTimer = setTimeout(() => this._persistCaches(), 400);
+  },
+
   _isFailed(key) {
     this._loadCaches();
     const until = this._failedUntil.get(key);
     if (!until) return false;
     if (until <= Date.now()) {
       this._failedUntil.delete(key);
-      this._persistCaches();
+      this._schedulePersist();
       return false;
     }
     return true;
@@ -140,15 +147,16 @@ const BookMindCoverImage = {
 
   _rememberSuccess(key, url) {
     if (!url) return;
+    const unchanged = this._memoryCache.get(key) === url;
     this._memoryCache.set(key, url);
     this._failedUntil.delete(key);
-    this._persistCaches();
+    if (!unchanged) this._schedulePersist();
   },
 
   _rememberFailure(key) {
     this._failedUntil.set(key, Date.now() + this._failedTtlMs);
     this._memoryCache.delete(key);
-    this._persistCaches();
+    this._schedulePersist();
   },
 
   placeholderHtml(ref, options = {}) {
@@ -188,7 +196,9 @@ const BookMindCoverImage = {
     const knownUrl = this.getKnownUrl(ref);
 
     if (knownUrl) {
-      this._rememberSuccess(this.cacheKey(ref), knownUrl);
+      if (!this._memoryCache.has(this.cacheKey(ref))) {
+        this._rememberSuccess(this.cacheKey(ref), knownUrl);
+      }
       return this.wrapHtml(
         `<img class="${imgClass}" data-cover-src="${this.escape(knownUrl)}" alt="${this.escape(ref.title)} cover" loading="lazy" decoding="async">`,
         { ...ref, cover_url: knownUrl },
@@ -215,6 +225,29 @@ const BookMindCoverImage = {
     if (!wrap.querySelector(".premium-book-placeholder")) {
       wrap.insertAdjacentHTML("beforeend", this.placeholderHtml(ref));
     }
+  },
+
+  _ensureResolveObserver() {
+    if (this._resolveObserver || typeof IntersectionObserver === "undefined") return;
+    this._resolveObserver = new IntersectionObserver(
+      entries => {
+        entries.forEach(entry => {
+          if (!entry.isIntersecting) return;
+          this._resolveObserver.unobserve(entry.target);
+          this._queueWrap(entry.target);
+        });
+      },
+      { rootMargin: "160px 0px", threshold: 0.01 }
+    );
+  },
+
+  _observeWrapForResolve(wrap) {
+    this._ensureResolveObserver();
+    if (this._resolveObserver) {
+      this._resolveObserver.observe(wrap);
+      return;
+    }
+    this._queueWrap(wrap);
   },
 
   _ensureImageObserver() {
@@ -410,8 +443,6 @@ const BookMindCoverImage = {
     this._loadCaches();
 
     const wraps = root.querySelectorAll("[data-cover-key]");
-    const visible = [];
-    const hidden = [];
 
     wraps.forEach(wrap => {
       const ref = this.refFromWrap(wrap);
@@ -430,21 +461,11 @@ const BookMindCoverImage = {
       if (!this.needsResolve(wrap)) return;
 
       if (this._isInViewport(wrap)) {
-        visible.push(wrap);
+        this._queueWrap(wrap);
       } else {
-        hidden.push(wrap);
+        this._observeWrapForResolve(wrap);
       }
     });
-
-    visible.forEach(wrap => this._queueWrap(wrap));
-
-    if (hidden.length) {
-      setTimeout(() => {
-        hidden.forEach(wrap => {
-          if (wrap.isConnected) this._queueWrap(wrap);
-        });
-      }, 400);
-    }
   },
 
   async hydrate(root = document, options = {}) {

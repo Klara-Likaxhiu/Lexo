@@ -278,7 +278,24 @@ def group_by_status(books: list[dict[str, Any]]) -> dict[str, list[dict[str, Any
 
 def find_book_by_title(user_id: str, title: str) -> dict[str, Any] | None:
     key = normalize_title(title)
-    for book in list_user_books(user_id):
+    if not key:
+        return None
+
+    trimmed = (title or "").strip()
+    params: dict[str, str] = {
+        "user_id": f"eq.{user_id}",
+        "select": "*",
+        "limit": "8",
+    }
+    if trimmed:
+        params["title"] = f"ilike.{trimmed}"
+
+    rows = _request("GET", TABLE, params=params)
+    if not isinstance(rows, list):
+        return None
+
+    for row in rows:
+        book = _row_to_book(row)
         if normalize_title(book.get("title")) == key:
             return book
     return None

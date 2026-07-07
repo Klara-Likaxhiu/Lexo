@@ -3,7 +3,7 @@
 <head>
   <title>BookMindAI</title>
   <link rel="stylesheet" href="styles.css">
-  <script src="js/auth.js"></script>
+  <script src="js/auth.js" defer></script>
 </head>
 <body>
 
@@ -172,11 +172,8 @@
     document.addEventListener("DOMContentLoaded", async () => {
       if (window.BookMindAuth) {
         await BookMindAuth.whenReady();
-        if (BookMindAuth.isLoggedIn()) {
-          const ok = await BookMindAuth.verifySession();
-          if (ok) {
-            window.location.replace("/home");
-          }
+        if (BookMindAuth.isLoggedIn() && BookMindAuth.getCurrentUser()?.id) {
+          window.location.replace("/home");
         }
       }
     });

@@ -47,6 +47,12 @@ const BookMindAuth = {
 
   _sessionReadyPromise: null,
   _refreshPromise: null,
+  _meCache: { token: null, user: null, at: 0 },
+  _meCacheTtlMs: 5 * 60 * 1000,
+
+  _clearMeCache() {
+    this._meCache = { token: null, user: null, at: 0 };
+  },
 
   _readStorageItem(key) {
     return localStorage.getItem(key) || sessionStorage.getItem(key);
@@ -206,6 +212,9 @@ const BookMindAuth = {
     const remember = remember_me !== undefined ? Boolean(remember_me) : true;
     localStorage.setItem(this.REMEMBER_KEY, remember ? "true" : "false");
     this._clearLegacyAuthKeys();
+    if (access_token !== this._session.accessToken) {
+      this._clearMeCache();
+    }
     this._updateSession({ access_token, refresh_token, user });
 
     this._session.ready = true;
@@ -239,7 +248,6 @@ const BookMindAuth = {
       accessKey: this.ACCESS_KEY,
       refreshKey: this.REFRESH_KEY,
     };
-    console.log("[BookMindAuth] auth state:", state);
     window.__BOOKMIND_AUTH_STATE__ = state;
     this._dispatchAuthReady(state.user);
     return state;
@@ -286,7 +294,6 @@ const BookMindAuth = {
     }
 
     if (!this._session.accessToken) {
-      console.log("[BookMindAuth] restoreSession: no token");
       this._clearLegacyAuthKeys();
       this._session.ready = true;
       this._publishAuthState("no-token");
@@ -294,7 +301,6 @@ const BookMindAuth = {
     }
 
     if (this.isAccessTokenExpired(this._session.accessToken)) {
-      console.log("[BookMindAuth] restoreSession: access token expired, refreshing");
       const refreshed = await this.ensureFreshSession({ clearOnFailure: false });
       if (!refreshed) {
         this._session.ready = true;
@@ -308,7 +314,6 @@ const BookMindAuth = {
       const user = await this.fetchCurrentUser({ allowRefresh: true });
       this._syncSessionFromStorage();
       this._session.ready = true;
-      console.log("[BookMindAuth] restoreSession: ok", user?.username || user?.email || "(no profile)");
       this._publishAuthState("restored");
       this.updateAuthUi();
       return user;
@@ -330,9 +335,18 @@ const BookMindAuth = {
     return this.getCurrentUser();
   },
 
-  async fetchCurrentUser({ allowRefresh = true } = {}) {
+  async fetchCurrentUser({ allowRefresh = true, force = false } = {}) {
     let token = this.getAccessToken();
     if (!token) return null;
+
+    if (
+      !force &&
+      this._meCache.token === token &&
+      this._meCache.user &&
+      Date.now() - this._meCache.at < this._meCacheTtlMs
+    ) {
+      return this._meCache.user;
+    }
 
     if (allowRefresh && this.isAccessTokenExpired(token)) {
       const refreshed = await this.refreshSession({ clearOnFailure: false });
@@ -383,6 +397,7 @@ const BookMindAuth = {
 
     if (data.user) {
       this._persistUser(data.user);
+      this._meCache = { token, user: data.user, at: Date.now() };
     }
     return data.user || this._session.user;
   },
@@ -397,11 +412,11 @@ const BookMindAuth = {
     localStorage.removeItem(this.REMEMBER_KEY);
     this._resetSessionState();
     this._clearLegacyAuthKeys();
+    this._clearMeCache();
   },
 
   /** Clear auth session and pending signup/verification state (not user data like settings). */
   clearAllAuthState() {
-    console.log("[BookMindAuth] clearAllAuthState");
     this.clearSession();
     this._sessionReadyPromise = null;
   },
@@ -430,7 +445,6 @@ const BookMindAuth = {
   },
 
   redirectToVerifyEmailPending(email, delivery = {}) {
-    console.log("[BookMindAuth] redirectToVerifyEmailPending (explicit post-signup only)", email);
     const value = (email || "").trim();
     if (value) {
       this.setPendingSignupEmail(value);
@@ -450,24 +464,20 @@ const BookMindAuth = {
   },
 
   restartSignupFlow() {
-    console.log("[BookMindAuth] restartSignupFlow");
     this.clearAllAuthState();
     window.location.href = "/signup.html";
   },
 
   goToLoginPage(query = "") {
-    console.log("[BookMindAuth] goToLoginPage");
     this.clearAllAuthState();
     window.location.href = `/login.html${query}`;
   },
 
   prepareSignupPage() {
-    console.log("[BookMindAuth] prepareSignupPage — clearing stale auth");
     this.clearAllAuthState();
   },
 
   prepareLoginPage() {
-    console.log("[BookMindAuth] prepareLoginPage");
     const params = new URLSearchParams(window.location.search);
     if (params.get("verified") === "1") {
       this.clearAllAuthState();
@@ -664,7 +674,6 @@ const BookMindAuth = {
 
   async signup(username, email, password) {
     const endpoint = this.apiUrl("/api/auth/signup");
-    console.log("[BookMindAuth] signup →", endpoint, "(origin:", window.location.origin, ")");
     const data = await this.api("/api/auth/signup", { username, email, password });
     if (data.verification_required) {
       this.clearPendingSignupState();
@@ -680,7 +689,6 @@ const BookMindAuth = {
       password,
       remember_me: rememberMe
     });
-    console.log("[BookMindAuth] login response", {
       verification_required: data.verification_required,
       hasAccessToken: Boolean(data.access_token),
       hasRefreshToken: Boolean(data.refresh_token),
@@ -690,7 +698,6 @@ const BookMindAuth = {
       this.clearPendingSignupState();
     } else if (data.access_token) {
       this.saveSession(data);
-      console.log("[BookMindAuth] login after saveSession, getAccessToken:", Boolean(this.getAccessToken()));
     } else {
       throw new Error("Login succeeded but the server did not return a session token.");
     }
@@ -781,14 +788,12 @@ const BookMindAuth = {
         remember_me: true,
         user
       });
-      console.log("[BookMindAuth] verification complete — session saved, redirect home");
       window.location.href = "/home.html";
       return;
     }
 
     const email = user?.email ? encodeURIComponent(user.email) : "";
     const query = email ? `?verified=1&email=${email}` : "?verified=1";
-    console.log("[BookMindAuth] verification complete — redirect login");
     window.location.href = `/login.html${query}`;
   },
 
@@ -975,7 +980,6 @@ const BookMindAuth = {
       });
       this._session.ready = true;
       this._sessionReadyPromise = Promise.resolve(data.user || this.getCurrentUser());
-      console.log("[BookMindAuth] refreshSession: ok");
       return true;
     } catch {
       if (clearOnFailure) this.handleAuthFailure();
@@ -984,14 +988,19 @@ const BookMindAuth = {
   },
 
   async verifySession() {
-    if (!this.getAccessToken()) {
-      console.log("[BookMindAuth] verifySession: no token");
-      return false;
+    const token = this.getAccessToken();
+    if (!token) return false;
+
+    if (
+      this._session.ready &&
+      !this.isAccessTokenExpired(token) &&
+      this.getCurrentUser()?.id
+    ) {
+      return true;
     }
 
     const user = await this.fetchCurrentUser({ allowRefresh: true });
     if (!this.isLoggedIn() || !user?.id) {
-      console.log("[BookMindAuth] verifySession: no valid session");
       return false;
     }
 
@@ -1002,14 +1011,12 @@ const BookMindAuth = {
         config.email_sending_enabled &&
         !user.email_verified
       ) {
-        console.log("[BookMindAuth] verifySession: email not verified");
         return false;
       }
-    } catch (error) {
-      console.log("[BookMindAuth] verifySession: config check failed", error);
+    } catch {
+      /* config optional for session check */
     }
 
-    console.log("[BookMindAuth] verifySession: ok");
     return true;
   },
 
@@ -1040,7 +1047,6 @@ const BookMindAuth = {
   },
 
   async logout() {
-    console.log("[BookMindAuth] logout");
     const refreshToken = this.getRefreshToken();
     try {
       await fetch("/api/auth/logout", {
@@ -1148,14 +1154,12 @@ const BookMindAuth = {
     const page = this.currentPage();
     if (!this.PROTECTED_PAGES.has(page)) return true;
 
-    console.log("[BookMindAuth] guardPage: protecting", page);
     document.documentElement.classList.add("auth-pending");
 
     await this.whenReady();
     const ok = await this.verifySession();
     if (!ok) {
       const next = encodeURIComponent(this.currentPath() + window.location.search);
-      console.log("[BookMindAuth] guardPage: redirect to login", next);
       window.location.replace(`/login.html?next=${next}`);
       return false;
     }
@@ -1169,7 +1173,6 @@ const BookMindAuth = {
     const page = this.currentPage();
     if (!this.PUBLIC_AUTH_PAGES.has(page)) return;
 
-    console.log("[BookMindAuth] guardPublicAuthPage:", page, "(no verify-email-pending redirect)");
 
     if (page === "signup.html") {
       this.prepareSignupPage();
@@ -1194,11 +1197,9 @@ const BookMindAuth = {
       if (this.getAccessToken()) {
         const ok = await this.verifySession();
         if (ok) {
-          console.log("[BookMindAuth] guardPublicAuthPage: verified user on login, redirect home");
           window.location.replace("/home");
           return;
         }
-        console.log("[BookMindAuth] guardPublicAuthPage: stale session on login, clearing tokens");
         this.clearSession();
       }
       return;
@@ -1240,14 +1241,12 @@ const BookMindAuth = {
 
     if (signupAgainLink) {
       signupAgainLink.addEventListener("click", () => {
-        console.log("[BookMindAuth] sign up again clicked — clearing state");
         BookMindAuth.clearAllAuthState();
       });
     }
 
     if (backToLoginLink) {
       backToLoginLink.addEventListener("click", () => {
-        console.log("[BookMindAuth] back to login clicked — clearing state");
         BookMindAuth.clearAllAuthState();
       });
     }
@@ -1472,35 +1471,26 @@ function whenDomReady(fn) {
 (async function initAuth() {
   const page = BookMindAuth.currentPage();
   const path = BookMindAuth.currentPath();
-  console.log("[BookMindAuth] initAuth page:", page, "path:", path);
 
   // Sync bookmind_access_token / bookmind_refresh_token from localStorage immediately.
   BookMindAuth._syncSessionFromStorage();
-  console.log(
-    "[BookMindAuth] initAuth bootstrap hasAccessToken:",
-    Boolean(BookMindAuth.getAccessToken())
-  );
 
   if (page === "signup.html") {
     BookMindAuth.clearAllAuthState();
-    console.log("[BookMindAuth] initAuth: signup — cleared stale auth");
     BookMindAuth._publishAuthState("signup-cleared");
     return;
   }
 
   if (BookMindAuth.redirectAuthCallbackIfNeeded()) {
-    console.log("[BookMindAuth] initAuth: auth callback redirect");
     return;
   }
 
   // Every non-signup page restores the Supabase session before app scripts call APIs.
-  console.log("[BookMindAuth] initAuth: restoring session");
   BookMindAuth._sessionReadyPromise = null;
   await BookMindAuth.whenReady();
   BookMindAuth.updateAuthUi();
 
   if (BookMindAuth.PUBLIC_PAGES.has(page) || page === "landing.html") {
-    console.log("[BookMindAuth] initAuth: public page");
     if (BookMindAuth.EMAIL_FEATURE_PAGES.has(page)) {
       await BookMindAuth.guardEmailFeaturePage();
       if (page === "verify-email-pending.html") {
@@ -1519,15 +1509,10 @@ function whenDomReady(fn) {
   }
 
   if (BookMindAuth.PROTECTED_PAGES.has(page)) {
-    console.log("[BookMindAuth] initAuth: protected page");
     await BookMindAuth.guardPage();
     return;
   }
 
-  console.log(
-    "[BookMindAuth] initAuth: app page ready, hasAccessToken:",
-    Boolean(BookMindAuth.getAccessToken())
-  );
   whenDomReady(() => BookMindAuth.setupLogoutLinks());
 })();
 

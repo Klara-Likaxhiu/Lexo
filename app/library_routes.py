@@ -83,13 +83,11 @@ def get_library(user: dict = Depends(get_verified_user)) -> dict:
     except LibraryStoreError as exc:
         _raise_store_error(exc)
 
+    grouped = group_by_status(books)
     return {
-        "library": group_by_status(books),
+        "library": grouped,
         "books": books,
-        "stats": {
-            status: len(group_by_status(books).get(status, []))
-            for status in VALID_STATUSES
-        },
+        "stats": {status: len(grouped.get(status, [])) for status in VALID_STATUSES},
     }
 
 

@@ -132,6 +132,11 @@ const BookMindLibrary = {
     return this._books.slice();
   },
 
+  getBooksByStatus(status) {
+    const shelf = this.normalizeStatus(status);
+    return (this.getLibrary()[shelf] || []).slice();
+  },
+
   getLastError() {
     return this._lastError;
   },

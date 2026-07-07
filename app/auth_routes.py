@@ -634,8 +634,8 @@ def logout(
 @router.get("/me")
 def me(user: dict = Depends(_get_current_user)) -> dict:
     """Return the authenticated Supabase user merged with the profiles row."""
-    profile = auth_db.get_profile_by_id(user["id"])
-    return {"user": merge_public_user(user["_supabase_user"], profile)}
+    public = {key: value for key, value in user.items() if not key.startswith("_")}
+    return {"user": public}
 
 
 @router.get("/me/debug")

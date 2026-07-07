@@ -90,14 +90,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     const mission = document.getElementById("todayMission");
 
     if (!force) {
-      try {
-        const cached = JSON.parse(localStorage.getItem("bookmind_reader_intelligence") || "null");
-        if (cached?.dashboard) {
-          applyIntelligence(cached);
-          return;
-        }
-      } catch {
-        /* ignore */
+      const mood = localStorage.getItem("bookmind_today_mood");
+      const goal = localStorage.getItem("bookmind_today_goal");
+      const cached = BookMindAPI._readIntelligenceCache({ today_mood: mood, today_goal: goal });
+      if (cached?.dashboard) {
+        applyIntelligence(cached);
+        return;
       }
     }
 

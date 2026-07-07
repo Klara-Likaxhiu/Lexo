@@ -5,7 +5,9 @@
 window.BookMindBadgeEngine = {
   STORAGE_KEY: "bookmind_earned_badges",
   AI_STORAGE_KEY: "bookmind_ai_badges",
+  AI_FETCH_META_KEY: "bookmind_ai_badges_meta",
   SEEN_KEY: "bookmind_badges_seen",
+  _aiBadgesTtlMs: 60 * 60 * 1000,
 
   svg(iconName, cls) {
     const paths = BookMindBadgeCatalog.ICONS[iconName] || BookMindBadgeCatalog.ICONS.star;
@@ -482,8 +484,26 @@ window.BookMindBadgeEngine = {
     };
   },
 
-  async fetchAiBadgesFromServer(ctx) {
+  async fetchAiBadgesFromServer(ctx, { force = false } = {}) {
     if (!window.BookMindAPI?.post || !window.BookMindAuth?.isLoggedIn?.()) return null;
+
+    if (!force) {
+      try {
+        const meta = JSON.parse(localStorage.getItem(this.AI_FETCH_META_KEY) || "null");
+        const cached = this.loadAiBadges();
+        if (
+          meta?.at &&
+          Date.now() - meta.at < this._aiBadgesTtlMs &&
+          Array.isArray(cached) &&
+          cached.length
+        ) {
+          return cached;
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+
     try {
       const data = await BookMindAPI.post("/api/reader/badges", {
         reader_profile: ctx.profile,
@@ -526,6 +546,7 @@ window.BookMindBadgeEngine = {
           }
         });
         this.saveAiBadges(merged);
+        localStorage.setItem(this.AI_FETCH_META_KEY, JSON.stringify({ at: Date.now() }));
         return merged;
       }
     } catch {

@@ -333,7 +333,7 @@ Use this exact structure:
 
     for path in parsed.get("paths", []) or []:
         if isinstance(path, dict):
-            path["books"] = enrich_books_in_list(path.get("books"))
+            path["books"] = enrich_books_in_list(path.get("books"), cache_only=True)
 
     parsed["engine"] = ai.engine_name()
 
@@ -499,7 +499,7 @@ Respond ONLY in valid JSON:
 
     from app.cover_service import enrich_books_in_list
 
-    parsed["books"] = enrich_books_in_list(parsed.get("books", []))[:7]
+    parsed["books"] = enrich_books_in_list(parsed.get("books", []), cache_only=True)[:7]
     parsed["engine"] = ai.engine_name()
     return parsed
 

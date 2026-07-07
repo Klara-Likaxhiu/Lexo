@@ -44,7 +44,7 @@ const BookMindAPI = {
     if (window.BookMindAuth?.whenReady) {
       await BookMindAuth.whenReady();
     }
-    if (window.BookMindAuth?._syncSessionFromStorage) {
+    if (window.BookMindAuth?._syncSessionFromStorage && !BookMindAuth._session?.ready) {
       BookMindAuth._syncSessionFromStorage();
     }
 
@@ -92,7 +92,7 @@ const BookMindAPI = {
       }
     } else if (window.BookMindAuth?.whenReady) {
       await BookMindAuth.whenReady();
-      if (window.BookMindAuth?._syncSessionFromStorage) {
+      if (window.BookMindAuth?._syncSessionFromStorage && !BookMindAuth._session?.ready) {
         BookMindAuth._syncSessionFromStorage();
       }
       token = BookMindAuth.getAccessToken() || null;
@@ -152,11 +152,25 @@ const BookMindAPI = {
     return this.request(path, { ...options, method: "DELETE" });
   },
 
-  async getMe({ redirect = false } = {}) {
+  async getMe({ redirect = false, force = false } = {}) {
+    const token = window.BookMindAuth?.getAccessToken?.();
+    const cachedUser = window.BookMindAuth?.getCurrentUser?.();
+    if (
+      !force &&
+      token &&
+      cachedUser?.id &&
+      !BookMindAuth.isAccessTokenExpired?.(token)
+    ) {
+      return cachedUser;
+    }
+
     const data = await this.get("/api/auth/me", { redirect });
     if (!data) return null;
     if (data.user && window.BookMindAuth?._persistUser) {
       BookMindAuth._persistUser(data.user);
+      if (BookMindAuth._meCache && token) {
+        BookMindAuth._meCache = { token, user: data.user, at: Date.now() };
+      }
     }
     return data.user || null;
   },
