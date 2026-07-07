@@ -240,3 +240,28 @@ drop policy if exists "Users delete own library" on public.user_library;
 create policy "Users delete own library"
   on public.user_library for delete
   using (auth.uid() = user_id);
+
+-- ── book_covers (global cover URL cache) ─────────────────────────────────────
+-- book_id: ISBN when available (isbn:978…), else normalized title|author
+-- See also: supabase/migrations/20250707_book_covers.sql
+
+create table if not exists public.book_covers (
+  book_id text primary key,
+  isbn text,
+  title text not null,
+  author text,
+  cover_url text not null,
+  source text not null default 'Unknown',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_book_covers_isbn on public.book_covers (isbn);
+create index if not exists idx_book_covers_title_author on public.book_covers (title, author);
+
+alter table public.book_covers enable row level security;
+
+drop policy if exists "Book covers readable by everyone" on public.book_covers;
+create policy "Book covers readable by everyone"
+  on public.book_covers for select
+  using (true);

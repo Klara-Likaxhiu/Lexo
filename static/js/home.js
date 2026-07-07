@@ -199,25 +199,24 @@ document.addEventListener("DOMContentLoaded", async () => {
       const card = document.createElement("div");
       card.className = "recommendation-card-modern card";
 
-      const coverHTML =
-        bookData && bookData.cover_url
-          ? `
-          <img
-            class="recommendation-cover"
-            src="${bookData.cover_url}"
-            alt="${aiBook.title} cover"
-            onerror="this.style.display='none'; this.nextElementSibling.style.display='grid';"
-          />
-          <div class="recommendation-cover fallback-cover" style="display:none;"></div>
-        `
-          : `
-          <div class="recommendation-cover fallback-cover"></div>
-        `;
+      const coverHTML = window.BookMindCoverImage
+        ? BookMindCoverImage.html(
+            { ...aiBook, ...bookData, genre },
+            {
+              imgClass: "recommendation-cover book-cover-img",
+              wrapClass: "recommendation-cover-wrap book-cover-wrap",
+              placeholderClass: "recommendation-cover book-cover-placeholder",
+            }
+          )
+        : bookData && bookData.cover_url
+        ? `
+          <div class="recommendation-cover-wrap">
+            <img class="recommendation-cover" src="${bookData.cover_url}" alt="${aiBook.title} cover" loading="lazy">
+          </div>`
+        : `<div class="recommendation-cover-wrap"><div class="recommendation-cover fallback-cover"></div></div>`;
 
       card.innerHTML = `
-      <div class="recommendation-cover-wrap">
-        ${coverHTML}
-      </div>
+      ${coverHTML}
 
       <div class="recommendation-info">
         <h3>${aiBook.title}</h3>
@@ -270,6 +269,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       container.appendChild(card);
     });
+
+    if (window.BookMindCoverImage) {
+      BookMindCoverImage.hydrate(container, { imgClass: "recommendation-cover book-cover-img" });
+    }
   }
 
   async function generateMoreRecommendations() {
@@ -302,7 +305,21 @@ document.addEventListener("DOMContentLoaded", async () => {
         return;
       }
 
-      const newItems = fresh.map(book => ({
+      const mergeItems = fresh.map(book => ({
+        title: book.title,
+        author: book.author,
+        genre: book.genre,
+        reason: book.reason,
+        difficulty: book.difficulty || "AI Pick",
+      }));
+
+      if (window.BookMindCoverImage) {
+        await BookMindCoverImage.hydrateMany(mergeItems, container, {
+          imgClass: "recommendation-cover book-cover-img",
+        });
+      }
+
+      const newItems = mergeItems.map(book => ({
         ai_recommendation: {
           title: book.title,
           author: book.author,
@@ -310,7 +327,14 @@ document.addEventListener("DOMContentLoaded", async () => {
           difficulty: book.difficulty || "AI Pick",
           reason: book.reason,
         },
-        book_data: null,
+        book_data: book.cover_url
+          ? {
+              title: book.title,
+              author: book.author,
+              genre: book.genre,
+              cover_url: book.cover_url,
+            }
+          : null,
       }));
 
       const stored = JSON.parse(localStorage.getItem("readerProfile")) || {};

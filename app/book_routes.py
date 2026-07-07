@@ -3,10 +3,39 @@ from typing import Literal
 
 import httpx
 from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel, Field
+
+from app.cover_service import resolve_cover, resolve_covers_batch
 
 router = APIRouter(prefix="/api/books", tags=["Books"])
 
 SearchMode = Literal["all", "title", "author", "genre"]
+
+
+class CoverResolveRequest(BaseModel):
+    title: str = Field(min_length=1)
+    author: str | None = None
+    isbn: str | None = None
+    cover_url: str | None = None
+    google_id: str | None = None
+    open_library_key: str | None = None
+
+
+class CoverBatchRequest(BaseModel):
+    books: list[CoverResolveRequest] = Field(default_factory=list, max_length=24)
+
+
+@router.post("/resolve-cover")
+def resolve_cover_endpoint(data: CoverResolveRequest) -> dict:
+    """Resolve the best available cover for a single book."""
+    return resolve_cover(**data.model_dump())
+
+
+@router.post("/resolve-covers")
+def resolve_covers_endpoint(data: CoverBatchRequest) -> dict:
+    """Resolve covers for multiple books in one request."""
+    books = resolve_covers_batch([book.model_dump() for book in data.books])
+    return {"results": books}
 
 
 def _strip_html(text: str) -> str:
@@ -100,9 +129,18 @@ def _parse_google_volume(item: dict) -> dict | None:
         return None
 
     images = info.get("imageLinks", {})
-    cover = images.get("thumbnail") or images.get("smallThumbnail")
+    cover = (
+        images.get("extraLarge")
+        or images.get("large")
+        or images.get("medium")
+        or images.get("thumbnail")
+        or images.get("smallThumbnail")
+    )
     if cover:
         cover = cover.replace("http://", "https://")
+        cover = re.sub(r"zoom=\d+", "zoom=0", cover)
+        cover = cover.replace("&edge=curl", "")
+        cover = re.sub(r"w=\d+-h\d+", "w=800-h1200", cover)
 
     published = (info.get("publishedDate") or "").strip()
     year = int(published[:4]) if published[:4].isdigit() else None
@@ -178,7 +216,7 @@ def _parse_open_library_doc(item: dict) -> dict | None:
         "publisher": (item.get("publisher") or [None])[0],
         "isbn": (item.get("isbn") or [None])[0],
         "cover_url": (
-            f"https://covers.openlibrary.org/b/id/{cover_id}-M.jpg" if cover_id else None
+            f"https://covers.openlibrary.org/b/id/{cover_id}-L.jpg" if cover_id else None
         ),
         "open_library_key": ol_key,
         "average_rating": rating,

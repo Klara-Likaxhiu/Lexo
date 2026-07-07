@@ -197,6 +197,10 @@ function renderShelf(shelf) {
 
     libraryBooks.appendChild(card);
   });
+
+  if (window.BookMindCoverImage) {
+    BookMindCoverImage.hydrate(libraryBooks, { imgClass: "shared-book-cover book-cover-img" });
+  }
 }
 
 function escapeHtml(value) {

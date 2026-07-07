@@ -39,6 +39,9 @@ function renderFeed(reviews) {
   }
 
   feed.innerHTML = reviews.map(renderCard).join("");
+  if (window.BookMindCoverImage) {
+    BookMindCoverImage.hydrate(feed, { imgClass: "community-cover-img book-cover-img" });
+  }
 
   feed.querySelectorAll(".community-card").forEach(card => {
     card.addEventListener("click", () => {
@@ -67,8 +70,22 @@ function renderCard(review) {
   const date = review.updated || review.created;
   const dateStr = date ? new Date(date).toLocaleDateString() : "";
 
-  const cover = review.cover_url
-    ? `<img src="${escapeAttr(review.cover_url)}" alt="${escapeAttr(review.book_title)} cover" onerror="this.style.display='none';this.nextElementSibling.style.display='grid';"><span class="community-card-fallback" style="display:none;"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg></span>`
+  const cover = window.BookMindCoverImage
+    ? BookMindCoverImage.html(
+        {
+          title: review.book_title,
+          author: review.author,
+          genre: review.genre,
+          cover_url: review.cover_url,
+        },
+        {
+          imgClass: "community-cover-img book-cover-img",
+          wrapClass: "community-card-cover book-cover-wrap",
+          placeholderClass: "community-card-fallback book-cover-placeholder",
+        }
+      )
+    : review.cover_url
+    ? `<img src="${escapeAttr(review.cover_url)}" alt="${escapeAttr(review.book_title)} cover" loading="lazy">`
     : `<span class="community-card-fallback"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg></span>`;
 
   const bookData = escapeAttr(
@@ -82,7 +99,7 @@ function renderCard(review) {
 
   return `
     <article class="community-card card" data-book="${bookData}">
-      <div class="community-card-cover">${cover}</div>
+      ${window.BookMindCoverImage ? cover : `<div class="community-card-cover">${cover}</div>`}
       <div class="community-card-body">
         <div class="community-card-head">
           <div>

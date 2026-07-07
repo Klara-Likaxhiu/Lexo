@@ -119,7 +119,32 @@ function renderBook(data) {
 
 function renderCover(aiBook, book) {
   const cover = document.getElementById("detailCover");
-  const coverUrl = (book && book.cover_url) || aiBook.cover_url;
+  const bookRef = {
+    title: aiBook.title,
+    author: aiBook.author || book?.author,
+    genre: aiBook.genre || book?.genre,
+    cover_url: (book && book.cover_url) || aiBook.cover_url,
+    isbn: book?.isbn,
+    open_library_key: book?.open_library_key,
+  };
+
+  if (window.BookMindCoverImage) {
+    cover.innerHTML = BookMindCoverImage.html(bookRef, {
+      imgClass: "bd-cover-img book-cover-img",
+      wrapClass: "book-cover-wrap bd-cover-wrap",
+      placeholderClass: "bd-cover-fallback book-cover-placeholder",
+      lazy: false,
+    });
+    const wrap = cover.querySelector(".book-cover-wrap");
+    if (wrap) {
+      BookMindCoverImage.hydrateWrap(wrap, bookRef, { imgClass: "bd-cover-img book-cover-img" }).then(url => {
+        if (url) bookCover = url;
+      });
+    }
+    return;
+  }
+
+  const coverUrl = bookRef.cover_url;
 
   if (coverUrl) {
     const img = document.createElement("img");

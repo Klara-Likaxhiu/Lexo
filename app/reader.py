@@ -141,6 +141,8 @@ Return ONLY valid JSON in this exact structure:
 
 
 def recommend_with_book_data(data: ReaderProfileRequest) -> dict:
+    from app.cover_service import enrich_recommendation
+
     reader_result = analyze_reader_profile(data)
     enriched_books = []
 
@@ -150,12 +152,14 @@ def recommend_with_book_data(data: ReaderProfileRequest) -> dict:
         if not title:
             continue
 
-        open_library_results = search_open_library(title, limit=1)
-
         enriched_books.append(
             {
                 "ai_recommendation": book,
-                "book_data": open_library_results[0] if open_library_results else None,
+                "book_data": enrich_recommendation(
+                    title,
+                    author=book.get("author"),
+                    genre=book.get("genre"),
+                ),
             }
         )
 
@@ -235,6 +239,10 @@ Do not write anything outside the JSON.
 
     excluded = _collect_excluded_titles(reader_profile)
     parsed["recommendations"] = _filter_books(parsed.get("recommendations", []), excluded)
+
+    from app.cover_service import enrich_books_in_list
+
+    parsed["recommendations"] = enrich_books_in_list(parsed.get("recommendations"))
 
     parsed["engine"] = ai.engine_name()
     return parsed
@@ -325,6 +333,12 @@ Use this exact structure:
     for path in parsed.get("paths", []) or []:
         if isinstance(path, dict):
             path["books"] = _filter_books(path.get("books", []), excluded)
+
+    from app.cover_service import enrich_books_in_list
+
+    for path in parsed.get("paths", []) or []:
+        if isinstance(path, dict):
+            path["books"] = enrich_books_in_list(path.get("books"))
 
     parsed["engine"] = ai.engine_name()
 
@@ -481,6 +495,18 @@ Use this exact structure:
 
     excluded = _collect_excluded_titles(reader_profile, library)
     _apply_intelligence_exclusions(parsed, excluded)
+
+    from app.cover_service import enrich_book_entry, enrich_books_in_list
+
+    dashboard = parsed.get("dashboard") or {}
+    top_pick = dashboard.get("top_pick")
+    if isinstance(top_pick, dict):
+        dashboard["top_pick"] = enrich_book_entry(top_pick)
+
+    discover = parsed.get("discover") or {}
+    for section in discover.get("sections", []) or []:
+        if isinstance(section, dict):
+            section["books"] = enrich_books_in_list(section.get("books"))
 
     parsed["engine"] = ai.engine_name()
     return parsed

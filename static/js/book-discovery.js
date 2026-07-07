@@ -15,6 +15,14 @@ const BookMindCover = {
   },
 
   html(book, variant = "card") {
+    if (window.BookMindCoverImage) {
+      return BookMindCoverImage.html(book, {
+        imgClass: variant === "modal" ? "discovery-detail-img book-cover-img" : "discovery-card-img book-cover-img",
+        wrapClass: variant === "modal" ? "discovery-modal-cover-slot book-cover-wrap" : "discovery-cover-slot book-cover-wrap",
+        placeholderClass: variant === "modal" ? "discovery-detail-ph book-cover-placeholder" : "discovery-card-ph book-cover-placeholder",
+      });
+    }
+
     const { title, coverClass, icon } = this.coverMeta(book);
     const isModal = variant === "modal";
     const slotClass = isModal ? "discovery-modal-cover-slot" : "discovery-cover-slot";
@@ -34,6 +42,11 @@ const BookMindCover = {
   },
 
   onImageError(img) {
+    if (window.BookMindCoverImage) {
+      BookMindCoverImage.onError(img);
+      return;
+    }
+
     const slot = img.closest("[data-cover-class]");
     if (!slot) {
       img.remove();
@@ -270,6 +283,10 @@ const BookMindDetailModal = {
 
     this.els.details.innerHTML = this.renderDetailsGrid(book);
     this.els.cover.innerHTML = BookMindCover.html(book, "modal");
+    if (window.BookMindCoverImage) {
+      const wrap = this.els.cover.querySelector(".book-cover-wrap");
+      if (wrap) BookMindCoverImage.hydrateWrap(wrap, book, { imgClass: "discovery-detail-img book-cover-img" });
+    }
 
     this.els.shelfBtns?.forEach(btn => {
       btn.classList.toggle("active-shelf", existing === btn.dataset.shelf);
@@ -484,6 +501,10 @@ const BookMindDiscovery = {
       });
       this.els.results.appendChild(card);
     });
+
+    if (window.BookMindCoverImage) {
+      BookMindCoverImage.hydrate(this.els.results, { imgClass: "discovery-card-img book-cover-img" });
+    }
   },
 
   setStatus(message, type = "idle") {

@@ -18,7 +18,13 @@ const BookMindBookCard = {
 
     const coverUrl = book.cover_url || book.book_data?.cover_url || null;
 
-    const cover = coverUrl
+    const cover = window.BookMindCoverImage
+      ? BookMindCoverImage.html(book, {
+          imgClass: "shared-book-cover book-cover-img",
+          wrapClass: "shared-book-cover-wrap book-cover-wrap",
+          placeholderClass: "shared-book-cover book-cover-placeholder",
+        })
+      : coverUrl
       ? `<img class="shared-book-cover" src="${coverUrl}" alt="${title} cover"
           onerror="this.style.display='none'; this.nextElementSibling.style.display='grid';">
          <div class="shared-book-cover fallback-cover" style="display:none;"></div>`
@@ -28,9 +34,7 @@ const BookMindBookCard = {
 
     return `
       <div class="shared-book-card card library-book-card" data-library-id="${book.library_id || ""}">
-        <div class="shared-book-cover-wrap">
-          ${cover}
-        </div>
+        ${window.BookMindCoverImage ? cover : `<div class="shared-book-cover-wrap">${cover}</div>`}
 
         <div class="shared-book-info">
           <h3>${this.escape(title)}</h3>

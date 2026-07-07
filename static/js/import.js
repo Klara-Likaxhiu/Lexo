@@ -130,10 +130,14 @@ const BookImport = {
       item.type = "button";
       item.className = "import-result";
 
-      const cover = result.cover_url
-        ? `<img src="${result.cover_url}" alt="${this.escape(result.title)} cover" onerror="this.style.display='none';this.nextElementSibling.style.display='grid';"><span class="import-result-fallback" style="display:none;">
-             <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>
-           </span>`
+      const cover = window.BookMindCoverImage
+        ? BookMindCoverImage.html(result, {
+            imgClass: "import-cover-img book-cover-img",
+            wrapClass: "import-result-cover book-cover-wrap",
+            placeholderClass: "import-result-fallback book-cover-placeholder",
+          })
+        : result.cover_url
+        ? `<img src="${result.cover_url}" alt="${this.escape(result.title)} cover" loading="lazy">`
         : `<span class="import-result-fallback"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg></span>`;
 
       const meta = [result.author, result.first_publish_year, result.total_pages ? `${result.total_pages} pages` : null]
@@ -141,7 +145,7 @@ const BookImport = {
         .join(" · ");
 
       item.innerHTML = `
-        <span class="import-result-cover">${cover}</span>
+        ${window.BookMindCoverImage ? cover : `<span class="import-result-cover">${cover}</span>`}
         <span class="import-result-info">
           <span class="import-result-title">${this.escape(result.title)}</span>
           <span class="import-result-meta">${this.escape(meta)}</span>
@@ -151,6 +155,10 @@ const BookImport = {
       item.addEventListener("click", () => this.selectResult(result, item));
       this.els.searchResults.appendChild(item);
     });
+
+    if (window.BookMindCoverImage) {
+      BookMindCoverImage.hydrate(this.els.searchResults, { imgClass: "import-cover-img book-cover-img" });
+    }
   },
 
   selectResult(result, element) {

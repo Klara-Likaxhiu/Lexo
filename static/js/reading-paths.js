@@ -311,7 +311,17 @@ function renderPaths(result) {
               (book, index) => `
             <div class="path-book ${book.completed ? "done" : ""}">
               <div class="path-step">${book.completed ? svg("check", "icon-inline") : index + 1}</div>
-              <div class="path-book-cover">${svg("book")}</div>
+              <div class="path-book-cover">
+                ${
+                  window.BookMindCoverImage
+                    ? BookMindCoverImage.html(book, {
+                        imgClass: "path-book-cover-img book-cover-img",
+                        wrapClass: "book-cover-wrap path-cover-wrap",
+                        placeholderClass: "path-book-cover-ph book-cover-placeholder",
+                      })
+                    : svg("book")
+                }
+              </div>
               <div class="path-book-info">
                 <span>${escapeHtml(book.level || "Recommended")}</span>
                 <h3>${escapeHtml(book.title || "Untitled Book")}</h3>
@@ -351,6 +361,10 @@ function renderPaths(result) {
     document.body.appendChild(datalist);
   }
   datalist.innerHTML = datalistOptions;
+
+  if (window.BookMindCoverImage) {
+    BookMindCoverImage.hydrate(pathsGrid, { imgClass: "path-book-cover-img book-cover-img" });
+  }
 }
 
 /* ------------------------------------------------------- event delegation */
