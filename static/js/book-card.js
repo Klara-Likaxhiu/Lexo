@@ -221,12 +221,12 @@ const BookMindBookCard = {
         options.onProgressSaved?.(result.message, result.finished);
         options.onChanged?.();
       } catch (error) {
-        console.error(error);
         if (errorEl) {
           errorEl.textContent = error.message;
           errorEl.hidden = false;
         }
         options.onError?.(error.message);
+        BookMindLibrary._notify?.(error.message || "Could not save progress.", "error");
       } finally {
         saveBtn.disabled = false;
       }

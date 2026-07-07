@@ -112,7 +112,7 @@ const BookImport = {
       const data = await response.json();
       this.renderResults(data.results || []);
     } catch (error) {
-      console.error(error);
+      this.showStatus(error.message || "Import search failed.", "error");
       this.els.searchResults.innerHTML = `<p class="import-hint">Search failed. Please try again.</p>`;
     }
   },
@@ -276,7 +276,7 @@ const BookImport = {
         location.reload();
       }
     } catch (error) {
-      console.error(error);
+      this.showStatus(error.message || "Import search failed.", "error");
       this.setMessage(error.message || "Could not save book.", true);
     } finally {
       this.els.addBtn.disabled = false;

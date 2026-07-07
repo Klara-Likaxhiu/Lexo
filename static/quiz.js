@@ -400,8 +400,8 @@ async function saveProgress(stepIndex) {
         currentStep: stepIndex,
         completion
       });
-    } catch (error) {
-      console.error("Quiz progress sync failed:", error);
+    } catch {
+      /* quiz progress stays in localStorage if sync fails */
     }
   }
 }
@@ -677,8 +677,8 @@ async function finishQuiz() {
         });
       }
     }
-  } catch (error) {
-    console.error(error);
+  } catch {
+    /* profile still saved locally */
   }
 
   showCompletionScreen(profile);

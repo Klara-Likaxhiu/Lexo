@@ -40,7 +40,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     BookMindLibrary.ensureLoaded().catch(() => {}),
   ]);
 
-  let profile = JSON.parse(localStorage.getItem("readerProfile"));
+  let profile = BookMindUI.readStorageJson("readerProfile");
 
   const stats = BookMindLibrary.getStats();
   document.getElementById("readCount").textContent = stats.read;

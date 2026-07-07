@@ -205,8 +205,8 @@ setupGoals();
 document.addEventListener("DOMContentLoaded", async () => {
   try {
     await BookMindLibrary.ensureLoaded();
-  } catch (error) {
-    console.error(error);
+  } catch {
+    /* library optional on challenges page */
   }
   render();
 });

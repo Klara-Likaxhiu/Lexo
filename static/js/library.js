@@ -411,7 +411,7 @@ const BookMindLibrary = {
     }
 
     if (type === "error") {
-      console.error(message);
+      /* toast unavailable — error already surfaced in UI when possible */
     }
   },
 

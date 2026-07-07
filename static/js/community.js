@@ -29,7 +29,6 @@ async function loadCommunityFeed() {
     const data = await BookMindAPI.get("/api/reviews/community?limit=30", { auth: false });
     renderFeed(data.reviews || []);
   } catch (error) {
-    console.error(error);
     feed.innerHTML = `
       <div class="empty-library card">
         <h2>Couldn't load the feed.</h2>

@@ -93,7 +93,7 @@ def get_cached_cover(book_id: str) -> dict[str, Any] | None:
                 "limit": "1",
             },
         )
-    except SupabaseRestError:
+    except Exception:
         return None
 
     if isinstance(rows, list) and rows:
@@ -121,7 +121,7 @@ def get_cached_cover_by_isbn(isbn: str | None) -> dict[str, Any] | None:
                 "limit": "1",
             },
         )
-    except SupabaseRestError:
+    except Exception:
         return None
 
     if isinstance(rows, list) and rows:
@@ -146,7 +146,7 @@ def get_cached_cover_by_title_author(title: str | None, author: str | None) -> d
 
     try:
         rows = request("GET", COVERS_TABLE, params=params)
-    except SupabaseRestError:
+    except Exception:
         return None
 
     if isinstance(rows, list) and rows:
@@ -227,7 +227,7 @@ def upsert_manual_cover(
             json=payload,
             prefer="resolution=merge-duplicates,return=representation",
         )
-    except SupabaseRestError:
+    except Exception:
         return None
 
     if isinstance(rows, list) and rows:

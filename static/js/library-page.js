@@ -26,7 +26,6 @@ async function initLibraryPage() {
     showImportFlash();
     renderAll();
   } catch (error) {
-    console.error(error);
     showState("error", error.message || "Could not load your library.");
   }
 }

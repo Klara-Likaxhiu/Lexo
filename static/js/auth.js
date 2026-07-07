@@ -211,16 +211,6 @@ const BookMindAuth = {
     this._session.ready = true;
     this._sessionReadyPromise = Promise.resolve(user || this.getCurrentUser());
     this._dispatchAuthReady(user || this.getCurrentUser());
-    console.log("saved access token:", access_token);
-    console.log("[BookMindAuth] saveSession storage", {
-      accessKey: this.ACCESS_KEY,
-      refreshKey: this.REFRESH_KEY,
-      userKey: this.USER_KEY,
-      accessInLocalStorage: Boolean(localStorage.getItem(this.ACCESS_KEY)),
-      refreshInLocalStorage: Boolean(localStorage.getItem(this.REFRESH_KEY)),
-      hasRefresh: Boolean(refresh_token),
-      user: user?.username || user?.email,
-    });
   },
 
   _persistUser(user) {
@@ -273,78 +263,6 @@ const BookMindAuth = {
     return this._sessionReadyPromise;
   },
 
-  /** Redacted session snapshot for shelf-action debugging. */
-  getSessionDebugSnapshot() {
-    this._syncSessionFromStorage();
-    const token = this.getAccessToken();
-    return {
-      sessionReady: this._session.ready,
-      accessTokenExists: Boolean(token),
-      refreshTokenExists: Boolean(this.getRefreshToken()),
-      isLoggedIn: this.isLoggedIn(),
-      userId: this.getCurrentUser()?.id || null,
-      username: this.getCurrentUser()?.username || null,
-      email: this.getCurrentUser()?.email || null,
-      storage: {
-        localAccess: Boolean(localStorage.getItem(this.ACCESS_KEY)),
-        sessionAccess: Boolean(sessionStorage.getItem(this.ACCESS_KEY)),
-      },
-    };
-  },
-
-  /** Session shape for debug logs (tokens redacted). */
-  async getSessionForDebug() {
-    const { data } = await this.getSession();
-    const session = data?.session;
-    if (!session) return null;
-    return {
-      access_token_exists: Boolean(session.access_token),
-      refresh_token_exists: Boolean(session.refresh_token),
-      user: session.user || null,
-    };
-  },
-
-  _redactHeaders(headers = {}) {
-    const copy = { ...headers };
-    if (copy.Authorization) {
-      copy.Authorization = copy.Authorization.startsWith("Bearer ")
-        ? "Bearer <present>"
-        : "<present>";
-    }
-    return copy;
-  },
-
-  /** Log client session + call /api/auth/me/debug. */
-  async logShelfAuthDebug(label, extra = {}) {
-    const session = await this.getSessionForDebug();
-    console.group(`[BookMindShelf] ${label}`);
-    console.log("current Supabase session:", session);
-    console.log("access token exists:", Boolean(this.getAccessToken()));
-    if (Object.keys(extra).length) console.log("context:", extra);
-
-    const url = this.apiUrl("/api/auth/me/debug");
-    const headers = this.getAuthHeaders();
-    try {
-      const response = await fetch(url, { headers });
-      const rawBody = await response.text();
-      let body = rawBody;
-      try {
-        body = JSON.parse(rawBody);
-      } catch {
-        /* keep raw */
-      }
-      console.log("request URL:", url);
-      console.log("request headers:", this._redactHeaders(headers));
-      console.log("backend response status:", response.status);
-      console.log("backend response body:", body);
-    } catch (error) {
-      console.log("request URL:", url);
-      console.log("request headers:", this._redactHeaders(headers));
-      console.error("backend /api/auth/me/debug request failed:", error);
-    }
-    console.groupEnd();
-  },
-
   /** Supabase-compatible session accessor — validates via /api/auth/me. */
   async getSession() {
     await this.whenReady();
@@ -379,7 +297,10 @@ const BookMindAuth = {
       console.log("[BookMindAuth] restoreSession: access token expired, refreshing");
       const refreshed = await this.ensureFreshSession({ clearOnFailure: false });
       if (!refreshed) {
-        console.warn("[BookMindAuth] restoreSession: refresh failed for expired token");
+        this._session.ready = true;
+        this._publishAuthState("expired-token");
+        this.updateAuthUi();
+        return this._session.user;
       }
     }
 
@@ -410,8 +331,17 @@ const BookMindAuth = {
   },
 
   async fetchCurrentUser({ allowRefresh = true } = {}) {
-    const token = this.getAccessToken();
+    let token = this.getAccessToken();
     if (!token) return null;
+
+    if (allowRefresh && this.isAccessTokenExpired(token)) {
+      const refreshed = await this.refreshSession({ clearOnFailure: false });
+      if (!refreshed) {
+        return this._session.user;
+      }
+      token = this.getAccessToken();
+      if (!token) return this._session.user;
+    }
 
     let response = await fetch(this.apiUrl("/api/auth/me"), {
       headers: { Authorization: `Bearer ${token}` },
@@ -721,15 +651,6 @@ const BookMindAuth = {
         rawBody,
         method
       });
-      console.error("[BookMindAuth] API error", {
-        method,
-        url,
-        status: response.status,
-        statusText: response.statusText,
-        requestBody: body,
-        responseBody: data,
-        rawBody
-      });
       throw error;
     }
 
@@ -771,7 +692,7 @@ const BookMindAuth = {
       this.saveSession(data);
       console.log("[BookMindAuth] login after saveSession, getAccessToken:", Boolean(this.getAccessToken()));
     } else {
-      console.error("[BookMindAuth] login succeeded but no access_token in response");
+      throw new Error("Login succeeded but the server did not return a session token.");
     }
     return data;
   },
@@ -1056,8 +977,7 @@ const BookMindAuth = {
       this._sessionReadyPromise = Promise.resolve(data.user || this.getCurrentUser());
       console.log("[BookMindAuth] refreshSession: ok");
       return true;
-    } catch (error) {
-      console.error("[BookMindAuth] refreshSession failed", error);
+    } catch {
       if (clearOnFailure) this.handleAuthFailure();
       return false;
     }

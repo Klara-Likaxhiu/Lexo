@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import time
 from typing import Any
 
@@ -13,6 +14,7 @@ from app.library_store import LibraryStoreError, user_has_finished_book
 from app.supabase_rest import SupabaseRestError, request
 
 router = APIRouter(prefix="/api/reviews", tags=["Reviews"])
+logger = logging.getLogger(__name__)
 
 TABLE = "community_reviews"
 
@@ -132,6 +134,15 @@ def unpublish_review(data: UnpublishRequest, user: dict = Depends(get_verified_u
     return {"status": "removed", "id": data.id}
 
 
+def _empty_feed() -> dict:
+    return {
+        "reviews": [],
+        "count": 0,
+        "average_rating": 0,
+        "rating_count": 0,
+    }
+
+
 @router.get("/community")
 def community_feed(book: str | None = None, limit: int = 50) -> dict:
     params: dict[str, str] = {
@@ -145,7 +156,11 @@ def community_feed(book: str | None = None, limit: int = 50) -> dict:
     try:
         rows = request("GET", TABLE, params=params)
     except SupabaseRestError as exc:
-        _handle_error(exc)
+        logger.warning("community_feed unavailable: %s", exc.message)
+        return _empty_feed()
+    except Exception as exc:
+        logger.warning("community_feed failed: %s", exc)
+        return _empty_feed()
 
     reviews = [_row_to_review(row) for row in rows] if isinstance(rows, list) else []
 

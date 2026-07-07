@@ -98,7 +98,6 @@ generateBtn.addEventListener("click", async () => {
     savePaths(state);
     renderPaths(state);
   } catch (error) {
-    console.error(error);
     pathsMessage.innerHTML = `
       <h2>Couldn't generate paths right now.</h2>
       <p>Please try again in a moment.</p>
@@ -187,7 +186,6 @@ function toggleComplete(pathId, bookId) {
       renderPaths(state);
       window.BookMindLibraryPage?.refresh?.();
     } catch (error) {
-      console.error("[ReadingPaths] toggleComplete failed", error);
       showPathToast(error.message || "Could not update your library.", true);
     }
   })();

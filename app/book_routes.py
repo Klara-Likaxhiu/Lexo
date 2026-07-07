@@ -1,3 +1,4 @@
+import logging
 import os
 import re
 import time
@@ -16,6 +17,7 @@ from app.cover_service import (
 from app.cover_store import get_cover_row, upsert_manual_cover
 
 router = APIRouter(prefix="/api/books", tags=["Books"])
+logger = logging.getLogger(__name__)
 
 SearchMode = Literal["all", "title", "author", "genre"]
 
@@ -61,7 +63,18 @@ def resolve_cover_endpoint(data: CoverResolveRequest) -> dict:
 @router.post("/resolve-covers")
 def resolve_covers_endpoint(data: CoverBatchRequest) -> dict:
     """Resolve covers for multiple books in one request."""
-    books = resolve_covers_batch([book.model_dump() for book in data.books])
+    try:
+        books = resolve_covers_batch([book.model_dump() for book in data.books])
+    except Exception as exc:
+        logger.warning("resolve-covers degraded: %s", exc)
+        books = [
+            {
+                **book.model_dump(),
+                "cover_url": normalize_cover_url(book.cover_url) if book.cover_url else None,
+                "cover_source": "unavailable",
+            }
+            for book in data.books
+        ]
     return {"results": books}
 
 

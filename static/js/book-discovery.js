@@ -225,8 +225,8 @@ const BookMindDetailModal = {
     if (window.BookMindAuth?.isLoggedIn()) {
       try {
         await BookMindLibrary.ensureLoaded();
-      } catch (error) {
-        console.error(error);
+      } catch {
+        /* library optional for discovery */
       }
     }
 
@@ -258,8 +258,7 @@ const BookMindDetailModal = {
       if (!response.ok) return book;
       const data = await response.json();
       return { ...book, ...(data.book || {}) };
-    } catch (error) {
-      console.error(error);
+    } catch {
       return book;
     }
   },
@@ -469,7 +468,6 @@ const BookMindDiscovery = {
       if (!response.ok) throw new Error(data.detail || "Search failed.");
       this.renderResults(data.results || [], query);
     } catch (error) {
-      console.error(error);
       this.els.results.innerHTML = "";
       this.setStatus(error.message || "Could not search right now.", "error");
     }
@@ -522,8 +520,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (window.BookMindAuth?.isLoggedIn()) {
     try {
       await BookMindLibrary.ensureLoaded();
-    } catch (error) {
-      console.error(error);
+    } catch {
+      /* optional */
     }
   }
   BookMindDiscovery.init();

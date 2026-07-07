@@ -37,7 +37,7 @@ async function initBookDetails() {
     await BookMindAuth.whenReady();
   }
 
-  const saved = JSON.parse(localStorage.getItem("selectedBook"));
+  const saved = BookMindUI.readStorageJson("selectedBook");
 
   if (!saved || !saved.ai_recommendation) {
     window.location.href = "library.html";
@@ -73,7 +73,7 @@ async function initBookDetails() {
         BookMindLibrary.recordBookOpened(entry.library_id);
       }
     })
-    .catch(error => console.error(error));
+    .catch(() => {});
 
   restoreReview();
   loadBookCommunity();
@@ -170,14 +170,6 @@ function setupShelfButtons() {
     button.addEventListener("click", async () => {
       const status = button.dataset.status;
 
-      if (window.BookMindAuth?.logShelfAuthDebug) {
-        await BookMindAuth.logShelfAuthDebug("book-details shelf button click", {
-          status,
-          currentShelf: getCurrentShelf(),
-          book: currentBook?.title,
-        });
-      }
-
       button.disabled = true;
 
       try {
@@ -197,7 +189,6 @@ function setupShelfButtons() {
         updateReviewEligibility();
         window.BookMindLibraryPage?.refresh?.();
       } catch (error) {
-        console.error("[BookDetails] shelf update failed", error);
         toast(error.message || "Could not update shelf.", true);
       } finally {
         button.disabled = false;
@@ -220,7 +211,6 @@ function setupAddDropdown() {
       refreshMotivation();
       updateReviewEligibility();
     } catch (error) {
-      console.error("[BookDetails] shelf dropdown update failed", error);
       toast(error.message || "Could not update shelf.", true);
     }
   });
@@ -548,7 +538,6 @@ function setupReview() {
       await loadBookCommunity();
       toast(isPublic ? "Review saved and shared with the community." : "Review saved.");
     } catch (error) {
-      console.error("[BookDetails] save review failed", error);
       toast(error.message || "Could not save review.", true);
     } finally {
       saveBtn.disabled = false;
@@ -623,7 +612,6 @@ function setupDeleteReview() {
       await loadBookCommunity();
       toast("Review deleted.");
     } catch (error) {
-      console.error("[BookDetails] delete review failed", error);
       toast(error.message || "Could not delete review.", true);
     } finally {
       button.disabled = false;
@@ -658,8 +646,8 @@ async function loadBookCommunity() {
 
     section.hidden = false;
     list.innerHTML = reviews.map(renderCommunityCard).join("");
-  } catch (error) {
-    console.error(error);
+  } catch {
+    /* show empty community section on failure */
   }
 }
 

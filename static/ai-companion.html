@@ -262,7 +262,7 @@
       await BookMindAuth.whenReady();
     }
     if (window.BookMindAuth?.isLoggedIn()) {
-      BookMindLibrary.ensureLoaded().catch(error => console.error(error));
+      BookMindLibrary.ensureLoaded().catch(() => {});
     }
   })();
 </script>
