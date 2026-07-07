@@ -1,9 +1,12 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="UTF-8">
   <title>Reader Journey - BookMindAI</title>
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="css/editorial.css">
   <script src="js/auth.js" defer></script>
+  <script src="js/sidebar.js" defer></script>
   <script src="js/api.js" defer></script>
   <script src="js/library.js" defer></script>
   <script src="js/user-data.js" defer></script>
@@ -13,66 +16,78 @@
 
 <div class="app-layout">
 
-  <aside class="sidebar">
-    <h2><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg> BookMindAI</h2>
-    <a href="home.html"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg> Home</a>
-    <a href="discovery.html"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg> Discovery</a>
-    <a href="ai-companion.html"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg> AI Companion</a>
-    <a href="reading-paths.html"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/></svg> Reading Paths</a>
-    <a href="library.html"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m16 6 4 14"/><path d="M12 6v14"/><path d="M8 8v12"/><path d="M4 4v16"/></svg> My Library</a>
-    <a href="community.html"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> Community</a>
-    <a href="challenges.html"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0z"/></svg> Challenges</a>
-    <a href="profile.html"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> Profile</a>
-    <a href="settings.html"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg> Settings</a>
-    <a href="reader-journey.html" class="active"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z"/><circle cx="12" cy="12" r="10"/></svg> Reader Journey</a>
-    <a href="#" class="sidebar-logout"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg> Logout</a>
-  </aside>
+  <aside class="sidebar-editorial" data-page="reader-journey"></aside>
 
-  <main class="dashboard">
+  <main class="dashboard journey-wrapped">
 
-    <div class="dashboard-header">
+    <header class="dashboard-header">
       <div>
-        <h1>Your Reader Journey</h1>
-        <p>Understand who you are as a reader and how your taste is growing.</p>
+        <h1>Reader DNA</h1>
+        <p class="page-subtitle">Your reading personality and year in books.</p>
       </div>
-    </div>
+    </header>
 
-    <section class="journey-grid">
-      <div class="journey-card card">
-        <p class="eyebrow">Reader DNA</p>
-        <h2 id="journeyType">Reader Type</h2>
-        <p id="journeyLevel"></p>
+    <section class="dna-page dna-hero-grid">
+      <article class="dna-archetype-card card">
+        <div class="dna-archetype-visual" aria-hidden="true"></div>
+        <div class="dna-archetype-content">
+          <p class="eyebrow">Your Reader Archetype</p>
+          <h2 id="journeyType">Reader Type</h2>
+          <p id="journeyLevel"></p>
+        </div>
+      </article>
+      <article class="dna-radar-card card">
+        <p class="eyebrow">Reading Personality</p>
+        <h2 id="topGenre">Your top genre</h2>
+        <div class="dna-traits-grid" id="dnaTraits"></div>
+      </article>
+    </section>
+
+    <h2 class="display-serif" style="font-size:1.5rem;margin:32px 0 24px">Your Reader Journey</h2>
+
+    <section class="journey-stats-row">
+      <div class="journey-stat-card card"><strong id="statBooksRead">0</strong><span>Books Read</span></div>
+      <div class="journey-stat-card card"><strong id="statPagesRead">0</strong><span>Pages Read</span></div>
+      <div class="journey-stat-card card"><strong id="statGenres">0</strong><span>Genres Explored</span></div>
+      <div class="journey-stat-card card"><strong id="statStreak">0</strong><span>Day Streak</span></div>
+      <div class="journey-stat-card card"><strong id="statRating">—</strong><span>Avg Rating</span></div>
+    </section>
+
+    <section class="journey-chart-section">
+      <div class="journey-line-chart card">
+        <p class="eyebrow">Your 2025 Journey</p>
+        <h2>Reading activity</h2>
+        <canvas id="journeyChart" width="600" height="200" aria-label="Monthly reading chart"></canvas>
       </div>
-
-      <div class="journey-card card">
-        <p class="eyebrow">Most Saved Genre</p>
-        <h2 id="topGenre">Not enough data</h2>
-        <p>Based on your library shelves.</p>
-      </div>
-
-      <div class="journey-card card">
-        <p class="eyebrow">Today’s Mode</p>
-        <h2 id="todayMode">No mode selected</h2>
-        <p>Mood + goal help BookMindAI personalize your suggestions.</p>
+      <div class="journey-donut-wrap card">
+        <p class="eyebrow">Top Genres</p>
+        <div class="journey-donut" id="genreDonut" aria-hidden="true"></div>
+        <div class="journey-legend" id="genreLegend"></div>
       </div>
     </section>
 
+    <!-- Legacy hooks -->
+    <div class="visually-hidden" aria-hidden="true">
+      <span id="todayMode"></span>
+    </div>
+
     <section class="card journey-insight">
-      <p class="eyebrow">AI Insight</p>
+      <p class="eyebrow">AI Insights</p>
       <h2>Your reading pattern</h2>
       <div id="insightList"></div>
     </section>
 
     <section class="card journey-insight">
-      <p class="eyebrow">Next Growth Path</p>
+      <p class="eyebrow">Reading Evolution</p>
       <h2>Genres you could explore next</h2>
-      <p class="growth-hint">Tap a genre to instantly build a personalized starter reading path.</p>
+      <p class="growth-hint">Tap a genre to build a personalized reading path.</p>
       <div id="growthList" class="growth-tags"></div>
       <p id="growthNote" class="growth-note" hidden></p>
     </section>
 
-  </main>
+    <p class="journey-footer-note" id="journeyFooterNote"></p>
 
+  </main>
 </div>
 
 </body>

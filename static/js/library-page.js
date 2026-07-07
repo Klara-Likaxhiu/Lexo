@@ -46,46 +46,102 @@ function bindTabs() {
 function renderAll() {
   const library = BookMindLibrary.getLibrary();
 
-  readingTotal.textContent = (library.reading || []).length;
-  wantTotal.textContent = (library.want || []).length;
-  readTotal.textContent = (library.read || []).length;
-  notInterestedTotal.textContent = (library.not_interested || []).length;
+  if (readingTotal) readingTotal.textContent = (library.reading || []).length;
+  if (wantTotal) wantTotal.textContent = (library.want || []).length;
+  if (readTotal) readTotal.textContent = (library.read || []).length;
+  if (notInterestedTotal) notInterestedTotal.textContent = (library.not_interested || []).length;
 
-  renderShelf(activeShelf);
+  const loading = document.getElementById("bookshelfLoading");
+  if (loading) loading.hidden = true;
+
+  renderBookshelves();
+}
+
+function renderBookshelves() {
+  const shelves = [
+    { id: "shelfReading", key: "reading" },
+    { id: "shelfWant", key: "want" },
+    { id: "shelfRead", key: "read" },
+  ];
+
+  const library = BookMindLibrary.getLibrary();
+
+  shelves.forEach(({ id, key }) => {
+    const container = document.getElementById(id);
+    if (!container) return;
+
+    const books = library[key] || [];
+    container.innerHTML = "";
+
+    books.forEach(book => {
+      const standing = document.createElement("div");
+      standing.className = "shelf-book-standing";
+      standing.title = book.title;
+
+      const coverHtml = window.BookMindCoverImage
+        ? BookMindCoverImage.html(book, {
+            imgClass: "book-cover-img",
+            wrapClass: "shelf-standing-cover book-cover-wrap",
+          })
+        : `<div class="shelf-standing-cover premium-book-placeholder mystery-cover"></div>`;
+
+      standing.innerHTML = coverHtml;
+      standing.addEventListener("click", () => {
+        if (book.library_id) {
+          BookMindLibrary.recordBookOpened(book.library_id, { skipRefresh: true });
+        }
+        localStorage.setItem(
+          "selectedBook",
+          JSON.stringify({ ai_recommendation: book, book_data: null })
+        );
+        window.location.href = "book-details.html";
+      });
+      container.appendChild(standing);
+    });
+
+    const addSlot = document.createElement("button");
+    addSlot.type = "button";
+    addSlot.className = "shelf-add-slot";
+    addSlot.innerHTML = `<span class="add-icon">+</span><span>Add Book</span>`;
+    addSlot.addEventListener("click", () => {
+      document.getElementById("openImportBtn")?.click();
+    });
+    container.appendChild(addSlot);
+
+    if (window.BookMindCoverImage && books.length) {
+      BookMindCoverImage.seedFromBooks(books);
+      BookMindCoverImage.hydrateLazy(container, { imgClass: "book-cover-img" });
+    }
+  });
 }
 
 function showState(type, message = "") {
-  if (!libraryBooks) return;
-
+  const loading = document.getElementById("bookshelfLoading");
   if (type === "loading") {
-    libraryBooks.innerHTML = `
-      <div class="library-skeleton-grid" aria-hidden="true">
-        ${Array.from({ length: 4 }, () => `
-          <div class="shared-book-card card skeleton-card">
-            <div class="skeleton skeleton-cover shared-book-cover"></div>
-            <div class="shared-book-info">
-              <div class="skeleton skeleton-line skeleton-line-lg"></div>
-              <div class="skeleton skeleton-line"></div>
-              <div class="skeleton skeleton-line skeleton-line-sm"></div>
-            </div>
-          </div>
-        `).join("")}
-      </div>
-    `;
+    if (loading) {
+      loading.hidden = false;
+      loading.innerHTML = `<p class="small-muted">Loading your library…</p>`;
+    }
     return;
   }
+  if (loading) loading.hidden = true;
 
   if (type === "error") {
-    libraryBooks.innerHTML = `
-      <div class="library-state card library-state-error">
+    const main = document.querySelector(".library-bookshelf-page");
+    if (main) {
+      const err = document.createElement("div");
+      err.className = "library-state card library-state-error";
+      err.innerHTML = `
         <h2>Could not load library</h2>
         <p>${escapeHtml(message)}</p>
         <button class="btn btn-primary" type="button" id="libraryRetryBtn">Try again</button>
-      </div>
-    `;
-    document.getElementById("libraryRetryBtn")?.addEventListener("click", () => {
-      initLibraryPage();
-    });
+      `;
+      main.prepend(err);
+      document.getElementById("libraryRetryBtn")?.addEventListener("click", () => {
+        err.remove();
+        initLibraryPage();
+      });
+    }
   }
 }
 

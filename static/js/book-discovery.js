@@ -525,4 +525,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
   BookMindDiscovery.init();
+
+  document.getElementById("surpriseMeBtn")?.addEventListener("click", () => {
+    const genres = ["mystery", "fantasy", "romance", "literary fiction", "thriller", "historical"];
+    const pick = genres[Math.floor(Math.random() * genres.length)];
+    const input = document.getElementById("discoverySearchInput");
+    if (input) {
+      input.value = pick;
+      document.getElementById("discoverySearchForm")?.requestSubmit();
+    }
+  });
 });

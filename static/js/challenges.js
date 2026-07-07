@@ -221,6 +221,29 @@ function filterBadges(badges) {
   });
 }
 
+function updateLevelHero(stats) {
+  const level = Math.max(1, Math.floor(stats.totalFinished / 3) + 1);
+  const xpPct = stats.goals.yearly
+    ? Math.min(100, Math.round((stats.booksThisYear / stats.goals.yearly) * 100))
+    : Math.min(100, (stats.totalFinished % 3) * 33);
+
+  const badge = document.getElementById("readerLevelBadge");
+  const title = document.getElementById("levelTitle");
+  const fill = document.getElementById("levelXpFill");
+  const daily = document.getElementById("dailyQuestText");
+  const weekly = document.getElementById("weeklyQuestText");
+
+  if (badge) badge.textContent = level;
+  if (title) title.textContent = `Level ${level} Reader`;
+  if (fill) fill.style.width = `${xpPct}%`;
+  if (daily) daily.textContent = stats.streak > 0 ? `Keep your ${stats.streak}-day streak alive` : "Read for 15 minutes today";
+  if (weekly) {
+    weekly.textContent = stats.goals.monthly
+      ? `${stats.booksThisMonth} of ${stats.goals.monthly} books this month`
+      : "Finish 1 book this week";
+  }
+}
+
 function renderBadgeStats(summary) {
   const bar = document.getElementById("badgeStatsBar");
   const rarityItems = BookMindBadgeCatalog.RARITIES.map(r => {
@@ -338,6 +361,8 @@ function setupGoals() {
 async function refresh() {
   const goalStats = gatherGoalStats();
   renderProgressCards(goalStats);
+
+  updateLevelHero(goalStats);
 
   const ctx = BookMindBadgeEngine.buildContext();
   await BookMindBadgeEngine.fetchAiBadgesFromServer(ctx);

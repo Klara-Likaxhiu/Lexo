@@ -6,6 +6,114 @@ const BookMindIcons = {
   cart: '<svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>',
 };
 
+function getTimeGreeting(name) {
+  const hour = new Date().getHours();
+  let period = "morning";
+  if (hour >= 12 && hour < 17) period = "afternoon";
+  else if (hour >= 17) period = "evening";
+  return `Good ${period}, ${name}`;
+}
+
+function computeStreak(activity) {
+  const set = new Set(activity || []);
+  if (set.size === 0) return 0;
+  const dateKey = dt => {
+    const offset = dt.getTimezoneOffset() * 60000;
+    return new Date(dt - offset).toISOString().slice(0, 10);
+  };
+  const cursor = new Date();
+  if (!set.has(dateKey(cursor))) {
+    cursor.setDate(cursor.getDate() - 1);
+    if (!set.has(dateKey(cursor))) return 0;
+  }
+  let streak = 0;
+  while (set.has(dateKey(cursor))) {
+    streak += 1;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  return streak;
+}
+
+function renderContinueReading() {
+  const section = document.getElementById("continueReadingSection");
+  const card = document.getElementById("continueReadingCard");
+  if (!section || !card) return;
+
+  const reading = BookMindLibrary.getLibrary().reading || [];
+  if (!reading.length) {
+    section.hidden = true;
+    return;
+  }
+
+  const book = reading[0];
+  const { current, total, percent } = BookMindLibrary.getProgressInfo(book);
+  const pagesLeft = total > 0 ? Math.max(0, total - current) : null;
+
+  const coverHtml = window.BookMindCoverImage
+    ? BookMindCoverImage.html(book, { imgClass: "book-cover-img", wrapClass: "continue-cover book-cover-wrap" })
+    : `<div class="continue-cover"><div class="premium-book-placeholder mystery-cover"></div></div>`;
+
+  card.innerHTML = `
+    ${coverHtml}
+    <div class="continue-reading-info">
+      <p class="eyebrow">Continue Reading</p>
+      <h2>${BookMindCoverImage?.escape?.(book.title) || book.title}</h2>
+      <p class="book-author">${book.author || "Unknown Author"}</p>
+      <div class="continue-progress-bar"><div class="continue-progress-fill" style="width:${percent}%"></div></div>
+      <p class="continue-progress-meta">${percent}% complete${pagesLeft != null ? ` · ${pagesLeft} pages left` : ""}</p>
+    </div>
+    <button class="btn btn-primary" type="button" id="continueReadingBtn">Continue</button>
+  `;
+
+  section.hidden = false;
+  document.getElementById("continueReadingBtn")?.addEventListener("click", () => {
+    localStorage.setItem("selectedBook", JSON.stringify({ ai_recommendation: book, book_data: null }));
+    window.location.href = "book-details.html";
+  });
+
+  if (window.BookMindCoverImage) {
+    BookMindCoverImage.hydrateLazy(card, { imgClass: "book-cover-img" });
+  }
+}
+
+function renderRecentlyAdded() {
+  const shelf = document.getElementById("recentlyAdded");
+  if (!shelf) return;
+
+  const books = BookMindLibrary.getBooks().slice(0, 8);
+  if (!books.length) {
+    shelf.innerHTML = `<p class="small-muted" style="padding:12px 0">Add books from Discovery to see them here.</p>`;
+    return;
+  }
+
+  shelf.innerHTML = books
+    .map(book => {
+      const cover = window.BookMindCoverImage
+        ? BookMindCoverImage.html(book, { imgClass: "book-cover-img", wrapClass: "shelf-book-cover book-cover-wrap" })
+        : `<div class="shelf-book-cover"></div>`;
+      return `
+        <div class="shelf-book" data-title="${BookMindCoverImage?.escape?.(book.title) || book.title}">
+          ${cover}
+          <div class="shelf-book-title">${book.title}</div>
+          <div class="shelf-book-author">${book.author || ""}</div>
+        </div>`;
+    })
+    .join("");
+
+  shelf.querySelectorAll(".shelf-book").forEach((el, i) => {
+    el.addEventListener("click", () => {
+      const book = books[i];
+      localStorage.setItem("selectedBook", JSON.stringify({ ai_recommendation: book, book_data: null }));
+      window.location.href = "book-details.html";
+    });
+  });
+
+  if (window.BookMindCoverImage) {
+    BookMindCoverImage.seedFromBooks(books);
+    BookMindCoverImage.hydrateLazy(shelf, { imgClass: "book-cover-img" });
+  }
+}
+
 function recommendationsSkeleton(count = 3) {
   return Array.from({ length: count }, () => `
     <div class="recommendation-card-modern card skeleton-card" aria-hidden="true">
@@ -27,8 +135,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   const user = window.BookMindAuth?.getCurrentUser();
   const name = user?.username || "Reader";
 
-  document.getElementById("welcomeText").textContent =
-    window.BookMindAuth?.isLoggedIn() ? `Welcome back, ${name}` : "Welcome to BookMindAI";
+  document.getElementById("welcomeText").textContent = window.BookMindAuth?.isLoggedIn()
+    ? getTimeGreeting(name)
+    : "Welcome to BookMindAI";
 
   const recommendationsEl = document.getElementById("recommendations");
   if (recommendationsEl) {
@@ -47,6 +156,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("readingCount").textContent = stats.reading;
   document.getElementById("wantCount").textContent = stats.want;
 
+  const streakEl = document.getElementById("streakCount");
+  if (streakEl) {
+    streakEl.textContent = computeStreak(BookMindLibrary.getReadingData().activity);
+  }
+
+  renderContinueReading();
+  renderRecentlyAdded();
+
   updateDNAProgress();
   setupMoodAndGoal();
   renderRecommendations(profile);
@@ -64,7 +181,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     subtitle.textContent = dashboard.greeting_subtitle || "Your personalized reading world is ready.";
     mission.textContent = dashboard.today_mission || "Choose a book that matches your current mood.";
-    topPickLabel.textContent = "Today's AI Pick";
+    topPickLabel.textContent = "AI Pick of the Day";
     topPickTitle.textContent = topPick.title || "Ask BookMindAI for a recommendation";
     topPickReason.textContent = topPick.reason || "Your AI pick will appear here.";
 

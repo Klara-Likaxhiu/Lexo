@@ -1,8 +1,10 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="UTF-8">
   <title>Home - BookMindAI</title>
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="css/editorial.css">
   <script src="js/reader-dna-state.js"></script>
   <script>
     try {
@@ -12,7 +14,7 @@
     } catch (e) { /* localStorage unavailable */ }
   </script>
   <script src="js/auth.js" defer></script>
-
+  <script src="js/sidebar.js" defer></script>
   <script src="js/api.js" defer></script>
   <script src="js/user-data.js" defer></script>
   <script src="js/library.js" defer></script>
@@ -24,116 +26,99 @@
 
 <div class="app-layout">
 
-  <aside class="sidebar">
-    <h2><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg> BookMindAI</h2>
-    <a href="home.html" class="active"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg> Home</a>
-    <a href="discovery.html"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg> Discovery</a>
-    <a href="ai-companion.html"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg> AI Companion</a>
-    <a href="reading-paths.html"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/></svg> Reading Paths</a>
-    <a href="library.html"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m16 6 4 14"/><path d="M12 6v14"/><path d="M8 8v12"/><path d="M4 4v16"/></svg> My Library</a>
-    <a href="community.html"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> Community</a>
-    <a href="challenges.html"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0z"/></svg> Challenges</a>
-    <a href="profile.html"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> Profile</a>
-    <a href="settings.html"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg> Settings</a>
-    <a href="reader-journey.html"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z"/><circle cx="12" cy="12" r="10"/></svg> Reader Journey</a>
-    <a href="#" class="sidebar-logout"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg> Logout</a>
-  </aside>
+  <aside class="sidebar-editorial" data-page="home"></aside>
 
-  <main class="dashboard">
+  <main class="dashboard home-magazine">
 
-    <div class="dashboard-header">
-      <div>
+    <header class="home-hero">
+      <div class="home-greeting">
         <h1 id="welcomeText">Welcome back</h1>
         <p id="homeSubtitle">Your personalized reading world is ready.</p>
       </div>
-
-      <a href="reader-quiz.html" class="btn btn-secondary" id="continueDiscoveryTop">Start Reader DNA Quiz</a>
-    </div>
+      <div class="home-streak-widget" aria-label="Reading streak">
+        <span class="home-streak-number" id="streakCount">0</span>
+        <span class="home-streak-label">day streak</span>
+      </div>
+    </header>
 
     <section class="dna-progress-card card" id="dnaProgressCard">
       <div>
         <p class="eyebrow">Reader DNA</p>
         <h2 id="dnaProgressTitle">Start Your Reader DNA</h2>
         <p id="dnaProgressSubtitle">Take the quiz to unlock personalized recommendations.</p>
-
         <div class="dna-progress-bar">
           <div id="dnaProgressFill"></div>
         </div>
       </div>
-
       <a href="reader-quiz.html" class="btn btn-primary" id="continueDiscoveryMain">Start Reader DNA Quiz</a>
     </section>
 
-    <section class="dashboard-grid">
-      <div class="reader-profile card">
-        <h2>Your Reader DNA</h2>
-        <p><strong>Type:</strong> <span id="readerType"></span></p>
-        <p><strong>Level:</strong> <span id="readingLevel"></span></p>
-        <p><strong>Genres:</strong> <span id="genres"></span></p>
-      </div>
-
-      <div class="stats-card card">
-        <h2>Reading Stats</h2>
-        <div class="stats-row">
-          <div><strong id="readCount">0</strong><span>Read</span></div>
-          <div><strong id="readingCount">0</strong><span>Reading</span></div>
-          <div><strong id="wantCount">0</strong><span>Want</span></div>
-        </div>
-      </div>
+    <section class="home-continue-reading" id="continueReadingSection" hidden>
+      <div class="continue-reading-card" id="continueReadingCard"></div>
     </section>
 
-    <section class="mood-card card">
-      <p class="eyebrow">Today’s Reading Mode</p>
-      <h2>How do you want to feel while reading?</h2>
-
-      <div class="mood-options">
-        <button data-mood="happy"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" x2="9.01" y1="9" y2="9"/><line x1="15" x2="15.01" y1="9" y2="9"/></svg> Happy</button>
-        <button data-mood="cozy"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2v2"/><path d="M14 2v2"/><path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1"/><path d="M6 2v2"/></svg> Cozy</button>
-        <button data-mood="emotional"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M16 16s-1.5-2-4-2-4 2-4 2"/><line x1="9" x2="9.01" y1="9" y2="9"/><line x1="15" x2="15.01" y1="9" y2="9"/></svg> Emotional</button>
-        <button data-mood="stressed"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/></svg> Stressed</button>
-        <button data-mood="plot twist"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M2 18h1.4c1.3 0 2.5-.6 3.3-1.7l6.1-8.6c.7-1.1 2-1.7 3.3-1.7H22"/><path d="m18 2 4 4-4 4"/><path d="M2 6h1.9c1.5 0 2.9.9 3.6 2.2"/><path d="M22 18h-5.9c-1.3 0-2.6-.7-3.3-1.8l-.5-.8"/><path d="m18 14 4 4-4 4"/></svg> Plot Twist</button>
-        <button data-mood="scary"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M9 10h.01"/><path d="M15 10h.01"/><path d="M12 2a8 8 0 0 0-8 8v12l3-3 2.5 2.5L12 19l2.5 2.5L17 19l3 3V10a8 8 0 0 0-8-8z"/></svg> Scare Me</button>
-        <button data-mood="romantic"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg> Romantic</button>
-      </div>
-
-      <h2 class="goal-title">What do you want from your book today?</h2>
-
-      <div class="goal-options">
-        <button data-goal="escape reality">Escape Reality</button>
-        <button data-goal="learn something">Learn Something</button>
-        <button data-goal="cry">Cry</button>
-        <button data-goal="laugh">Laugh</button>
-        <button data-goal="think deeply">Think</button>
-        <button data-goal="surprise me">Surprise Me</button>
-      </div>
-    </section>
-
-    <section class="highlight-card card">
-      <div>
-        <p class="eyebrow" id="topPickLabel">Today’s AI Pick</p>
+    <section class="home-feature-row">
+      <article class="home-ai-pick card highlight-card">
+        <p class="eyebrow" id="topPickLabel">Today's AI Pick</p>
         <h2 id="topPickTitle">Loading...</h2>
         <p id="topPickReason"></p>
+        <button class="btn btn-primary" id="topPickBtn" type="button">Why this book?</button>
+      </article>
+
+      <article class="home-brief card journey-insight">
+        <p class="eyebrow">Today's Reading Brief</p>
+        <h2 id="todayMission">Building today's mission…</h2>
+      </article>
+
+      <article class="home-mood card mood-card">
+        <h2>Reading Mood</h2>
+        <div class="mood-options">
+          <button type="button" data-mood="happy">Feel Good</button>
+          <button type="button" data-mood="emotional">Emotional</button>
+          <button type="button" data-mood="plot twist">Think</button>
+          <button type="button" data-mood="cozy">Escape</button>
+          <button type="button" data-mood="romantic">Fast Read</button>
+        </div>
+        <div class="goal-options" aria-hidden="true">
+          <button type="button" data-goal="escape reality">Escape Reality</button>
+          <button type="button" data-goal="learn something">Learn Something</button>
+          <button type="button" data-goal="cry">Cry</button>
+          <button type="button" data-goal="laugh">Laugh</button>
+          <button type="button" data-goal="think deeply">Think</button>
+          <button type="button" data-goal="surprise me">Surprise Me</button>
+        </div>
+      </article>
+    </section>
+
+    <section class="home-shelf-section">
+      <div class="section-title">
+        <h2>Recently Added</h2>
       </div>
-
-      <button class="btn btn-primary" id="topPickBtn">View Book</button>
+      <div class="horizontal-shelf" id="recentlyAdded"></div>
     </section>
 
-    <section class="card journey-insight">
-      <p class="eyebrow">Today’s Mission</p>
-      <h2 id="todayMission">Building today's mission...</h2>
+    <section class="home-dna-strip reader-profile" aria-label="Reading stats">
+      <div class="mini-stat card"><strong id="readCount">0</strong><span>Books Read</span></div>
+      <div class="mini-stat card"><strong id="readingCount">0</strong><span>Currently Reading</span></div>
+      <div class="mini-stat card"><strong id="wantCount">0</strong><span>Want to Read</span></div>
     </section>
 
-    <section>
+    <div class="visually-hidden" aria-hidden="true">
+      <span id="readerType"></span>
+      <span id="readingLevel"></span>
+      <span id="genres"></span>
+      <a href="reader-quiz.html" id="continueDiscoveryTop">Quiz</a>
+    </div>
+
+    <section class="home-recommendations">
       <div class="section-title">
         <h2>Recommended For You</h2>
         <a href="ai-companion.html">Ask AI</a>
       </div>
-
       <div id="recommendations" class="recommendation-grid"></div>
     </section>
 
   </main>
-
 </div>
 
 </body>
