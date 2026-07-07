@@ -163,6 +163,14 @@ const BookMindLibrary = {
     return entry ? entry.status : null;
   },
 
+  isFinished(book) {
+    const entry = this.findBook(book);
+    if (!entry) return false;
+    const status = String(entry.status || "").toLowerCase();
+    const progress = Number(entry.progress) || 0;
+    return status === "read" || progress >= 100;
+  },
+
   getShelfLabel(status) {
     const labels = {
       read: "Finished",

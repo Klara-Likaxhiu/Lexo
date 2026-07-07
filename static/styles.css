@@ -5254,6 +5254,24 @@ html.reader-dna-complete #continueDiscoveryMain {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
 }
 
+.review-card-v2.is-locked .review-top-grid,
+.review-card-v2.is-locked .review-write-grid,
+.review-card-v2.is-locked .review-visibility,
+.review-card-v2.is-locked .review-actions {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.review-locked-message {
+  margin: 0 0 18px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(255, 193, 7, 0.12);
+  color: var(--text, #3d342c);
+  font-size: 14px;
+  font-weight: 600;
+}
+
 .review-top-grid {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;

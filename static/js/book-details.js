@@ -59,6 +59,7 @@ async function initBookDetails() {
   setupDeleteReview();
   setupReadingSource();
   setupSidebarDna();
+  updateReviewEligibility();
 
   BookMindLibrary.ensureLoaded()
     .then(() => {
@@ -66,6 +67,7 @@ async function initBookDetails() {
       restoreProgress();
       restoreSource();
       refreshMotivation();
+      updateReviewEligibility();
       const entry = BookMindLibrary.findBook(currentBook);
       if (entry?.library_id) {
         BookMindLibrary.recordBookOpened(entry.library_id);
@@ -192,6 +194,7 @@ function setupShelfButtons() {
         await BookMindLibrary.refresh();
         restoreShelf();
         refreshMotivation();
+        updateReviewEligibility();
         window.BookMindLibraryPage?.refresh?.();
       } catch (error) {
         console.error("[BookDetails] shelf update failed", error);
@@ -215,6 +218,7 @@ function setupAddDropdown() {
       await BookMindLibrary.refresh();
       restoreShelf();
       refreshMotivation();
+      updateReviewEligibility();
     } catch (error) {
       console.error("[BookDetails] shelf dropdown update failed", error);
       toast(error.message || "Could not update shelf.", true);
@@ -307,6 +311,7 @@ function setupProgress() {
         toast(result.message || "Reading progress saved.");
       }
       refreshMotivation();
+      updateReviewEligibility();
     } catch (error) {
       toast(error.message || "Could not save progress.", true);
     }
@@ -449,6 +454,37 @@ function paintRecommend(value) {
 
 /* ---------------------------------------------------------------- review */
 
+function isBookFinishedForReview() {
+  return Boolean(BookMindLibrary.isFinished?.(currentBook));
+}
+
+function updateReviewEligibility() {
+  const section = document.querySelector(".review-card-v2");
+  const lockedMessage = document.getElementById("reviewLockedMessage");
+  const finished = isBookFinishedForReview();
+
+  if (section) {
+    section.classList.toggle("is-locked", !finished);
+  }
+  if (lockedMessage) {
+    lockedMessage.hidden = finished;
+  }
+
+  const controls = [
+    ...document.querySelectorAll("#starRating button"),
+    document.getElementById("recommendBook"),
+    document.getElementById("difficultyFeedback"),
+    document.getElementById("reviewTitle"),
+    document.getElementById("reviewText"),
+    document.getElementById("reviewPublic"),
+    document.getElementById("saveReviewBtn"),
+  ].filter(Boolean);
+
+  controls.forEach(control => {
+    control.disabled = !finished;
+  });
+}
+
 function setupReview() {
   const textarea = document.getElementById("reviewText");
   const counter = document.getElementById("reviewCount");
@@ -459,6 +495,11 @@ function setupReview() {
   }
 
   document.getElementById("saveReviewBtn").addEventListener("click", async () => {
+    if (!isBookFinishedForReview()) {
+      toast("Finish this book before leaving a review.", true);
+      return;
+    }
+
     if (selectedRating === 0) {
       toast("Please choose a star rating first.", true);
       return;
@@ -526,6 +567,9 @@ async function syncReviewVisibility(review) {
   }
 
   if (review.visibility === "public") {
+    if (!isBookFinishedForReview()) {
+      throw new Error("Finish this book before leaving a review.");
+    }
     await BookMindAPI.post("/api/reviews/publish", {
       id: review.id,
       user: me.username || "Reader",
@@ -690,6 +734,7 @@ function restoreReview() {
   if (deleteBtn) deleteBtn.hidden = false;
 
   renderSavedReview(saved);
+  updateReviewEligibility();
 }
 
 function renderSavedReview(review) {

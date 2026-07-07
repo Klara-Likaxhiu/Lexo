@@ -284,6 +284,21 @@ def find_book_by_title(user_id: str, title: str) -> dict[str, Any] | None:
     return None
 
 
+def is_book_finished(book: dict[str, Any]) -> bool:
+    """True when the user has completed this library entry."""
+    status = (book.get("status") or "").strip().lower()
+    progress = int(book.get("progress") or 0)
+    return status == "read" or progress >= 100
+
+
+def user_has_finished_book(user_id: str, *, title: str) -> bool:
+    """Check whether the user finished the given book in their library."""
+    book = find_book_by_title(user_id, title)
+    if not book:
+        return False
+    return is_book_finished(book)
+
+
 def upsert_book(user_id: str, book: dict[str, Any], status: str) -> dict[str, Any]:
     if status not in VALID_STATUSES:
         raise LibraryStoreError(f"Invalid status: {status}")

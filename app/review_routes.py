@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from app.deps import get_verified_user
+from app.library_store import LibraryStoreError, user_has_finished_book
 from app.supabase_rest import SupabaseRestError, request
 
 router = APIRouter(prefix="/api/reviews", tags=["Reviews"])
@@ -67,6 +68,18 @@ def _handle_error(exc: SupabaseRestError) -> None:
 def publish_review(review: CommunityReview, user: dict = Depends(get_verified_user)) -> dict:
     if not review.id or not review.book_title.strip():
         raise HTTPException(status_code=400, detail="Review id and book title are required.")
+
+    try:
+        finished = user_has_finished_book(user["id"], title=review.book_title.strip())
+    except LibraryStoreError as exc:
+        _handle_error(exc)
+        finished = False
+
+    if not finished:
+        raise HTTPException(
+            status_code=403,
+            detail="Finish this book before leaving a review.",
+        )
 
     now = _timestamp()
     payload = {
