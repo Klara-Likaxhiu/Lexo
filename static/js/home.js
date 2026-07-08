@@ -62,7 +62,9 @@ function renderContinueReading() {
       <div class="continue-progress-bar"><div class="continue-progress-fill" style="width:${percent}%"></div></div>
       <p class="continue-progress-meta">${percent}% complete${pagesLeft != null ? ` · ${pagesLeft} pages left` : ""}</p>
     </div>
-    <button class="btn btn-primary" type="button" id="continueReadingBtn">Continue</button>
+    <div class="continue-reading-actions">
+      <button class="btn btn-primary" type="button" id="continueReadingBtn">Continue</button>
+    </div>
   `;
 
   section.hidden = false;

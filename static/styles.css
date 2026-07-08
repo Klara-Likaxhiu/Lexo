@@ -1237,8 +1237,9 @@ html.auth-pending body {
 
 .dashboard-grid {
   display: grid;
-  grid-template-columns: 1.3fr 0.7fr;
+  grid-template-columns: 1.1fr 1fr 1fr;
   gap: 24px;
+  align-items: stretch;
   margin-bottom: 30px;
 }
 
@@ -1278,7 +1279,7 @@ html.auth-pending body {
   color: var(--text-secondary);
 }
 
-.highlight-card {
+.highlight-card:not(.ai-pick-card) {
   padding: 38px 40px;
   margin-bottom: 40px;
   display: flex;
@@ -3715,7 +3716,7 @@ body.settings-modal-open {
 }
 /* FIXED AI PICK + MISSION DESIGN */
 
-.highlight-card {
+.highlight-card:not(.ai-pick-card) {
   display: grid;
   grid-template-columns: 1fr auto;
   align-items: center;
@@ -3724,25 +3725,24 @@ body.settings-modal-open {
   background: linear-gradient(135deg, rgba(255,255,255,0.92), rgba(248,233,255,0.8));
 }
 
-.highlight-card > div {
+.highlight-card:not(.ai-pick-card) > div {
   padding: 0;
 }
 
-.highlight-card h2 {
+.highlight-card:not(.ai-pick-card) h2 {
   font-family: Georgia, serif;
   font-size: 30px;
   margin: 6px 0 8px;
   color: var(--readable-heading, var(--ink));
 }
 
-.highlight-card p {
+.highlight-card:not(.ai-pick-card) p {
   max-width: 760px;
   line-height: 1.5;
 }
 
 #topPickBtn {
   margin: 0;
-  white-space: nowrap;
 }
 
 .journey-insight {

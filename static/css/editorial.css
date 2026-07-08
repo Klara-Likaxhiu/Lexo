@@ -84,6 +84,13 @@ h1, h2, h3, .display-serif {
 .dashboard {
   padding: 40px 48px 64px;
   max-width: 1280px;
+  width: 100%;
+  min-width: 0;
+}
+
+.home-magazine.dashboard {
+  margin: 0 auto;
+  overflow-x: hidden;
 }
 
 .dashboard-header h1 {
@@ -289,15 +296,29 @@ h1, h2, h3, .display-serif {
 }
 
 .continue-reading-card {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  gap: 28px;
+  display: flex;
   align-items: center;
+  gap: 28px;
+  overflow: hidden;
   padding: 28px 32px;
-  background: var(--white);
-  border: 1px solid var(--border-light);
+  background: var(--card);
+  border: 1px solid var(--border);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-card);
+}
+
+.continue-reading-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.continue-reading-actions {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.continue-reading-actions .btn {
+  white-space: nowrap;
 }
 
 .continue-reading-card .book-cover-wrap,
@@ -346,31 +367,67 @@ h1, h2, h3, .display-serif {
   color: var(--muted);
 }
 
+.dashboard-grid,
 .home-feature-row {
   display: grid;
   grid-template-columns: 1.1fr 1fr 1fr;
-  gap: 20px;
+  gap: 24px;
+  align-items: stretch;
   margin-bottom: 40px;
 }
 
-.home-ai-pick {
+.dashboard-card {
+  min-width: 0;
   padding: 28px;
+  overflow: hidden;
 }
 
-.home-ai-pick h2 {
+.ai-pick-card {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-bottom: 0;
+}
+
+.ai-pick-card h2 {
   font-size: 1.35rem;
-  margin: 8px 0 12px;
+  margin: 0;
+  line-height: 1.3;
+  word-wrap: break-word;
 }
 
-.home-ai-pick p {
-  color: var(--muted);
-  font-size: 14px;
+.ai-pick-description {
+  max-width: 100%;
   line-height: 1.6;
-  margin-bottom: 20px;
+  color: var(--muted-text);
+  font-size: 14px;
+  margin: 0;
 }
 
-.home-brief {
-  padding: 28px;
+.ai-pick-card .eyebrow {
+  margin: 0;
+}
+
+.ai-pick-card button {
+  margin-top: auto;
+  width: 100%;
+}
+
+.home-brief.dashboard-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+}
+
+.home-mood.dashboard-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.dashboard-grid .journey-insight,
+.dashboard-grid .mood-card,
+.dashboard-grid .highlight-card {
+  margin-bottom: 0;
 }
 
 .home-brief h2 {
@@ -419,9 +476,9 @@ h1, h2, h3, .display-serif {
 }
 
 .mood-options button.active-mood {
-  background: var(--navy);
-  color: #fff;
-  border-color: var(--navy);
+  background: var(--button-bg);
+  color: var(--button-text);
+  border-color: var(--button-bg);
 }
 
 .goal-options {
@@ -1567,8 +1624,23 @@ html.reader-dna-complete #continueDiscoveryTop {
    Responsive
    ============================================================ */
 @media (max-width: 1100px) {
-  .home-feature-row {
+  .home-feature-row,
+  .dashboard-grid {
     grid-template-columns: 1fr;
+  }
+
+  .continue-reading-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .continue-reading-actions {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .continue-reading-actions .btn {
+    width: 100%;
   }
 
   .paths-journey-layout,
@@ -1623,8 +1695,18 @@ html.reader-dna-complete #continueDiscoveryTop {
   }
 
   .continue-reading-card {
-    grid-template-columns: 1fr;
-    text-align: center;
+    flex-direction: column;
+    align-items: flex-start;
+    text-align: left;
+  }
+
+  .continue-reading-actions {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .continue-reading-actions .btn {
+    width: 100%;
   }
 
   .home-hero {
