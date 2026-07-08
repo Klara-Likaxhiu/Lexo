@@ -184,7 +184,7 @@ function renderBadgeCard(badge, compact) {
       <div class="badge-progress">
         <div class="badge-progress-fill" style="width:${badge.progress}%"></div>
       </div>
-      <span class="badge-progress-label">${Math.min(badge.value, badge.goal)} / ${badge.goal}</span>
+      <span class="achievement-progress badge-progress-label">${Math.min(badge.value, badge.goal)} / ${badge.goal}</span>
     `
     : "";
 
@@ -192,18 +192,18 @@ function renderBadgeCard(badge, compact) {
     ? `<span class="badge-unlock">Unlocked ${formatUnlockDate(badge.unlockedAt)}</span>`
     : "";
 
-  const bodyClass = compact ? "badge-v2 badge-v2-compact" : "badge-v2";
+  const articleClass = `achievement-card badge-v2 ${earned ? "earned" : "locked"} rarity-${rarity}${animate}${compact ? " badge-v2-compact" : ""}`;
 
   return `
-    <article class="${bodyClass} ${earned ? "earned" : "locked"} rarity-${rarity}${animate}" data-id="${badge.id}">
+    <article class="${articleClass}" data-id="${badge.id}">
       <div class="badge-icon badge-icon-v2">${engine.svg(badge.icon)}</div>
       <div class="badge-body">
         <div class="badge-meta-row">
           <span class="badge-rarity rarity-${rarity}">${rarityLabel(rarity)}</span>
           ${cat ? `<span class="badge-category">${cat.emoji}</span>` : ""}
         </div>
-        <strong>${badge.title}</strong>
-        <p>${badge.description}</p>
+        <strong class="achievement-title">${badge.title}</strong>
+        <p class="achievement-description">${badge.description}</p>
         ${progressHtml}
         ${unlockHtml}
       </div>

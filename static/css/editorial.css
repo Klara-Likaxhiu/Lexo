@@ -1278,42 +1278,106 @@ html.reader-dna-complete #continueDiscoveryTop {
   margin: 0;
 }
 
-.badge-grid-v2 {
+.badge-grid-v2,
+.achievements-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 24px;
 }
 
-.badge-v2 {
-  padding: 20px 16px;
-  text-align: center;
-  border-radius: var(--radius-md);
-  transition: transform 0.2s, box-shadow 0.2s;
+.achievement-card,
+.challenges-page .badge-v2 {
+  display: flex;
+  gap: 14px;
+  min-height: 220px;
+  padding: 24px;
+  border-radius: 20px;
+  overflow: visible;
+  text-align: left;
+  background: var(--card);
+  border: 1px solid var(--border);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-.badge-v2.earned {
-  background: var(--white);
-  border: 1px solid var(--border-light);
+.achievement-card.earned,
+.challenges-page .badge-v2.earned {
+  opacity: 1;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
 }
 
-.badge-v2.earned:hover {
-  transform: scale(1.04);
+.achievement-card.earned:hover,
+.challenges-page .badge-v2.earned:hover {
+  transform: translateY(-2px);
   box-shadow: var(--shadow-card);
 }
 
-.badge-v2.locked {
-  opacity: 0.45;
-  filter: grayscale(0.8);
+.achievement-card.locked,
+.challenges-page .badge-v2.locked {
+  opacity: 0.75;
+  filter: none;
 }
 
-.badge-v2.is-new {
-  animation: badgePop 0.5s ease;
+.achievement-title,
+.challenges-page .badge-v2 .achievement-title,
+.challenges-page .badge-v2 strong {
+  display: block;
+  color: #1f2937;
+  font-weight: 700;
+  white-space: normal;
+  word-break: normal;
+  overflow-wrap: break-word;
+  line-height: 1.35;
+  margin: 0 0 6px;
 }
 
-@keyframes badgePop {
-  0% { transform: scale(0.9); opacity: 0; }
-  60% { transform: scale(1.05); }
-  100% { transform: scale(1); opacity: 1; }
+.achievement-description,
+.challenges-page .badge-v2 .achievement-description,
+.challenges-page .badge-v2 .badge-body > p {
+  color: #4b5563;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  white-space: normal;
+  word-break: normal;
+  overflow-wrap: break-word;
+  margin: 0 0 10px;
+}
+
+.achievement-progress,
+.challenges-page .badge-progress-label {
+  color: #374151;
+  font-weight: 600;
+}
+
+.achievement-filter,
+.challenges-page .badge-filters select {
+  appearance: none;
+  -webkit-appearance: none;
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  padding: 10px 14px;
+  color: #1f2937;
+  font-size: 0.88rem;
+  font-weight: 500;
+  cursor: pointer;
+  min-width: 160px;
+}
+
+.challenges-page .achievements-section {
+  max-width: none;
+  width: 100%;
+}
+
+.challenges-page .badge-body {
+  flex: 1;
+  min-width: 0;
+}
+
+@media (max-width: 900px) {
+  .badge-grid-v2,
+  .achievements-grid {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  }
 }
 
 .progress-cards {
