@@ -506,7 +506,7 @@ function renderCompletePathButton(path, { completed, total, allBooksDone }) {
         <strong>${completed} / ${total}</strong> Books Completed
       </p>
       ${!allBooksDone ? `<p class="path-complete-hint">Complete all books to finish this Reading Path.</p>` : ""}
-      <button type="button" class="btn path-complete-btn ${ready ? "path-complete-btn-ready" : "path-complete-btn-disabled"}"
+      <button type="button" class="btn path-complete-btn ${ready ? "path-complete-btn-ready complete-path-button" : "path-complete-btn-disabled"}"
         data-action="complete-path" ${!allBooksDone ? "disabled" : ""}>
         🏆 Complete Reading Path
       </button>

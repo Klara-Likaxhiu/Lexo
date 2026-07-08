@@ -3337,6 +3337,127 @@ html.theme-dark .bd-input:focus {
   box-shadow: 0 0 0 3px rgba(90, 106, 122, 0.2) !important;
 }
 
+/* Dark mode — contrast fixes (readable text on dark surfaces) */
+html.theme-dark .book-hub-pill,
+html.theme-dark .bookmind-badge {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffd6e7;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+html.theme-dark .book-hub-card-v2,
+html.theme-dark .review-card-v2 {
+  background: var(--card);
+}
+
+html.theme-dark .detail-meta-row span {
+  background: rgba(255, 255, 255, 0.08);
+  color: #e8c4d4;
+}
+
+html.theme-dark .recommendation-reason-box {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: var(--border-neutral);
+}
+
+html.theme-dark .recommendation-reason-box p {
+  color: var(--text-secondary);
+}
+
+html.theme-dark .bd-meta-chip {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+}
+
+html.theme-dark .bd-eyebrow-pill {
+  background: rgba(255, 255, 255, 0.1);
+  color: #c8e6d4;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+html.theme-dark .status-btn-modern {
+  background: var(--card);
+  color: var(--text);
+  border-color: var(--border-neutral);
+}
+
+html.theme-dark .rating-summary-card p {
+  color: var(--muted);
+}
+
+html.theme-dark .path-complete-btn-disabled:disabled {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.45);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+html.theme-dark .path-complete-btn-ready,
+html.theme-dark .complete-path-button {
+  background: #1f313a;
+  color: #ffffff;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+html.theme-dark .path-complete-btn-ready:hover,
+html.theme-dark .complete-path-button:hover {
+  background: #2a4552;
+  color: #ffffff;
+}
+
+html.theme-dark .journey-continue-btn {
+  background: #1f313a;
+  color: #ffffff;
+  border: none;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+html.theme-dark .journey-continue-btn:hover {
+  background: #2a4552;
+  color: #ffffff;
+}
+
+html.theme-dark .path-unlock-banner {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+html.theme-dark .passport-stamp {
+  background: linear-gradient(165deg, rgba(255, 255, 255, 0.04) 0%, var(--card) 100%);
+}
+
+html.theme-dark .secret-path-locked h3 {
+  color: var(--muted);
+}
+
+html.theme-dark .settings-coming-soon {
+  background: rgba(255, 255, 255, 0.1);
+  color: #c8e6d4;
+}
+
+html.theme-dark .auth-notice-warning {
+  background: rgba(255, 248, 232, 0.08);
+  color: #e8d4a8;
+  border-color: rgba(240, 223, 160, 0.25);
+}
+
+html.theme-dark .auth-notice-info {
+  background: rgba(238, 244, 255, 0.08);
+  color: #a8c4e8;
+  border-color: rgba(201, 220, 255, 0.2);
+}
+
+html.theme-dark .eyebrow {
+  color: var(--text-secondary);
+  opacity: 1;
+}
+
+html.theme-dark .path-books-progress-done strong {
+  color: var(--accent);
+}
+
+html.theme-dark .path-completed-ribbon {
+  color: #2a2520;
+}
 
 .settings-modal {
   position: fixed;
@@ -5193,15 +5314,17 @@ html.reader-dna-complete #continueDiscoveryMain {
   font-weight: 800;
 }
 
-.book-hub-pill {
+.book-hub-pill,
+.bookmind-badge {
   display: inline-block;
   padding: 6px 14px;
   border-radius: 999px;
-  background: rgba(193,84,125,0.14);
-  color: var(--orchid);
-  font-weight: 900;
+  background: linear-gradient(135deg, #f8d9e8, #f3c7dc);
+  color: #a03b73;
+  border: 1px solid rgba(160, 59, 115, 0.18);
+  font-weight: 700;
   font-size: 11px;
-  letter-spacing: 1px;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
@@ -6734,12 +6857,51 @@ body.import-open {
   padding: 16px 24px;
   font-size: 1.05rem;
   font-weight: 700;
+  border: none;
+  border-radius: 12px;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
 }
 
-.path-complete-btn-ready {
-  background: linear-gradient(135deg, #c9a227, #e8c547);
-  border-color: #b8921f;
-  color: #2a2520;
+.path-complete-btn-ready,
+.complete-path-button {
+  background: #1f313a;
+  color: #ffffff;
+  border: none;
+  box-shadow: 0 8px 24px rgba(31, 49, 58, 0.28);
+  -webkit-text-fill-color: #ffffff;
+}
+
+.path-complete-btn-ready:hover,
+.complete-path-button:hover {
+  background: #2a4552;
+  color: #ffffff;
+  -webkit-text-fill-color: #ffffff;
+}
+
+.path-complete-btn-ready svg,
+.path-complete-btn-ready .icon,
+.complete-path-button svg,
+.complete-path-button .icon {
+  color: #ffffff;
+  stroke: #ffffff;
+}
+
+.path-complete-btn-disabled:disabled {
+  background: rgba(47, 62, 79, 0.08);
+  color: var(--muted);
+  border: 1px solid var(--border-neutral, var(--border));
+  opacity: 1;
+  cursor: not-allowed;
+  box-shadow: none;
+  -webkit-text-fill-color: currentColor;
+}
+
+.path-complete-hint {
+  margin: 14px 0 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+  text-align: center;
 }
 
 .path-icon-emoji {
@@ -6748,18 +6910,6 @@ body.import-open {
   align-items: center;
   justify-content: center;
   background: var(--off-white) !important;
-}
-
-.path-complete-btn-disabled:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-.path-complete-hint {
-  margin: 14px 0 0;
-  font-size: 0.9rem;
-  color: var(--muted);
-  text-align: center;
 }
 
 .path-completed-ribbon {
@@ -7421,9 +7571,17 @@ body.journey-modal-open {
   font-size: 1.05rem;
   font-weight: 700;
   margin-top: 8px;
-  background: linear-gradient(135deg, #c9a227, #e8c547);
-  border-color: #b8921f;
-  color: #2a2520;
+  background: #1f313a;
+  color: #ffffff;
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(31, 49, 58, 0.28);
+  -webkit-text-fill-color: #ffffff;
+}
+
+.journey-continue-btn:hover {
+  background: #2a4552;
+  color: #ffffff;
 }
 
 /* Profile journey collection */
