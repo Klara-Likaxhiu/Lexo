@@ -664,3 +664,77 @@ Use this exact structure:
 
     parsed["engine"] = ai.engine_name()
     return parsed
+
+
+def generate_path_reflection(
+    path: dict,
+    reader_profile: dict | None = None,
+    library: dict | None = None,
+    days_taken: int | None = None,
+) -> dict:
+    """Personalized AI reflection after completing a reading path."""
+    path_name = path.get("path_name") or "Reading Path"
+    books = path.get("books") or []
+    book_list = [
+        f"- {b.get('title', 'Unknown')} by {b.get('author', 'Unknown')}"
+        for b in books
+        if isinstance(b, dict)
+    ]
+
+    prompt = f"""
+You are BookMindAI, a warm and insightful reading companion.
+
+The user just completed the reading path "{path_name}".
+
+Path details:
+- Genre / theme: {path.get("genre") or path.get("why_this_path") or "General"}
+- Difficulty: {path.get("difficulty_progression") or "Personalized"}
+- Days taken: {days_taken or "unknown"}
+- Books completed:
+{chr(10).join(book_list) or "- (none listed)"}
+
+Reader profile:
+{reader_profile}
+
+Library snapshot:
+{library}
+
+Write a personalized reflection (2–3 short paragraphs) that:
+1. Summarizes what themes, styles, or ideas they explored on this journey
+2. Notes how their Reader DNA may be evolving based on this path
+3. Suggests ONE specific next genre or path to explore (be concrete, e.g. "Magical Realism")
+
+Also suggest a next_path_name (short, evocative title for a follow-up journey).
+
+Respond ONLY in valid JSON:
+{{
+  "reflection": "string — 2-3 paragraphs, use 'you' voice, literary but accessible",
+  "next_path_suggestion": "string — one sentence recommendation",
+  "next_path_name": "string — e.g. Magical Realism Journey"
+}}
+"""
+
+    result = ai._openai_chat_completion(
+        [
+            {
+                "role": "system",
+                "content": "You are BookMindAI. Always return valid JSON only. Be personal, never generic.",
+            },
+            {"role": "user", "content": prompt},
+        ],
+        temperature=0.75,
+    )
+
+    parsed = _safe_json_loads(
+        result,
+        {
+            "reflection": (
+                f"Over your journey through {path_name}, you explored new voices and ideas. "
+                "Your reading is deepening — keep following what surprises you."
+            ),
+            "next_path_suggestion": "Try a path in an adjacent genre to stretch your comfort zone.",
+            "next_path_name": "Your Next Chapter",
+        },
+    )
+    parsed["engine"] = ai.engine_name()
+    return parsed

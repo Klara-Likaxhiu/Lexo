@@ -2,8 +2,7 @@
 window.BookMindPathCompletion = {
   STATS_KEY: "bookmind_path_stats",
   XP_KEY: "bookmind_path_xp",
-  BASE_XP: 50,
-  XP_PER_BOOK: 15,
+  BASE_XP: 500,
 
   readStats() {
     try {
@@ -21,6 +20,8 @@ window.BookMindPathCompletion = {
       unlockedAdvanced: false,
       unlockedCategories: [],
       favoriteCategory: null,
+      favoritePathName: null,
+      latestStampPathId: null,
     };
   },
 
@@ -54,7 +55,11 @@ window.BookMindPathCompletion = {
   },
 
   difficultyLabel(path) {
-    return path.difficulty_progression || path.difficulty || "Personalized";
+    const raw = path.difficulty_progression || path.difficulty || "Personalized";
+    if (/beginner/i.test(raw)) return "Beginner";
+    if (/legendary/i.test(raw)) return "Legendary";
+    if (/advanced|challenging|demanding/i.test(raw)) return "Advanced";
+    return "Intermediate";
   },
 
   categoryFor(path) {
@@ -74,11 +79,15 @@ window.BookMindPathCompletion = {
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-|-$/g, "")
       .slice(0, 40);
+    const base = (path.path_name || "Reading Path")
+      .replace(/\s*(Journey|Path|Starter Path|Collection)$/i, "")
+      .trim();
+    const title = base ? `${base} Scholar` : "Path Scholar";
     return {
       id: `path-complete-${slug}-${path.id?.slice(0, 8) || "local"}`,
-      title: `${path.path_name || "Reading Path"} Conqueror`,
-      description: `Completed the ${path.path_name || "reading path"}.`,
-      rarity: path.genre_slug ? "rare" : "epic",
+      title,
+      description: `Earned by completing ${path.path_name || "a reading path"}.`,
+      rarity: path.tier === "legendary" ? "legendary" : path.genre_slug ? "rare" : "epic",
     };
   },
 
@@ -101,11 +110,24 @@ window.BookMindPathCompletion = {
       profile.paths_completed = stats.pathsCompleted;
       profile.last_path_completed = path.path_name;
       profile.last_path_completed_at = path.completed_at;
-      profile.path_mastery_level = stats.pathsCompleted >= 5 ? "Advanced" : stats.pathsCompleted >= 2 ? "Intermediate" : "Explorer";
+      profile.path_mastery_level =
+        stats.pathsCompleted >= 5 ? "Advanced" : stats.pathsCompleted >= 2 ? "Intermediate" : "Explorer";
+      profile.path_total_xp = stats.totalXp;
+      profile.favorite_completed_path = stats.favoritePathName;
+      profile.latest_passport_stamp = path.path_name;
+      profile.latest_passport_at = path.completed_at;
       const genres = new Set(profile.favorite_genres || []);
       if (path.genre) genres.add(path.genre);
       profile.favorite_genres = [...genres];
       profile.unlocked_path_categories = stats.unlockedCategories;
+      profile.journey_milestone =
+        stats.pathsCompleted >= 5
+          ? "Master Navigator"
+          : stats.pathsCompleted >= 3
+            ? "Trailblazer"
+            : stats.pathsCompleted >= 1
+              ? "Pathfinder"
+              : null;
       localStorage.setItem("readerProfile", JSON.stringify(profile));
     } catch {
       /* ignore */
@@ -127,14 +149,13 @@ window.BookMindPathCompletion = {
     const active = all.filter(p => !p.path_completed);
     const completed = all.filter(p => p.path_completed);
     const stats = this.readStats();
+    const Passport = window.BookMindPathPassport;
 
-    let startedCount = 0;
     let finishedBooksOnActive = 0;
     let totalBooksOnActive = 0;
 
     active.forEach(path => {
       const prog = this.pathProgress(path);
-      if (prog.completed > 0 || path.started_at) startedCount += 1;
       finishedBooksOnActive += prog.completed;
       totalBooksOnActive += prog.total;
     });
@@ -157,9 +178,40 @@ window.BookMindPathCompletion = {
       completionRate,
       avgCompletionDays: avgDays,
       favoriteCategory: stats.favoriteCategory || this.recomputeFavoriteCategory(stats.completions),
-      totalXp: stats.totalXp + this.readXpBonus(),
+      totalXp: stats.totalXp,
       unlockedAdvanced: stats.unlockedAdvanced,
+      totalBooksThroughPaths: Passport?.totalBooksThroughPaths(all) || 0,
+      legendaryFinished: Passport?.countLegendaryCompleted(all) || 0,
     };
+  },
+
+  async fetchReflection(path, daysTaken) {
+    const fallback = {
+      reflection:
+        `Over the last ${daysTaken || "few"} days you've journeyed through ${path.path_name}. ` +
+        "Your reading is growing richer — themes, voices, and ideas are weaving into your Reader DNA.",
+      next_path_suggestion: "Based on this journey, explore a neighboring genre to deepen your range.",
+      next_path_name: "Your Next Chapter",
+    };
+
+    if (!window.BookMindAPI?.post) return fallback;
+
+    try {
+      const token = await BookMindAPI.ensureAuth({ redirect: false });
+      if (!token) return fallback;
+
+      const readerProfile = JSON.parse(localStorage.getItem("readerProfile") || "null");
+      const library = window.BookMindLibrary?.getLibrary?.() || {};
+
+      return await BookMindAPI.post("/api/reader/path-reflection", {
+        path,
+        reader_profile: readerProfile,
+        library,
+        days_taken: daysTaken,
+      });
+    } catch {
+      return fallback;
+    }
   },
 
   completePath(path) {
@@ -172,24 +224,28 @@ window.BookMindPathCompletion = {
 
     const badge = this.badgeForPath(path);
     const daysTaken = this.daysTaken(path, completedAt);
-    const xp = this.BASE_XP + (path.books?.length || 0) * this.XP_PER_BOOK;
+    const xp = this.BASE_XP;
     const category = this.categoryFor(path);
 
     path.path_completed = true;
     path.completed_at = completedAt;
     path.completion_badge_id = badge.id;
     path.completion_badge_title = badge.title;
+    path.passport_stamp = true;
 
     const stats = this.readStats();
     stats.pathsCompleted += 1;
     stats.totalXp += xp;
     stats.unlockedAdvanced = stats.pathsCompleted >= 1;
+    stats.favoritePathName = path.path_name;
+    stats.latestStampPathId = path.id;
     if (category && !stats.unlockedCategories.includes(category)) {
       stats.unlockedCategories.push(category);
     }
     stats.completions.unshift({
       pathId: path.id,
       pathName: path.path_name,
+      pathIcon: path.path_icon || "📖",
       completedAt,
       booksCount: path.books?.length || 0,
       daysTaken,
@@ -198,6 +254,7 @@ window.BookMindPathCompletion = {
       badgeTitle: badge.title,
       category,
       genre: path.genre || null,
+      tier: path.tier || null,
     });
     stats.favoriteCategory = this.recomputeFavoriteCategory(stats.completions);
     this.saveStats(stats);
@@ -218,7 +275,9 @@ window.BookMindPathCompletion = {
     path.completed_at = null;
     path.completion_badge_id = null;
     path.completion_badge_title = null;
+    path.passport_stamp = false;
     path.started_at = null;
+    path.ai_reflection = null;
     (path.books || []).forEach(book => {
       book.completed = false;
     });
@@ -238,6 +297,6 @@ window.BookMindPathCompletion = {
   },
 
   shareText(path, badge) {
-    return `I completed the "${path.path_name}" Reading Path on BookMindAI! 🎉 Badge: ${badge.title}`;
+    return `I completed the "${path.path_name}" Reading Path on BookMindAI! 🏆 Badge: ${badge.title} · +500 XP`;
   },
 };

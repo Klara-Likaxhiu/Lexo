@@ -7,6 +7,8 @@
   <script src="js/auth.js"></script>
   <script src="js/sidebar.js" defer></script>
   <script src="js/api.js" defer></script>
+  <script src="js/reading-path-passport.js" defer></script>
+  <script src="js/reading-path-completion.js" defer></script>
 </head>
 <body>
 
@@ -53,31 +55,39 @@
       </div>
 
     </section>
+
+    <section id="journeyCollection" class="journey-collection card" hidden>
+      <h2>Journey Collection</h2>
+      <p class="journey-collection-sub">Meaningful reading journeys you've completed — not just books on a shelf.</p>
+      <div class="journey-collection-stats" id="journeyCollectionStats"></div>
+      <div class="journey-collection-highlight" id="journeyCollectionHighlight"></div>
+      <a href="reading-paths.html" class="btn btn-secondary">View Reading Passport →</a>
+    </section>
+
   </main>
 
 </div>
 
 <script>
   document.addEventListener("DOMContentLoaded", async function () {
-    if (window.BookMindAuth?.whenReady) {
-      await window.BookMindAuth.whenReady();
-    }
+    if (window.BookMindAuth?.whenReady) await window.BookMindAuth.whenReady();
 
     const authUser = await BookMindAPI.getMe({ redirect: true });
     const usernameEl = document.getElementById("authUsername");
-    if (usernameEl && authUser) {
-      usernameEl.textContent = authUser.username;
-    }
+    if (usernameEl && authUser) usernameEl.textContent = authUser.username;
 
-    const profile = JSON.parse(localStorage.getItem("readerProfile"));
-    const savedUserProfile = JSON.parse(localStorage.getItem("bookmind_user_profile")) || {};
+    const profile = JSON.parse(localStorage.getItem("readerProfile") || "null") || {};
+    const savedUserProfile = JSON.parse(localStorage.getItem("bookmind_user_profile") || "null") || {};
+    const pathStats = window.BookMindPathCompletion?.readStats?.() || { pathsCompleted: 0, completions: [] };
+    const rawPaths = JSON.parse(localStorage.getItem("bookmind_reading_paths") || "null");
+    const paths = rawPaths?.paths || [];
 
     const avatar = document.getElementById("profileAvatar");
     const nicknameInput = document.getElementById("nicknameInput");
     const bioInput = document.getElementById("bioInput");
     const displayBio = document.getElementById("displayBio");
 
-    nicknameInput.value = savedUserProfile.nickname || (authUser && authUser.username) || "";
+    nicknameInput.value = savedUserProfile.nickname || authUser?.username || "";
     bioInput.value = savedUserProfile.bio || "";
     displayBio.textContent = savedUserProfile.bio || "No description yet.";
 
@@ -85,16 +95,40 @@
       avatar.innerHTML = `<img src="${savedUserProfile.profilePic}" alt="Profile picture">`;
     }
 
-    if (profile) {
-      document.getElementById("readerType").textContent = profile.reader_type || "Not available";
-      document.getElementById("readingLevel").textContent = profile.confirmed_reading_level || "Not available";
-      document.getElementById("genres").textContent = (profile.favorite_genres || []).join(", ");
+    document.getElementById("readerType").textContent = profile.reader_type || "Not available";
+    document.getElementById("readingLevel").textContent = profile.confirmed_reading_level || "Not available";
+    document.getElementById("genres").textContent = (profile.favorite_genres || []).join(", ") || "—";
+
+    const journeySection = document.getElementById("journeyCollection");
+    if (pathStats.pathsCompleted > 0 || paths.some(p => p.path_completed)) {
+      journeySection.hidden = false;
+      const P = window.BookMindPathPassport;
+      const ps = P?.passportStats(paths, pathStats) || {};
+      const favorite = P?.favoriteCompletedPath(pathStats.completions);
+      const latest = P?.latestStamp(pathStats.completions);
+
+      document.getElementById("journeyCollectionStats").innerHTML = `
+        <div class="journey-stat-pill"><strong>${ps.pathsCompleted || pathStats.pathsCompleted}</strong> paths completed</div>
+        <div class="journey-stat-pill"><strong>${ps.totalXp || pathStats.totalXp || 0}</strong> path XP earned</div>
+        <div class="journey-stat-pill"><strong>${profile.journey_milestone || "Pathfinder"}</strong> milestone</div>
+      `;
+
+      document.getElementById("journeyCollectionHighlight").innerHTML = `
+        <div class="journey-highlight-card">
+          <p class="eyebrow">Favorite journey</p>
+          <h3>${favorite?.pathName || profile.favorite_completed_path || "—"}</h3>
+        </div>
+        <div class="journey-highlight-card journey-stamp-preview">
+          <p class="eyebrow">Latest passport stamp</p>
+          <h3>${latest?.pathIcon || "📖"} ${latest?.pathName || profile.latest_passport_stamp || "—"}</h3>
+          <p>${latest?.completedAt ? new Date(latest.completedAt).toLocaleDateString(undefined, { month: "long", year: "numeric" }) : ""}</p>
+        </div>
+      `;
     }
 
     document.getElementById("profilePicInput").addEventListener("change", function (e) {
       const file = e.target.files[0];
       if (!file) return;
-
       const reader = new FileReader();
       reader.onload = function (event) {
         avatar.innerHTML = `<img src="${event.target.result}" alt="Profile picture">`;
@@ -105,14 +139,11 @@
     });
 
     document.getElementById("saveProfileBtn").addEventListener("click", function () {
-      const updatedProfile = {
+      localStorage.setItem("bookmind_user_profile", JSON.stringify({
         nickname: nicknameInput.value,
         bio: bioInput.value,
-        profilePic: savedUserProfile.profilePic || null
-      };
-
-      localStorage.setItem("bookmind_user_profile", JSON.stringify(updatedProfile));
-
+        profilePic: savedUserProfile.profilePic || null,
+      }));
       displayBio.textContent = bioInput.value || "No description yet.";
       alert("Profile saved!");
     });

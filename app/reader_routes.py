@@ -7,6 +7,7 @@ from app.reader import (
     generate_reading_paths,
     generate_genre_reading_path,
     generate_reader_intelligence,
+    generate_path_reflection,
 )
 
 from app.reader_models import (
@@ -16,6 +17,7 @@ from app.reader_models import (
     ReaderIntelligenceRequest,
     ReaderBadgesRequest,
     GenrePathRequest,
+    PathReflectionRequest,
 )
 from app.badge_service import generate_personalized_badges
 from app.reading_paths_store import (
@@ -129,3 +131,13 @@ def reader_genre_path(
         "path": saved,
         "message": f'Created your "{saved.get("path_name") or genre} Starter Path".',
     }
+
+
+@router.post("/path-reflection")
+def path_reflection(data: PathReflectionRequest) -> dict:
+    return generate_path_reflection(
+        path=data.path,
+        reader_profile=data.reader_profile,
+        library=data.library,
+        days_taken=data.days_taken,
+    )

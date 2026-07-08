@@ -1,18 +1,25 @@
 const generateBtn = document.getElementById("generateBtn");
 const pathsGrid = document.getElementById("pathsGrid");
 const pathsMessage = document.getElementById("pathsMessage");
-const pathStatsBar = document.getElementById("pathStatsBar");
 const activePathsSection = document.getElementById("activePathsSection");
 const activePathsGrid = document.getElementById("activePathsGrid");
-const completedPathsSection = document.getElementById("completedPathsSection");
-const completedPathsGrid = document.getElementById("completedPathsGrid");
-const pathsUnlockBanner = document.getElementById("pathsUnlockBanner");
+const secretPathsSection = document.getElementById("secretPathsSection");
+const secretPathsGrid = document.getElementById("secretPathsGrid");
+const passportSection = document.getElementById("passportSection");
+const passportStatsBar = document.getElementById("passportStatsBar");
+const passportGrid = document.getElementById("passportGrid");
+const ratedPathsSection = document.getElementById("ratedPathsSection");
+const ratedPathsGrid = document.getElementById("ratedPathsGrid");
 const pathCompletionModal = document.getElementById("pathCompletionModal");
 
 const STORE_KEY = "bookmind_reading_paths";
 const Completion = () => window.BookMindPathCompletion;
+const Passport = () => window.BookMindPathPassport;
 let focusPathId = new URLSearchParams(window.location.search).get("path");
 let saveTimer = null;
+let pendingReviewPathId = null;
+let selectedStars = 0;
+let confettiFrame = null;
 
 const ICONS = {
   route: '<circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/>',
@@ -23,7 +30,7 @@ const ICONS = {
   flag: '<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" x2="4" y1="22" y2="15"/>',
   x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
   refresh: '<path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/>',
-  eye: '<path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/>',
+  lock: '<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
 };
 
 function svg(name, cls) {
@@ -75,23 +82,17 @@ function saveLocalPaths(result) {
 
 async function loadPathsFromServer() {
   if (!window.BookMindAPI?.get) return null;
-
   const token = await BookMindAPI.ensureAuth({ redirect: false });
   if (!token) return loadLocalPaths();
-
   try {
     const data = await BookMindAPI.get("/api/reading-paths");
-    if (Array.isArray(data?.paths) && data.paths.length) {
-      return normalize(data);
-    }
-
+    if (Array.isArray(data?.paths) && data.paths.length) return normalize(data);
     const local = loadLocalPaths();
     if (local?.paths?.length) {
       await persistPaths(local, { immediate: true });
       localStorage.removeItem(STORE_KEY);
       return local;
     }
-
     return normalize(data || { message: "Your saved reading paths.", paths: [] });
   } catch {
     return loadLocalPaths();
@@ -100,9 +101,7 @@ async function loadPathsFromServer() {
 
 async function persistPaths(result, { immediate = false } = {}) {
   saveLocalPaths(result);
-
   if (!window.BookMindAPI?.put) return;
-
   const run = async () => {
     try {
       const token = await BookMindAPI.ensureAuth({ redirect: false });
@@ -112,28 +111,22 @@ async function persistPaths(result, { immediate = false } = {}) {
         paths: result.paths,
       });
       if (Array.isArray(data?.paths)) {
-        const savedByKey = new Map(
-          data.paths.map(path => [path.id || path.path_name, path])
-        );
+        const savedByKey = new Map(data.paths.map(path => [path.id || path.path_name, path]));
         const merged = result.paths.map(path => {
           const saved = savedByKey.get(path.id) || savedByKey.get(path.path_name);
           return saved ? { ...path, ...saved } : path;
         });
         data.paths.forEach(path => {
-          if (!merged.some(item => item.id === path.id)) {
-            merged.push(path);
-          }
+          if (!merged.some(item => item.id === path.id)) merged.push(path);
         });
         state = normalize({ ...result, paths: merged });
       }
     } catch {
-      /* local cache remains as fallback */
+      /* local cache remains */
     }
   };
-
-  if (immediate) {
-    await run();
-  } else {
+  if (immediate) await run();
+  else {
     clearTimeout(saveTimer);
     saveTimer = setTimeout(run, 400);
   }
@@ -149,12 +142,7 @@ let state = normalize({ message: "", paths: [] });
 function orderPaths(paths) {
   const list = paths.slice();
   if (!focusPathId) return list;
-
-  list.sort((a, b) => {
-    if (a.id === focusPathId) return -1;
-    if (b.id === focusPathId) return 1;
-    return 0;
-  });
+  list.sort((a, b) => (a.id === focusPathId ? -1 : b.id === focusPathId ? 1 : 0));
   return list;
 }
 
@@ -168,71 +156,44 @@ function showPathFlash() {
 void (async () => {
   if (window.BookMindAPI?.ensureAuth) {
     const token = await BookMindAPI.ensureAuth({ redirect: false });
-    if (token) {
-      await BookMindLibrary.ensureLoaded();
-    }
+    if (token) await BookMindLibrary.ensureLoaded();
   }
-
   const loaded = await loadPathsFromServer();
   if (loaded) {
     state = loaded;
     renderPaths(state);
-    if (state.paths?.length) {
-      generateBtn.textContent = "Regenerate Paths";
-    }
+    if (state.paths?.length) generateBtn.textContent = "Regenerate Paths";
   }
-
   showPathFlash();
 })();
 
 generateBtn.addEventListener("click", async () => {
   generateBtn.textContent = "Generating...";
   generateBtn.disabled = true;
-
-  pathsGrid.innerHTML = "";
-  activePathsGrid.innerHTML = "";
-  completedPathsGrid.innerHTML = "";
   pathsMessage.style.display = "block";
-  pathsMessage.innerHTML = `
-    <h2>Building your personalized reading journeys...</h2>
-    <p>BookMindAI is analyzing your Reader DNA, library, mood, and goal.</p>
-  `;
-
-  const readerProfile = JSON.parse(localStorage.getItem("readerProfile"));
-
+  pathsMessage.innerHTML = `<h2>Building your personalized reading journeys...</h2><p>BookMindAI is analyzing your Reader DNA, library, mood, and goal.</p>`;
   try {
     await BookMindLibrary.ensureLoaded();
-    const library = BookMindLibrary.getLibrary();
-
     const result = await BookMindAPI.post("/api/reader/paths", {
-      reader_profile: readerProfile,
-      library: library,
+      reader_profile: JSON.parse(localStorage.getItem("readerProfile")),
+      library: BookMindLibrary.getLibrary(),
       today_mood: localStorage.getItem("bookmind_today_mood"),
       today_goal: localStorage.getItem("bookmind_today_goal"),
     });
-
     state = normalize(result);
     const genrePaths = (await loadPathsFromServer())?.paths?.filter(p => p.genre_slug) || [];
-    if (genrePaths.length) {
-      const ids = new Set(state.paths.map(p => p.id));
-      genrePaths.forEach(path => {
-        if (!ids.has(path.id)) state.paths.push(path);
-      });
-    }
+    const ids = new Set(state.paths.map(p => p.id));
+    genrePaths.forEach(path => {
+      if (!ids.has(path.id)) state.paths.push(path);
+    });
     await persistPaths(state, { immediate: true });
     renderPaths(state);
   } catch {
-    pathsMessage.innerHTML = `
-      <h2>Couldn't generate paths right now.</h2>
-      <p>Please try again in a moment.</p>
-    `;
+    pathsMessage.innerHTML = `<h2>Couldn't generate paths right now.</h2><p>Please try again in a moment.</p>`;
   }
-
   generateBtn.textContent = "Regenerate Paths";
   generateBtn.disabled = false;
 });
-
-/* ---------------------------------------------------------------- actions */
 
 function findPath(pathId) {
   return state.paths.find(p => p.id === pathId);
@@ -258,13 +219,12 @@ function invalidatePathCompletion(path) {
   path.completed_at = null;
   path.completion_badge_id = null;
   path.completion_badge_title = null;
+  path.passport_stamp = false;
 }
 
 function ensureStartedAt(path) {
   const prog = Completion()?.pathProgress(path);
-  if (prog?.completed > 0 && !path.started_at) {
-    path.started_at = new Date().toISOString();
-  }
+  if (prog?.completed > 0 && !path.started_at) path.started_at = new Date().toISOString();
 }
 
 function toggleComplete(pathId, bookId) {
@@ -274,55 +234,30 @@ function toggleComplete(pathId, bookId) {
   if (!book) return;
 
   void (async () => {
-    if (!window.BookMindAPI?.ensureAuth) {
-      showPathToast("BookMindAPI is not loaded.", true);
-      return;
-    }
-
     const token = await BookMindAPI.ensureAuth({ redirect: true });
     if (!token) {
       showPathToast("Sign in to update your library.", true);
       return;
     }
-
     await BookMindLibrary.ensureLoaded();
-
     const nextCompleted = !book.completed;
-    const payload = {
-      title: book.title,
-      author: book.author || "",
-      genre: book.genre || path.genre || "Book",
-    };
-
+    const payload = { title: book.title, author: book.author || "", genre: book.genre || path.genre || "Book" };
     try {
       if (nextCompleted) {
         const existing = BookMindLibrary.findBook(payload);
-        if (existing?.library_id) {
-          await BookMindLibrary.patchBook(existing.library_id, {
-            status: "read",
-            progress: 100,
-          });
-        } else {
-          await BookMindLibrary.addBook(payload, "read", { progress: 100, silent: true });
-        }
+        if (existing?.library_id) await BookMindLibrary.patchBook(existing.library_id, { status: "read", progress: 100 });
+        else await BookMindLibrary.addBook(payload, "read", { progress: 100, silent: true });
         book.completed = true;
         ensureStartedAt(path);
-        showPathToast(`"${book.title}" marked as Finished in your library.`);
+        showPathToast(`"${book.title}" marked as Finished.`);
       } else {
         const entry = BookMindLibrary.findBook(payload);
-        if (entry?.library_id) {
-          await BookMindLibrary.patchBook(entry.library_id, {
-            status: "reading",
-            progress: entry.progress || 0,
-          });
-        } else {
-          BookMindLibrary.clearFinish(payload);
-        }
+        if (entry?.library_id) await BookMindLibrary.patchBook(entry.library_id, { status: "reading", progress: entry.progress || 0 });
+        else BookMindLibrary.clearFinish(payload);
         book.completed = false;
         invalidatePathCompletion(path);
         showPathToast(`"${book.title}" moved back to Currently Reading.`);
       }
-
       savePaths(state);
       renderPaths(state);
       window.BookMindLibraryPage?.refresh?.();
@@ -334,77 +269,71 @@ function toggleComplete(pathId, bookId) {
 
 function completeNext(pathId) {
   const path = findPath(pathId);
-  if (!path) return;
-  const next = path.books.find(b => !b.completed);
+  const next = path?.books.find(b => !b.completed);
   if (next) toggleComplete(pathId, next.id);
 }
 
 function completeReadingPath(pathId) {
   const path = findPath(pathId);
   const C = Completion();
-  if (!path || !C) return;
-
-  if (!C.isReadyToComplete(path)) {
+  if (!path || !C || !C.isReadyToComplete(path)) {
     showPathToast("Complete all books to finish this Reading Path.", true);
     return;
   }
-
   try {
     const result = C.completePath(path);
     savePaths(state);
     renderPaths(state);
-    showCompletionModal(result);
+    void showJourneyModal(result);
     showPathToast(`"${path.path_name}" completed! +${result.xp} XP`);
   } catch (error) {
     showPathToast(error.message || "Could not complete this path.", true);
   }
 }
 
-function restartPath(pathId) {
-  const path = findPath(pathId);
+function discoverSecretPath(secretId) {
+  const P = Passport();
   const C = Completion();
-  if (!path || !C) return;
-
-  if (!window.confirm(`Restart "${path.path_name}"? All book progress will reset.`)) return;
-
-  C.restartPath(path);
-  savePaths(state);
-  renderPaths(state);
-  showPathToast(`"${path.path_name}" restarted. Happy rereading!`);
-}
-
-function revisitPath(pathId) {
-  const card = document.querySelector(`.path-card-completed[data-path="${pathId}"]`);
-  if (card) {
-    const panel = card.querySelector(".path-review-panel");
-    if (panel) {
-      const expanded = !card.classList.contains("path-review-expanded");
-      card.classList.toggle("path-review-expanded", expanded);
-      panel.hidden = !expanded;
-    }
-    card.scrollIntoView({ behavior: "smooth", block: "start" });
+  if (!P || !C) return;
+  const stats = C.readStats();
+  const secret = P.SECRET_PATHS.find(s => s.secret_id === secretId);
+  if (!secret || !P.checkUnlock(secret, stats, state.paths)) {
+    showPathToast("This journey is still locked.", true);
     return;
   }
-  const active = document.querySelector(`.path-card[data-path="${pathId}"]`);
-  active?.scrollIntoView({ behavior: "smooth", block: "start" });
+  if (state.paths.some(p => p.secret_id === secretId)) {
+    focusPathId = state.paths.find(p => p.secret_id === secretId)?.id;
+    renderPaths(state);
+    return;
+  }
+  const newPath = P.discoverSecret(secretId, state.paths);
+  if (newPath) {
+    state.paths.push(newPath);
+    focusPathId = newPath.id;
+    savePaths(state);
+    renderPaths(state);
+    showPathToast(`Discovered: ${newPath.path_name}!`);
+  }
+}
+
+function restartPath(pathId) {
+  const path = findPath(pathId);
+  if (!path || !window.confirm(`Restart "${path.path_name}"? All book progress will reset.`)) return;
+  Completion()?.restartPath(path);
+  savePaths(state);
+  renderPaths(state);
+  showPathToast(`"${path.path_name}" restarted.`);
 }
 
 function addBookToPath(pathId, title, author) {
   const path = findPath(pathId);
   if (!path || !title.trim()) return;
-
   invalidatePathCompletion(path);
-
   path.books.push({
-    id: uid(),
-    title: title.trim(),
-    author: (author || "").trim(),
-    level: "Added by you",
-    difficulty: "Custom",
-    reason: "You added this book to the path.",
-    completed: false,
+    id: uid(), title: title.trim(), author: (author || "").trim(),
+    level: "Added by you", difficulty: "Custom",
+    reason: "You added this book to the path.", completed: false,
   });
-
   savePaths(state);
   renderPaths(state);
 }
@@ -418,62 +347,143 @@ function removeBookFromPath(pathId, bookId) {
   renderPaths(state);
 }
 
-/* ----------------------------------------------------------- completion UI */
+/* ----------------------------------------------------------- confetti */
 
-let lastCompletionShare = "";
+function startConfetti() {
+  const canvas = document.getElementById("journeyConfetti");
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  const colors = ["#c9a227", "#e8c547", "#6b8cae", "#b79ac8", "#3f9b7a", "#fff8e7"];
+  const particles = Array.from({ length: 120 }, () => ({
+    x: Math.random() * canvas.width,
+    y: Math.random() * canvas.height - canvas.height,
+    w: 6 + Math.random() * 6,
+    h: 10 + Math.random() * 8,
+    color: colors[Math.floor(Math.random() * colors.length)],
+    rot: Math.random() * 360,
+    spin: (Math.random() - 0.5) * 8,
+    vy: 2 + Math.random() * 4,
+    vx: (Math.random() - 0.5) * 2,
+    opacity: 1,
+  }));
+  let frame = 0;
+  function tick() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    particles.forEach(p => {
+      p.y += p.vy;
+      p.x += p.vx;
+      p.rot += p.spin;
+      if (frame > 90) p.opacity -= 0.012;
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, p.opacity);
+      ctx.translate(p.x, p.y);
+      ctx.rotate((p.rot * Math.PI) / 180);
+      ctx.fillStyle = p.color;
+      ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+      ctx.restore();
+    });
+    frame += 1;
+    if (frame < 180) confettiFrame = requestAnimationFrame(tick);
+    else ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
+  cancelAnimationFrame(confettiFrame);
+  tick();
+}
 
-function showCompletionModal({ path, badge, xp, daysTaken }) {
+function stopConfetti() {
+  cancelAnimationFrame(confettiFrame);
+  const canvas = document.getElementById("journeyConfetti");
+  canvas?.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height);
+}
+
+/* ----------------------------------------------------------- journey modal */
+
+async function showJourneyModal({ path, badge, xp, daysTaken }) {
   if (!pathCompletionModal) return;
-
   const C = Completion();
-  document.getElementById("pathCompletionPathName").textContent = `You completed: ${path.path_name}`;
-  document.getElementById("pathCompletionRewards").innerHTML = `
-    <div class="path-reward-pill">${svg("trophy", "icon-inline")} Badge: ${escapeHtml(badge.title)}</div>
-    <div class="path-reward-pill">+${xp} Reading Journey XP</div>
-    <div class="path-reward-pill">${path.books?.length || 0} books · ${daysTaken} day${daysTaken === 1 ? "" : "s"}</div>
+  pendingReviewPathId = path.id;
+  selectedStars = 0;
+
+  document.getElementById("journeyModalTitle").textContent = path.path_name;
+  document.getElementById("journeyModalStats").innerHTML = `
+    <div class="journey-stat"><span>📚</span><strong>${path.books?.length || 0} Books</strong></div>
+    <div class="journey-stat"><span>⏱</span><strong>${daysTaken} Days</strong></div>
+    <div class="journey-stat"><span>⭐</span><strong>${C.difficultyLabel(path)}</strong></div>
+  `;
+  document.getElementById("journeyModalBadge").textContent = badge.title;
+  document.getElementById("journeyModalRewards").innerHTML = `
+    <div class="journey-reward">+${xp} XP</div>
+    <div class="journey-reward">Reader DNA Updated</div>
+    <div class="journey-reward">Passport Stamp Earned</div>
   `;
 
-  document.getElementById("pathCompletionShareTitle").textContent = path.path_name;
-  document.getElementById("pathCompletionShareMeta").textContent =
-    `Completed ${C.formatDate(path.completed_at)} · ${C.difficultyLabel(path)} · ${path.books?.length || 0} books`;
-  document.getElementById("pathCompletionShareBadge").innerHTML =
-    `${svg("trophy", "icon-inline")} ${escapeHtml(badge.title)}`;
+  const reflectionEl = document.getElementById("journeyReflectionText");
+  const nextEl = document.getElementById("journeyNextSuggestion");
+  reflectionEl.innerHTML = `<span class="journey-reflection-loading">BookMindAI is reflecting on your journey…</span>`;
+  nextEl.textContent = "";
 
-  lastCompletionShare = C.shareText(path, badge);
+  document.getElementById("journeySurpriseInput").value = "";
+  document.getElementById("journeyRecommendInput").checked = false;
+  document.querySelectorAll("#journeyStarRating button").forEach(b => b.classList.remove("active"));
 
   pathCompletionModal.hidden = false;
   pathCompletionModal.setAttribute("aria-hidden", "false");
   pathCompletionModal.classList.add("is-open");
+  document.body.classList.add("journey-modal-open");
+  startConfetti();
+
+  const reflection = await C.fetchReflection(path, daysTaken);
+  path.ai_reflection = reflection.reflection;
+  savePaths(state);
+  reflectionEl.innerHTML = `<p>${escapeHtml(reflection.reflection).replace(/\n\n/g, "</p><p>").replace(/\n/g, "<br>")}</p>`;
+  nextEl.textContent = reflection.next_path_suggestion
+    ? `${reflection.next_path_suggestion}${reflection.next_path_name ? ` → ${reflection.next_path_name}` : ""}`
+    : "";
 }
 
-function closeCompletionModal() {
+function closeJourneyModal() {
   if (!pathCompletionModal) return;
   pathCompletionModal.classList.remove("is-open");
   pathCompletionModal.hidden = true;
   pathCompletionModal.setAttribute("aria-hidden", "true");
+  document.body.classList.remove("journey-modal-open");
+  stopConfetti();
+  pendingReviewPathId = null;
 }
 
-document.getElementById("pathCompletionShareBtn")?.addEventListener("click", async () => {
-  if (navigator.share) {
-    try {
-      await navigator.share({ title: "BookMindAI Reading Path", text: lastCompletionShare });
-      return;
-    } catch {
-      /* fall through */
-    }
+document.querySelectorAll("#journeyStarRating button").forEach(btn => {
+  btn.addEventListener("click", () => {
+    selectedStars = Number(btn.dataset.star);
+    document.querySelectorAll("#journeyStarRating button").forEach(b => {
+      b.classList.toggle("active", Number(b.dataset.star) <= selectedStars);
+    });
+  });
+});
+
+document.getElementById("journeySubmitReview")?.addEventListener("click", () => {
+  if (!pendingReviewPathId || !Passport()) return;
+  if (!selectedStars) {
+    showPathToast("Please select a star rating.", true);
+    return;
   }
-  try {
-    await navigator.clipboard.writeText(lastCompletionShare);
-    showPathToast("Achievement copied to clipboard.");
-  } catch {
-    showPathToast(lastCompletionShare);
+  const review = Passport().saveReview(pendingReviewPathId, {
+    rating: selectedStars,
+    surprise: document.getElementById("journeySurpriseInput").value.trim(),
+    recommend: document.getElementById("journeyRecommendInput").checked,
+  });
+  const path = findPath(pendingReviewPathId);
+  if (path) {
+    path.review = review;
+    savePaths(state);
+    renderPaths(state);
   }
+  showPathToast("Thank you for your review!");
 });
 
 pathCompletionModal?.addEventListener("click", event => {
-  if (event.target.closest("[data-action='close-modal']")) {
-    closeCompletionModal();
-  }
+  if (event.target.closest("[data-action='close-modal']")) closeJourneyModal();
 });
 
 /* ---------------------------------------------------------------- render */
@@ -482,108 +492,25 @@ function libraryTitleOptions() {
   const library = BookMindLibrary.getLibrary();
   const titles = new Set();
   Object.values(library).forEach(shelf =>
-    (shelf || []).forEach(book => book && book.title && titles.add(book.title))
+    (shelf || []).forEach(book => book?.title && titles.add(book.title))
   );
   return [...titles].map(t => `<option value="${escapeHtml(t)}"></option>`).join("");
 }
 
-function milestoneStrip(completed, total, pathCompleted) {
-  const half = Math.ceil(total / 2);
-  const milestones = [
-    { label: "Started", reached: completed >= 1 },
-    { label: "Halfway", reached: total > 0 && completed >= half },
-    { label: "All books read", reached: total > 0 && completed >= total },
-    { label: "Path finished", reached: pathCompleted },
-  ];
-
-  return `
-    <div class="path-milestones">
-      ${milestones
-        .map(
-          m => `
-        <span class="milestone ${m.reached ? "reached" : ""}">
-          ${m.reached ? svg("check", "icon-inline") : svg("flag", "icon-inline")}
-          ${m.label}
-        </span>
-      `
-        )
-        .join("")}
-    </div>
-  `;
-}
-
-function renderPathStats(paths) {
-  const C = Completion();
-  if (!pathStatsBar || !C) return;
-
-  const stats = C.computeAggregateStats(paths);
-  if (!paths.length) {
-    pathStatsBar.hidden = true;
-    return;
-  }
-
-  pathStatsBar.hidden = false;
-  pathStatsBar.innerHTML = `
-    <div class="path-stat">
-      <strong>${stats.pathsCompleted}</strong>
-      <span>Paths Completed</span>
-    </div>
-    <div class="path-stat">
-      <strong>${stats.activePaths}</strong>
-      <span>Active Paths</span>
-    </div>
-    <div class="path-stat">
-      <strong>${stats.completionRate}%</strong>
-      <span>Completion Rate</span>
-    </div>
-    <div class="path-stat">
-      <strong>${stats.avgCompletionDays || "—"}${stats.avgCompletionDays ? "d" : ""}</strong>
-      <span>Avg. Completion Time</span>
-    </div>
-    <div class="path-stat">
-      <strong>${escapeHtml(stats.favoriteCategory || "—")}</strong>
-      <span>Favorite Category</span>
-    </div>
-  `;
-}
-
-function renderUnlockBanner(stats) {
-  if (!pathsUnlockBanner) return;
-  if (!stats.unlockedAdvanced) {
-    pathsUnlockBanner.hidden = true;
-    return;
-  }
-
-  pathsUnlockBanner.hidden = false;
-  pathsUnlockBanner.innerHTML = `
-    <div class="path-unlock-content">
-      <strong>Unlocked:</strong> Advanced paths, AI recommendations from completed journeys, exclusive badges, and new genre suggestions.
-    </div>
-  `;
-}
-
 function renderCompletePathButton(path, { completed, total, allBooksDone }) {
-  const C = Completion();
-  const ready = C?.isReadyToComplete(path);
-  const isCompleted = path.path_completed;
-
-  if (isCompleted) return "";
-
-  const disabled = !allBooksDone;
-  const hint = disabled
-    ? `<p class="path-complete-hint">Complete all books to finish this Reading Path.</p>`
-    : "";
-
+  if (path.path_completed) return "";
+  const ready = Completion()?.isReadyToComplete(path);
   return `
-    ${hint}
-    <button
-      type="button"
-      class="btn btn-primary path-complete-btn ${ready ? "path-complete-btn-ready" : "path-complete-btn-disabled"}"
-      data-action="complete-path"
-      ${disabled ? "disabled" : ""}
-    >
-      ${svg("trophy", "icon-inline")} Complete Reading Path
-    </button>
+    <div class="path-journey-footer">
+      <p class="path-books-progress ${allBooksDone ? "path-books-progress-done" : ""}">
+        <strong>${completed} / ${total}</strong> Books Completed
+      </p>
+      ${!allBooksDone ? `<p class="path-complete-hint">Complete all books to finish this Reading Path.</p>` : ""}
+      <button type="button" class="btn path-complete-btn ${ready ? "path-complete-btn-ready" : "path-complete-btn-disabled"}"
+        data-action="complete-path" ${!allBooksDone ? "disabled" : ""}>
+        🏆 Complete Reading Path
+      </button>
+    </div>
   `;
 }
 
@@ -596,194 +523,175 @@ function renderActivePathCard(path, pathIndex) {
   return `
     <div class="path-card card ${isFocus ? "path-card-focus" : ""}" data-path="${path.id}">
       <div class="path-header">
-        <div class="path-icon">${svg("route")}</div>
+        <div class="path-icon ${path.path_icon ? "path-icon-emoji" : ""}">${path.path_icon ? escapeHtml(path.path_icon) : svg("route")}</div>
         <div>
-          <p class="eyebrow">${path.genre ? escapeHtml(path.genre) : `Path ${pathIndex + 1}`}</p>
+          <p class="eyebrow">${path.is_secret ? "Secret Journey" : path.genre ? escapeHtml(path.genre) : `Path ${pathIndex + 1}`}</p>
           <h2>${escapeHtml(path.path_name || "Personalized Reading Path")}</h2>
-          <p>${escapeHtml(path.why_this_path || "A personalized path created from your Reader DNA.")}</p>
+          <p>${escapeHtml(path.why_this_path || "")}</p>
         </div>
       </div>
-
-      ${milestoneStrip(completed, total, false)}
-
-      <div class="path-progress">
-        <div style="width: ${percent}%;"></div>
-      </div>
-      <p class="path-count">${escapeHtml(path.difficulty_progression || "Personalized progression")} · ${completed} / ${total} books completed</p>
-
+      <div class="path-progress"><div style="width:${percent}%;"></div></div>
       <div class="path-timeline">
-        ${(path.books || [])
-          .map(
-            (book, index) => `
-            <div class="path-book ${book.completed ? "done" : ""}">
-              <div class="path-step">${book.completed ? svg("check", "icon-inline") : index + 1}</div>
-              <div class="path-book-cover">
-                ${
-                  window.BookMindCoverImage
-                    ? BookMindCoverImage.html(book, {
-                        imgClass: "path-book-cover-img book-cover-img",
-                        wrapClass: "book-cover-wrap path-cover-wrap",
-                        placeholderClass: "path-book-cover-ph book-cover-placeholder",
-                      })
-                    : svg("book")
-                }
-              </div>
-              <div class="path-book-info">
-                <span>${escapeHtml(book.level || "Recommended")}${book.difficulty ? ` · ${escapeHtml(book.difficulty)}` : ""}</span>
-                <h3>${escapeHtml(book.title || "Untitled Book")}</h3>
-                <p>${escapeHtml(book.author || "Unknown Author")}</p>
-                <small>${escapeHtml(book.reason || "")}</small>
-              </div>
-              <div class="path-book-actions">
-                <button class="btn btn-secondary btn-sm" data-action="toggle" data-book="${book.id}">
-                  ${book.completed ? "Completed" : "Mark complete"}
-                </button>
-                <button class="path-book-remove" data-action="remove" data-book="${book.id}" title="Remove from path">${svg("x", "icon-inline")}</button>
-              </div>
+        ${(path.books || []).map((book, index) => `
+          <div class="path-book ${book.completed ? "done" : ""}">
+            <div class="path-step">${book.completed ? svg("check", "icon-inline") : index + 1}</div>
+            <div class="path-book-cover">${window.BookMindCoverImage ? BookMindCoverImage.html(book, { imgClass: "path-book-cover-img book-cover-img", wrapClass: "book-cover-wrap path-cover-wrap", placeholderClass: "path-book-cover-ph book-cover-placeholder" }) : svg("book")}</div>
+            <div class="path-book-info">
+              <span>${escapeHtml(book.level || "Recommended")}${book.difficulty ? ` · ${escapeHtml(book.difficulty)}` : ""}</span>
+              <h3>${escapeHtml(book.title || "Untitled")}</h3>
+              <p>${escapeHtml(book.author || "Unknown")}</p>
+              <small>${escapeHtml(book.reason || "")}</small>
             </div>
-          `
-          )
-          .join("")}
+            <div class="path-book-actions">
+              <button class="btn btn-secondary btn-sm" data-action="toggle" data-book="${book.id}">${book.completed ? "Finished" : "Mark complete"}</button>
+              <button class="path-book-remove" data-action="remove" data-book="${book.id}">${svg("x", "icon-inline")}</button>
+            </div>
+          </div>`).join("")}
       </div>
-
       <div class="path-add">
         <input type="text" class="path-add-title" list="libraryTitles" placeholder="Add a book by title">
         <input type="text" class="path-add-author" placeholder="Author (optional)">
         <button class="btn btn-secondary" data-action="add">${svg("plus", "icon-inline")} Add</button>
       </div>
-
-      <button class="btn btn-secondary complete-next-btn" data-action="next" ${allBooksDone ? "disabled" : ""}>
-        Mark next book complete
-      </button>
-
+      <button class="btn btn-secondary complete-next-btn" data-action="next" ${allBooksDone ? "disabled" : ""}>Mark next book complete</button>
       ${renderCompletePathButton(path, { completed, total, allBooksDone })}
-    </div>
-  `;
+    </div>`;
 }
 
-function renderCompletedPathCard(path) {
+function renderPassportStamp(path) {
   const C = Completion();
-  const total = path.books?.length || 0;
+  const P = Passport();
   const daysTaken = C?.daysTaken(path, path.completed_at) || 0;
-  const badgeTitle = path.completion_badge_title || "Path Conqueror";
+  const badgeTitle = path.completion_badge_title || "Path Scholar";
+  const review = P?.getReview(path.id);
 
   return `
-    <div class="path-card path-card-completed card" data-path="${path.id}">
-      <div class="path-completed-ribbon">
-        ${svg("check", "icon-inline")} Completed
+    <article class="passport-stamp card" data-path="${path.id}">
+      <div class="passport-stamp-perforation"></div>
+      <div class="passport-stamp-icon">${path.path_icon || "📖"}</div>
+      <h3>${escapeHtml(path.path_name)}</h3>
+      <p class="passport-stamp-status">Completed · ${P?.formatMonthYear(path.completed_at)}</p>
+      <div class="passport-stamp-meta">
+        <span>${path.books?.length || 0} Books</span>
+        <span>${daysTaken} Days</span>
+        <span>${escapeHtml(C?.difficultyLabel(path))}</span>
       </div>
-
-      <div class="path-header">
-        <div class="path-icon path-icon-completed">${svg("trophy")}</div>
-        <div>
-          <p class="eyebrow">${path.genre ? escapeHtml(path.genre) : "Completed path"}</p>
-          <h2>${escapeHtml(path.path_name || "Reading Path")}</h2>
-          <p>${escapeHtml(path.why_this_path || "")}</p>
-        </div>
-      </div>
-
-      <div class="path-completed-meta">
-        <div class="path-completed-stat">
-          <span>Completed</span>
-          <strong>${C?.formatDate(path.completed_at) || "—"}</strong>
-        </div>
-        <div class="path-completed-stat">
-          <span>Books</span>
-          <strong>${total}</strong>
-        </div>
-        <div class="path-completed-stat">
-          <span>Time taken</span>
-          <strong>${daysTaken} day${daysTaken === 1 ? "" : "s"}</strong>
-        </div>
-        <div class="path-completed-stat">
-          <span>Difficulty</span>
-          <strong>${escapeHtml(C?.difficultyLabel(path) || "—")}</strong>
-        </div>
-        <div class="path-completed-stat path-completed-badge">
-          <span>Badge</span>
-          <strong>${svg("trophy", "icon-inline")} ${escapeHtml(badgeTitle)}</strong>
-        </div>
-      </div>
-
-      <div class="path-completed-actions">
-        <button type="button" class="btn btn-secondary" data-action="revisit">${svg("eye", "icon-inline")} Review path</button>
-        <button type="button" class="btn btn-secondary" data-action="restart">${svg("refresh", "icon-inline")} Restart for reread</button>
-      </div>
-
-      <div class="path-review-panel" hidden>
-        <h3 class="path-review-title">Books in this path</h3>
-        <div class="path-timeline path-timeline-readonly">
-          ${(path.books || [])
-            .map(
-              (book, index) => `
-              <div class="path-book done">
-                <div class="path-step">${svg("check", "icon-inline")}</div>
-                <div class="path-book-info">
-                  <span>Book ${index + 1}${book.difficulty ? ` · ${escapeHtml(book.difficulty)}` : ""}</span>
-                  <h3>${escapeHtml(book.title || "Untitled Book")}</h3>
-                  <p>${escapeHtml(book.author || "Unknown Author")}</p>
-                </div>
-              </div>
-            `
-            )
-            .join("")}
-        </div>
-      </div>
-    </div>
-  `;
+      <div class="passport-stamp-badge">${svg("trophy", "icon-inline")} ${escapeHtml(badgeTitle)}</div>
+      ${review ? `<p class="passport-stamp-review">${"★".repeat(review.rating)}${review.recommend ? " · Recommended" : ""}</p>` : ""}
+      <button type="button" class="btn btn-secondary btn-sm" data-action="restart">${svg("refresh", "icon-inline")} Reread journey</button>
+    </article>`;
 }
 
-function hydrateCovers(container, paths) {
-  if (!window.BookMindCoverImage || !container) return;
-  const allBooks = paths.flatMap(path => path.books || []);
-  BookMindCoverImage.seedFromBooks(allBooks);
-  BookMindCoverImage.hydrateLazy(container, {
-    imgClass: "path-book-cover-img book-cover-img",
-  });
+function renderSecretCard(secret, unlocked, alreadyHas) {
+  if (unlocked) {
+    return `
+      <div class="secret-path-card secret-path-unlocked card">
+        <div class="secret-path-icon">${secret.path_icon}</div>
+        <h3>${escapeHtml(secret.path_name)}</h3>
+        <p>${escapeHtml(secret.why_this_path)}</p>
+        <span class="secret-path-tier">${secret.tier === "legendary" ? "Legendary" : "Advanced"}</span>
+        <button type="button" class="btn btn-primary btn-sm" data-action="discover-secret" data-secret="${secret.secret_id}">
+          ${alreadyHas ? "View journey" : "Discover path"}
+        </button>
+      </div>`;
+  }
+  return `
+    <div class="secret-path-card secret-path-locked card">
+      <div class="secret-path-lock">${svg("lock", "icon-inline")}</div>
+      <div class="secret-path-icon secret-path-icon-muted">${secret.path_icon}</div>
+      <h3>???</h3>
+      <p class="secret-unlock-hint">Unlock: ${escapeHtml(secret.unlockLabel)}</p>
+    </div>`;
+}
+
+function renderRatedPathCard(item, isCommunity = false) {
+  if (isCommunity) {
+    return `
+      <div class="rated-path-card card">
+        <p class="eyebrow">${escapeHtml(item.genre)}</p>
+        <h3>${escapeHtml(item.path_name)}</h3>
+        <p class="rated-path-score">★ ${item.rating} · ${item.completions.toLocaleString()} readers</p>
+        <span class="rated-path-tag">Community favorite</span>
+      </div>`;
+  }
+  const { path, review } = item;
+  return `
+    <div class="rated-path-card card">
+      <h3>${escapeHtml(path.path_name)}</h3>
+      <p class="rated-path-score">${"★".repeat(review.rating)} <span>${review.rating}/5</span></p>
+      ${review.surprise ? `<p class="rated-path-quote">"${escapeHtml(review.surprise)}"</p>` : ""}
+      ${review.recommend ? `<span class="rated-path-tag">You'd recommend this</span>` : ""}
+    </div>`;
+}
+
+function renderPassportStats(paths) {
+  const C = Completion();
+  const P = Passport();
+  if (!passportStatsBar || !C || !P) return;
+  const stats = C.readStats();
+  const ps = P.passportStats(paths, stats);
+  passportStatsBar.innerHTML = `
+    <div class="passport-stat"><span>📖</span><strong>${ps.pathsCompleted}</strong><small>Paths Completed</small></div>
+    <div class="passport-stat"><span>🔥</span><strong>${ps.activePaths}</strong><small>Active Paths</small></div>
+    <div class="passport-stat"><span>⭐</span><strong>${ps.avgCompletionDays || "—"}${ps.avgCompletionDays ? "d" : ""}</strong><small>Avg. Completion</small></div>
+    <div class="passport-stat"><span>📚</span><strong>${ps.totalBooks}</strong><small>Books Through Paths</small></div>
+    <div class="passport-stat"><span>🏅</span><strong>${ps.legendaryFinished}</strong><small>Legendary Finished</small></div>
+    <div class="passport-stat"><span>✓</span><strong>${ps.completionPct}%</strong><small>Completion</small></div>`;
 }
 
 function renderPaths(result) {
   const paths = orderPaths(result.paths || []);
   const C = Completion();
+  const P = Passport();
   const activePaths = paths.filter(p => !p.path_completed);
   const completedPaths = paths.filter(p => p.path_completed);
-  const aggregateStats = C?.computeAggregateStats(paths) || {};
+  const stats = C?.readStats() || { pathsCompleted: 0 };
 
   pathsMessage.style.display = "block";
-  pathsMessage.innerHTML = `<h2>${escapeHtml(result.message || "Here are your personalized reading paths.")}</h2>`;
+  pathsMessage.innerHTML = activePaths.length
+    ? `<h2>${escapeHtml(result.message || "Your reading journeys await.")}</h2>`
+    : completedPaths.length
+      ? `<h2>All journeys complete — explore your passport below.</h2>`
+      : `<h2>${escapeHtml(result.message || "Start your first reading journey.")}</h2>`;
 
-  renderPathStats(paths);
-  renderUnlockBanner(aggregateStats);
-
-  if (paths.length === 0) {
-    pathsGrid.innerHTML = "";
-    activePathsGrid.innerHTML = "";
-    completedPathsGrid.innerHTML = "";
+  if (!paths.length) {
+    pathsMessage.innerHTML += `<p>Click "Generate My Journey" or discover hidden paths as you read.</p>`;
     activePathsSection.hidden = true;
-    completedPathsSection.hidden = true;
-    pathsMessage.innerHTML += `<p>No paths yet — click "Generate My Journey" or explore genres on Reader Journey.</p>`;
+    passportSection.hidden = true;
+    secretPathsSection.hidden = true;
+    ratedPathsSection.hidden = true;
     return;
   }
 
-  pathsGrid.innerHTML = "";
-  pathsGrid.hidden = true;
+  activePathsSection.hidden = !activePaths.length;
+  activePathsGrid.innerHTML = activePaths.map((p, i) => renderActivePathCard(p, i)).join("");
 
-  if (activePaths.length) {
-    activePathsSection.hidden = false;
-    activePathsGrid.innerHTML = activePaths
-      .map((path, index) => renderActivePathCard(path, index))
-      .join("");
-  } else {
-    activePathsSection.hidden = true;
-    activePathsGrid.innerHTML = "";
+  if (P) {
+    secretPathsSection.hidden = false;
+    secretPathsGrid.innerHTML = P.SECRET_PATHS.map(secret => {
+      const unlocked = P.checkUnlock(secret, stats, paths);
+      const alreadyHas = paths.some(p => p.secret_id === secret.secret_id);
+      return renderSecretCard(secret, unlocked, alreadyHas);
+    }).join("");
   }
 
   if (completedPaths.length) {
-    completedPathsSection.hidden = false;
-    completedPathsGrid.innerHTML = completedPaths.map(renderCompletedPathCard).join("");
+    passportSection.hidden = false;
+    renderPassportStats(paths);
+    passportGrid.innerHTML = completedPaths.map(renderPassportStamp).join("");
   } else {
-    completedPathsSection.hidden = true;
-    completedPathsGrid.innerHTML = "";
+    passportSection.hidden = true;
+  }
+
+  const userRated = P?.highlyRatedUserPaths(paths) || [];
+  const community = P?.FEATURED_JOURNEYS || [];
+  if (userRated.length || community.length) {
+    ratedPathsSection.hidden = false;
+    ratedPathsGrid.innerHTML =
+      userRated.map(item => renderRatedPathCard(item)).join("") +
+      community.map(item => renderRatedPathCard(item, true)).join("");
+  } else {
+    ratedPathsSection.hidden = true;
   }
 
   let datalist = document.getElementById("libraryTitles");
@@ -794,47 +702,31 @@ function renderPaths(result) {
   }
   datalist.innerHTML = libraryTitleOptions();
 
-  hydrateCovers(activePathsGrid, activePaths);
-
-  const focusCard =
-    activePathsGrid.querySelector(".path-card-focus") ||
-    completedPathsGrid.querySelector(`[data-path="${focusPathId}"]`);
-  if (focusCard) {
-    focusCard.scrollIntoView({ behavior: "smooth", block: "start" });
+  if (window.BookMindCoverImage) {
+    BookMindCoverImage.seedFromBooks(paths.flatMap(p => p.books || []));
+    BookMindCoverImage.hydrateLazy(activePathsGrid, { imgClass: "path-book-cover-img book-cover-img" });
   }
-}
 
-/* ------------------------------------------------------- event delegation */
+  activePathsGrid.querySelector(".path-card-focus")?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
 
 function handlePathGridClick(event) {
   const button = event.target.closest("[data-action]");
   if (!button) return;
-
-  const card = button.closest(".path-card, .path-card-completed");
+  const card = button.closest(".path-card, .passport-stamp");
   const pathId = card?.dataset?.path;
-  if (!pathId) return;
-
   const action = button.dataset.action;
 
-  if (action === "toggle") {
-    toggleComplete(pathId, button.dataset.book);
-  } else if (action === "remove") {
-    removeBookFromPath(pathId, button.dataset.book);
-  } else if (action === "next") {
-    completeNext(pathId);
-  } else if (action === "add") {
-    const titleInput = card.querySelector(".path-add-title");
-    const authorInput = card.querySelector(".path-add-author");
-    addBookToPath(pathId, titleInput.value, authorInput.value);
-  } else if (action === "complete-path") {
-    completeReadingPath(pathId);
-  } else if (action === "restart") {
-    restartPath(pathId);
-  } else if (action === "revisit") {
-    revisitPath(pathId);
-  }
+  if (action === "toggle") toggleComplete(pathId, button.dataset.book);
+  else if (action === "remove") removeBookFromPath(pathId, button.dataset.book);
+  else if (action === "next") completeNext(pathId);
+  else if (action === "add") {
+    addBookToPath(pathId, card.querySelector(".path-add-title").value, card.querySelector(".path-add-author").value);
+  } else if (action === "complete-path") completeReadingPath(pathId);
+  else if (action === "restart") restartPath(pathId);
+  else if (action === "discover-secret") discoverSecretPath(button.dataset.secret);
 }
 
-pathsGrid?.addEventListener("click", handlePathGridClick);
 activePathsGrid?.addEventListener("click", handlePathGridClick);
-completedPathsGrid?.addEventListener("click", handlePathGridClick);
+passportGrid?.addEventListener("click", handlePathGridClick);
+secretPathsGrid?.addEventListener("click", handlePathGridClick);

@@ -56,3 +56,10 @@ class GenrePathRequest(BaseModel):
     library: dict | None = None
     today_mood: str | None = None
     today_goal: str | None = None
+
+
+class PathReflectionRequest(BaseModel):
+    path: dict = Field(..., description="Completed reading path with books and metadata.")
+    reader_profile: dict | None = None
+    library: dict | None = None
+    days_taken: int | None = None

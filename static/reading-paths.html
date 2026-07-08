@@ -13,6 +13,7 @@
   <script src="js/book-cover.js" defer></script>
   <script src="js/badge-catalog.js" defer></script>
   <script src="js/badge-engine.js" defer></script>
+  <script src="js/reading-path-passport.js" defer></script>
   <script src="js/reading-path-completion.js" defer></script>
   <script src="js/reading-paths.js" defer></script>
 </head>
@@ -27,56 +28,96 @@
     <header class="dashboard-header">
       <div>
         <h1>Reading Paths</h1>
-        <p class="page-subtitle">AI-generated reading journeys built around your Reader DNA.</p>
+        <p class="page-subtitle">Curated journeys — finish every book, earn your passport stamp.</p>
       </div>
       <button id="generateBtn" class="btn btn-primary" type="button">Generate My Journey</button>
     </header>
 
-    <section id="pathStatsBar" class="path-stats-bar" hidden></section>
-
     <section id="pathsMessage" class="paths-message-clean" style="display:none;"></section>
-
-    <section id="pathsUnlockBanner" class="path-unlock-banner" hidden></section>
 
     <section id="activePathsSection" class="paths-section" hidden>
       <h2 class="paths-section-title">Active Reading Paths</h2>
       <div id="activePathsGrid" class="paths-grid"></div>
     </section>
 
-    <section id="completedPathsSection" class="paths-section" hidden>
-      <h2 class="paths-section-title">Completed Reading Paths</h2>
-      <div id="completedPathsGrid" class="paths-grid paths-grid-completed"></div>
+    <section id="secretPathsSection" class="paths-section paths-section-secrets" hidden>
+      <h2 class="paths-section-title">Hidden Journeys</h2>
+      <p class="paths-section-sub">Secret paths reveal themselves as you complete journeys.</p>
+      <div id="secretPathsGrid" class="secret-paths-grid"></div>
     </section>
 
-    <section id="pathsGrid" class="paths-grid"></section>
+    <section id="passportSection" class="paths-section paths-passport-section" hidden>
+      <div class="passport-header">
+        <div>
+          <h2 class="paths-section-title">Reading Passport</h2>
+          <p class="paths-section-sub">Every completed journey becomes a stamp in your reading passport.</p>
+        </div>
+      </div>
+
+      <div id="passportStatsBar" class="passport-stats-bar"></div>
+      <div id="passportGrid" class="passport-grid"></div>
+    </section>
+
+    <section id="ratedPathsSection" class="paths-section" hidden>
+      <h2 class="paths-section-title">Highly Rated Journeys</h2>
+      <p class="paths-section-sub">Community favorites and your top-rated paths.</p>
+      <div id="ratedPathsGrid" class="rated-paths-grid"></div>
+    </section>
+
+    <section id="pathsGrid" class="paths-grid" hidden></section>
 
   </main>
 </div>
 
 <div id="pathsToast" class="library-toast" hidden></div>
 
-<div id="pathCompletionModal" class="path-completion-modal" hidden aria-hidden="true">
-  <div class="path-completion-backdrop" data-action="close-modal"></div>
-  <div class="path-completion-dialog" role="dialog" aria-labelledby="pathCompletionTitle">
-    <div class="path-completion-confetti" aria-hidden="true"></div>
-    <div class="path-completion-icon">🎉</div>
-    <h2 id="pathCompletionTitle">Reading Path Complete!</h2>
-    <p class="path-completion-sub">Congratulations!</p>
-    <p class="path-completion-path-name" id="pathCompletionPathName"></p>
-
-    <div class="path-completion-rewards" id="pathCompletionRewards"></div>
-
-    <div class="path-completion-share card" id="pathCompletionShareCard">
-      <p class="eyebrow">Shareable achievement</p>
-      <h3 id="pathCompletionShareTitle"></h3>
-      <p id="pathCompletionShareMeta"></p>
-      <div class="path-completion-share-badge" id="pathCompletionShareBadge"></div>
+<div id="pathCompletionModal" class="journey-modal" hidden aria-hidden="true">
+  <canvas id="journeyConfetti" class="journey-confetti-canvas" aria-hidden="true"></canvas>
+  <div class="journey-modal-inner">
+    <div class="journey-modal-hero">
+      <div class="journey-modal-trophy">🏆</div>
+      <p class="journey-modal-eyebrow">Reading Path Complete</p>
+      <h2 id="journeyModalTitle" class="journey-modal-title"></h2>
+      <p class="journey-modal-congrats">Congratulations!</p>
     </div>
 
-    <div class="path-completion-actions">
-      <button type="button" class="btn btn-secondary" id="pathCompletionShareBtn">Share achievement</button>
-      <button type="button" class="btn btn-primary" data-action="close-modal">Continue reading</button>
+    <div class="journey-modal-stats" id="journeyModalStats"></div>
+
+    <div class="journey-modal-badge-wrap">
+      <p class="journey-modal-label">Badge Earned</p>
+      <div class="journey-modal-badge" id="journeyModalBadge"></div>
     </div>
+
+    <div class="journey-modal-rewards" id="journeyModalRewards"></div>
+
+    <div class="journey-modal-reflection card" id="journeyReflectionBlock">
+      <p class="journey-modal-label">AI Reflection</p>
+      <div id="journeyReflectionText" class="journey-reflection-text">
+        <span class="journey-reflection-loading">BookMindAI is reflecting on your journey…</span>
+      </div>
+      <p id="journeyNextSuggestion" class="journey-next-suggestion"></p>
+    </div>
+
+    <div class="journey-review card" id="journeyReviewBlock">
+      <p class="journey-modal-label">Rate this Reading Path</p>
+      <div class="journey-star-rating" id="journeyStarRating">
+        <button type="button" data-star="1" aria-label="1 star">★</button>
+        <button type="button" data-star="2" aria-label="2 stars">★</button>
+        <button type="button" data-star="3" aria-label="3 stars">★</button>
+        <button type="button" data-star="4" aria-label="4 stars">★</button>
+        <button type="button" data-star="5" aria-label="5 stars">★</button>
+      </div>
+      <label class="journey-review-label" for="journeySurpriseInput">What surprised you most?</label>
+      <textarea id="journeySurpriseInput" rows="2" placeholder="A moment, theme, or book that stayed with you…"></textarea>
+      <label class="journey-review-label">
+        <input type="checkbox" id="journeyRecommendInput"> Would you recommend this journey?
+      </label>
+      <button type="button" class="btn btn-secondary btn-sm" id="journeySubmitReview">Submit review</button>
+    </div>
+
+    <button type="button" class="btn btn-primary journey-continue-btn" data-action="close-modal">
+      Continue Exploring →
+    </button>
   </div>
 </div>
 
