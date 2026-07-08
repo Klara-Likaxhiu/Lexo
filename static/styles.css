@@ -2859,6 +2859,12 @@ html.theme-dark .bd-textarea {
   margin-bottom: 20px;
 }
 
+#reading .settings-section-head {
+  margin-bottom: 32px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--border-neutral, rgba(0, 0, 0, 0.06));
+}
+
 .settings-section-head h2 {
   margin: 0 0 6px;
   font-family: Georgia, serif;
@@ -2873,7 +2879,7 @@ html.theme-dark .bd-textarea {
 .settings-coming-soon {
   display: inline-flex;
   align-items: center;
-  margin-left: 8px;
+  margin-left: 12px;
   padding: 3px 8px;
   border-radius: 999px;
   background: var(--primary-soft);
@@ -2883,6 +2889,81 @@ html.theme-dark .bd-textarea {
   letter-spacing: 0.04em;
   text-transform: uppercase;
   vertical-align: middle;
+}
+
+/* Reading Preferences — airy vertical rhythm (8px system) */
+.settings-form-stack {
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-reading-form {
+  max-width: 100%;
+}
+
+.settings-reading-form .settings-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 24px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--border-neutral, rgba(0, 0, 0, 0.06));
+}
+
+.settings-reading-form .settings-field-group--goal {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.settings-reading-form .settings-field-group--ai {
+  margin-top: 32px;
+  padding-top: 32px;
+  border-top: 1px solid var(--border-neutral, rgba(0, 0, 0, 0.06));
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.settings-reading-form .settings-field-label {
+  margin: 0;
+  font-weight: 600;
+  font-size: 0.92rem;
+  color: var(--charcoal, var(--ink));
+}
+
+.settings-field-label-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0;
+}
+
+.settings-field-label-row .settings-coming-soon {
+  margin-left: 12px;
+}
+
+.settings-reading-form .settings-input,
+.settings-reading-form .settings-tag-grid {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.settings-reading-form .settings-tag-grid {
+  margin-top: 0;
+}
+
+.settings-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border-neutral, var(--border));
+}
+
+.settings-form-actions .btn {
+  min-width: 160px;
 }
 
 .settings-account-row {

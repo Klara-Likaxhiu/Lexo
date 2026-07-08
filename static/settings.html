@@ -69,27 +69,41 @@
             <p>Personalize recommendations and reading goals.</p>
           </div>
 
-          <label class="settings-field-label">Preferred genres</label>
-          <div id="settingsGenreTags" class="settings-tag-grid"></div>
+          <div class="settings-form-stack settings-reading-form">
 
-          <label class="settings-field-label" for="settingsFavoriteAuthors">Favorite authors</label>
-          <input type="text" id="settingsFavoriteAuthors" class="settings-input" placeholder="e.g. Jane Austen, Stephen King">
+            <div class="settings-field-group">
+              <label class="settings-field-label" for="settingsGenreTags">Preferred genres</label>
+              <div id="settingsGenreTags" class="settings-tag-grid"></div>
+            </div>
 
-          <label class="settings-field-label" for="settingsReadingGoal">Reading goal (books per year)</label>
-          <input type="number" id="settingsReadingGoal" class="settings-input" min="1" max="365" value="12">
+            <div class="settings-field-group">
+              <label class="settings-field-label" for="settingsFavoriteAuthors">Favorite authors</label>
+              <input type="text" id="settingsFavoriteAuthors" class="settings-input" placeholder="e.g. Jane Austen, Stephen King">
+            </div>
 
-          <label class="settings-field-label" for="settingsAiRecommendations">
-            AI recommendation style
-            <span class="settings-coming-soon">Coming Soon</span>
-          </label>
-          <select id="settingsAiRecommendations" class="settings-input">
-            <option value="balanced">Balanced mix</option>
-            <option value="adventurous">More adventurous picks</option>
-            <option value="comfort">Comfort reads</option>
-            <option value="challenge">Challenge me</option>
-          </select>
+            <div class="settings-field-group settings-field-group--goal">
+              <label class="settings-field-label" for="settingsReadingGoal">Reading goal (books per year)</label>
+              <input type="number" id="settingsReadingGoal" class="settings-input" min="1" max="365" value="12">
+            </div>
 
-          <button type="button" class="btn btn-primary" id="settingsSaveReadingBtn">Save Preferences</button>
+            <div class="settings-field-group settings-field-group--ai">
+              <label class="settings-field-label settings-field-label-row" for="settingsAiRecommendations">
+                <span>AI recommendation style</span>
+                <span class="settings-coming-soon">Coming Soon</span>
+              </label>
+              <select id="settingsAiRecommendations" class="settings-input">
+                <option value="balanced">Balanced mix</option>
+                <option value="adventurous">More adventurous picks</option>
+                <option value="comfort">Comfort reads</option>
+                <option value="challenge">Challenge me</option>
+              </select>
+            </div>
+
+            <div class="settings-form-actions">
+              <button type="button" class="btn btn-primary" id="settingsSaveReadingBtn">Save Preferences</button>
+            </div>
+
+          </div>
         </section>
 
         <section id="appearance" class="settings-section card">
