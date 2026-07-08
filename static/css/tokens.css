@@ -1,0 +1,130 @@
+/* =============================================================================
+   BookMindAI Design Tokens
+   Single source of truth for colors. Loaded first via styles.css @import.
+   ============================================================================= */
+
+:root {
+  /* --- Core palette (light mode) --- */
+  --bg: #faf7f2;
+  --card: #ffffff;
+  --text: #1f2937;
+  --muted-text: #4b5563;
+  --soft-text: #6b7280;
+  --accent: #e879b9;
+  --accent-dark: #b45309;
+  --button-bg: #1f313a;
+  --button-text: #ffffff;
+  --border: #e5e7eb;
+
+  /* --- Semantic text --- */
+  --heading-text: #1f2937;
+  --body-text: #374151;
+  --link-text: var(--accent-dark);
+
+  /* --- Interactive --- */
+  --star-empty: #cbd5e1;
+  --star-hover: #fbbf24;
+  --star-active: #f59e0b;
+  --focus-ring: rgba(232, 121, 185, 0.28);
+
+  /* --- Legacy aliases (keep existing components working) --- */
+  --ivory: var(--bg);
+  --off-white: #fafaf8;
+  --white: var(--card);
+  --surface: var(--bg);
+  --background: var(--card);
+  --sidebar-bg: var(--card);
+  --border-neutral: var(--border);
+  --charcoal: var(--body-text);
+  --navy: #2f3e4f;
+  --ink: var(--navy);
+  --muted: var(--soft-text);
+  --text-secondary: var(--muted-text);
+
+  --readable-body: var(--body-text);
+  --readable-secondary: var(--muted-text);
+  --readable-heading: var(--heading-text);
+  --readable-link: var(--link-text);
+
+  --forest: #2f4a3a;
+  --forest-hover: #243a2d;
+  --progress-green: #4a6b58;
+  --success: #4a6b58;
+  --success-soft: #e8f0eb;
+  --primary: var(--forest);
+  --primary-strong: var(--forest-hover);
+  --primary-light: var(--progress-green);
+
+  --beige: #ede8df;
+  --sky: #dce8f4;
+  --coral: #f8e8e3;
+  --lavender: #e8e4f0;
+  --butter: #fbf5e0;
+  --sage-section: #e8efe9;
+
+  --gold: #c4a24a;
+  --red: #c47a6e;
+  --red-soft: #f5e8e6;
+}
+
+html.theme-dark {
+  --bg: #181c21;
+  --card: #2a3139;
+  --text: #f3f4f6;
+  --muted-text: #d1d5db;
+  --soft-text: #9ca3af;
+  --accent: #f0abce;
+  --accent-dark: #fcd34d;
+  --button-bg: #1f313a;
+  --button-text: #ffffff;
+  --border: #384150;
+
+  --heading-text: #f3f4f6;
+  --body-text: #e5e7eb;
+  --link-text: var(--accent-dark);
+
+  --star-empty: #6b7280;
+  --star-hover: #fbbf24;
+  --star-active: #f59e0b;
+  --focus-ring: rgba(240, 171, 206, 0.25);
+
+  --ivory: var(--bg);
+  --off-white: #212830;
+  --white: var(--card);
+  --surface: var(--bg);
+  --background: #242b33;
+  --sidebar-bg: #1f252c;
+  --border-neutral: var(--border);
+  --charcoal: var(--body-text);
+  --navy: #d8e0e8;
+  --ink: #e2e8ef;
+  --muted: var(--soft-text);
+  --text-secondary: var(--muted-text);
+
+  --readable-body: var(--body-text);
+  --readable-secondary: var(--muted-text);
+  --readable-heading: var(--heading-text);
+  --readable-link: var(--link-text);
+
+  --forest: #4f7262;
+  --forest-hover: #426055;
+  --progress-green: #5e8a74;
+  --success: #6b9a82;
+  --success-soft: #263229;
+  --primary: var(--forest);
+  --primary-strong: var(--forest-hover);
+  --primary-light: var(--progress-green);
+
+  --beige: #2c2a26;
+  --sky: #232b34;
+  --coral: #2e2828;
+  --lavender: #282633;
+  --butter: #2a2924;
+  --sage-section: #252d28;
+
+  --gold: #b8a67a;
+  --red: #b87f76;
+  --red-soft: #3a2e2c;
+
+  color-scheme: dark;
+}

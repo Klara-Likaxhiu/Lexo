@@ -1,0 +1,513 @@
+/* =============================================================================
+   BookMindAI Design System
+   Enforces readable contrast on all surfaces. Load after styles.css + editorial.css.
+   ============================================================================= */
+
+/* --- Base --- */
+body {
+  background: var(--bg);
+  color: var(--body-text);
+}
+
+.dashboard {
+  background: transparent;
+  color: var(--body-text);
+}
+
+.dashboard h1,
+h1,
+h2,
+h3,
+.display-serif {
+  color: var(--heading-text);
+}
+
+.dashboard-header p,
+.page-subtitle {
+  color: var(--muted-text);
+}
+
+.eyebrow {
+  color: var(--muted-text);
+  opacity: 1;
+}
+
+/* --- Cards (light surfaces) --- */
+.card:not(.dna-archetype-card):not(.user-message) {
+  background: var(--card);
+  border-color: var(--border);
+  color: var(--body-text);
+}
+
+.card:not(.dna-archetype-card) h1,
+.card:not(.dna-archetype-card) h2,
+.card:not(.dna-archetype-card) h3 {
+  color: var(--heading-text);
+}
+
+.card:not(.dna-archetype-card) p,
+.card:not(.dna-archetype-card) li,
+.card:not(.dna-archetype-card) small {
+  color: var(--body-text);
+}
+
+/* Tinted section cards */
+.highlight-card,
+.journey-insight,
+.stats-card,
+.home-brief,
+.reader-profile,
+.mood-card,
+.goal-card,
+.community-card,
+.companion-hero,
+.companion-answer,
+.settings-section,
+.settings-nav,
+.library-tabs.card,
+.path-card,
+.passport-stamp,
+.dna-radar-card,
+.journey-stat-card,
+.journey-line-chart,
+.journey-donut-wrap,
+.challenge-goal,
+.progress-cards .card,
+.achievements-section .badge-grid .card {
+  color: var(--body-text);
+}
+
+.highlight-card h2,
+.journey-insight h2,
+.stats-card h2,
+.home-brief h2 {
+  color: var(--heading-text);
+}
+
+/* --- Dark-surface cards (light text allowed) --- */
+.dna-archetype-card,
+.dna-archetype-card.card {
+  background: linear-gradient(135deg, #1a2744 0%, #2d4a6f 50%, #1e3a5f 100%);
+  color: #ffffff;
+}
+
+.dna-archetype-content h2,
+.dna-archetype-content p,
+.dna-archetype-content .eyebrow {
+  color: inherit;
+}
+
+.dna-archetype-content .eyebrow {
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.dna-archetype-content p {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.journey-modal-reflection.card {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.journey-modal-inner {
+  color: #ffffff;
+}
+
+/* Review form stays a readable light card inside dark modal */
+.journey-review.card {
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--accent);
+  color: var(--body-text);
+}
+
+.journey-review-heading,
+.journey-review-label {
+  color: var(--heading-text);
+}
+
+.journey-review-checkbox {
+  color: var(--body-text);
+}
+
+/* --- Buttons --- */
+.btn-primary,
+.path-complete-btn-ready,
+.complete-path-button,
+.journey-continue-btn,
+.journey-review-submit,
+.discovery-shelf-btn.active-shelf,
+.bd-shelf-btn.active {
+  background: var(--button-bg);
+  color: var(--button-text);
+  -webkit-text-fill-color: var(--button-text);
+}
+
+.btn-primary:hover,
+.path-complete-btn-ready:hover,
+.complete-path-button:hover,
+.journey-continue-btn:hover,
+.journey-review-submit:hover {
+  background: #2a4552;
+  color: var(--button-text);
+  -webkit-text-fill-color: var(--button-text);
+}
+
+.btn-secondary,
+.mini-btn {
+  background: var(--card);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.btn-secondary:hover,
+.mini-btn:hover {
+  background: var(--bg);
+  color: var(--heading-text);
+  border-color: var(--text);
+}
+
+.btn-danger {
+  background: var(--red);
+  color: var(--button-text);
+}
+
+.library-tab {
+  color: var(--text);
+  background: transparent;
+}
+
+.library-tab.active-tab {
+  background: var(--button-bg);
+  color: var(--button-text);
+  border-color: var(--button-bg);
+}
+
+/* --- Form controls --- */
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not([type="hidden"]),
+textarea,
+select,
+.settings-input,
+.bd-input,
+.bd-select,
+.path-add-title,
+.path-add-author,
+.journey-review-input,
+.journey-review textarea {
+  background: var(--card);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+::placeholder {
+  color: var(--soft-text);
+  opacity: 1;
+}
+
+input:focus,
+textarea:focus,
+select:focus,
+.settings-input:focus,
+.bd-input:focus,
+.bd-select:focus,
+.journey-review-input:focus,
+.journey-review textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+.settings-field-label,
+.settings-section-head h2 {
+  color: var(--heading-text);
+}
+
+.settings-section-head p,
+.settings-meta-label,
+.settings-coming-soon,
+.path-complete-hint {
+  color: var(--muted-text);
+}
+
+.settings-nav-link {
+  color: var(--body-text);
+}
+
+.settings-nav-link:hover,
+.settings-nav-link.active {
+  background: var(--bg);
+  color: var(--heading-text);
+}
+
+/* --- Stars --- */
+.journey-star-rating button,
+.star-rating-v2 button,
+.bd-star-rating button,
+.bd-star {
+  color: var(--star-empty);
+  background: none;
+  border: none;
+}
+
+.journey-star-rating button:hover,
+.journey-star-rating button.hover-preview,
+.star-rating-v2 button:hover,
+.bd-star-rating button:hover {
+  color: var(--star-hover);
+}
+
+.journey-star-rating button.active,
+.star-rating-v2 button.active,
+.bd-star-rating button.on,
+.bd-star.active {
+  color: var(--star-active);
+}
+
+/* --- Badges & pills --- */
+.book-hub-pill,
+.bookmind-badge {
+  background: linear-gradient(135deg, #fce7f3, #fbcfe8);
+  color: #9d174d;
+  border: 1px solid rgba(157, 23, 77, 0.18);
+}
+
+.match-badge {
+  background: rgba(180, 83, 9, 0.1);
+  color: var(--accent-dark);
+}
+
+.mood-pill {
+  background: rgba(47, 74, 58, 0.12);
+  color: var(--forest);
+}
+
+.growth-tag-btn,
+.growth-tags span {
+  background: rgba(180, 83, 9, 0.08);
+  color: var(--accent-dark);
+  border: 1px solid rgba(180, 83, 9, 0.22);
+  font-weight: 600;
+}
+
+.path-completed-ribbon,
+.journey-modal-badge {
+  color: #2a2520;
+}
+
+.milestone {
+  color: var(--muted-text);
+  background: var(--card);
+  border: 1px solid var(--border);
+}
+
+.milestone.reached {
+  background: var(--button-bg);
+  color: var(--button-text);
+  border-color: transparent;
+}
+
+.path-reward-pill {
+  color: var(--body-text);
+  background: var(--bg);
+}
+
+/* --- Links --- */
+a.text-link,
+.section-title a {
+  color: var(--accent-dark);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+a.text-link:hover,
+.section-title a:hover {
+  opacity: 0.85;
+}
+
+/* --- Reader DNA --- */
+.journey-wrapped {
+  color: var(--body-text);
+}
+
+.journey-wrapped .display-serif,
+.journey-wrapped .journey-stat-card strong,
+.dna-radar-card h2 {
+  color: var(--heading-text);
+}
+
+.journey-wrapped .page-subtitle,
+.journey-wrapped .journey-stat-card span,
+.journey-wrapped .journey-legend-item,
+.dna-radar-card .eyebrow {
+  color: var(--muted-text);
+}
+
+.dna-trait {
+  background: var(--bg);
+  color: var(--body-text);
+}
+
+/* --- Library --- */
+.stats-row strong,
+.stats-card strong,
+.journey-stat-pill strong {
+  color: var(--heading-text);
+}
+
+.stats-row span,
+.stats-card p,
+.library-summary-grid .stats-card p {
+  color: var(--muted-text);
+}
+
+.book-meta span {
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* --- Community & companion --- */
+.community-card-head h3,
+.community-card-body,
+.companion-hero p,
+.companion-answer,
+.chat-shell .message:not(.user-message) {
+  color: var(--body-text);
+}
+
+.community-card-head .book-author,
+.community-card .eyebrow {
+  color: var(--muted-text);
+}
+
+.user-message {
+  color: var(--button-text);
+}
+
+/* --- Reviews & Add to Reading --- */
+.review-card-v2,
+.book-hub-card-v2 {
+  background: var(--card);
+  color: var(--body-text);
+}
+
+.review-card-v2 h2,
+.book-hub-card-v2 h2 {
+  color: var(--heading-text);
+}
+
+.review-card-v2 select,
+.review-card-v2 input,
+.review-card-v2 textarea,
+.book-hub-card-v2 select,
+.book-hub-card-v2 input,
+.book-hub-card-v2 textarea {
+  background: var(--card);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.small-muted,
+.bd-hint {
+  color: var(--muted-text);
+}
+
+/* --- Challenges --- */
+.badge-grid .card h3,
+.goal-card h2,
+.challenge-goal {
+  color: var(--heading-text);
+}
+
+/* --- Toasts (dark surface) --- */
+.library-toast,
+#pathsToast {
+  background: var(--button-bg);
+  color: var(--button-text);
+}
+
+/* --- Path icons on light emoji background --- */
+.path-icon-emoji {
+  color: var(--heading-text);
+  background: var(--bg);
+}
+
+/* --- Mood / goal selectors --- */
+.mood-options button,
+.goal-options button {
+  background: var(--card);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.mood-options button:hover,
+.goal-options button:hover,
+.active-mood {
+  background: var(--lavender);
+  border-color: #d8d2e6;
+  color: var(--heading-text);
+}
+
+/* --- Dark mode overrides --- */
+html.theme-dark body,
+html.theme-dark .dashboard {
+  color: var(--body-text);
+}
+
+html.theme-dark .card:not(.dna-archetype-card):not(.journey-review) {
+  color: var(--body-text);
+}
+
+html.theme-dark .journey-review.card {
+  background: #ffffff;
+  color: #374151;
+}
+
+html.theme-dark .journey-review-heading,
+html.theme-dark .journey-review-label,
+html.theme-dark .journey-review-checkbox {
+  color: #1f2937;
+}
+
+html.theme-dark .journey-review-input,
+html.theme-dark .journey-review textarea {
+  background: #ffffff;
+  color: #1f2937;
+  border-color: #d1d5db;
+}
+
+html.theme-dark .book-hub-pill,
+html.theme-dark .bookmind-badge {
+  background: linear-gradient(135deg, #fce7f3, #fbcfe8);
+  color: #9d174d;
+}
+
+html.theme-dark .dna-trait {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--body-text);
+}
+
+html.theme-dark .growth-tag-btn,
+html.theme-dark .growth-tags span {
+  background: rgba(252, 211, 77, 0.1);
+  color: var(--accent-dark);
+  border-color: rgba(252, 211, 77, 0.25);
+}
+
+html.theme-dark .journey-donut::after {
+  background: var(--card);
+}
+
+html.theme-dark input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]),
+html.theme-dark textarea,
+html.theme-dark select,
+html.theme-dark .settings-input {
+  background: var(--card);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+html.theme-dark ::placeholder {
+  color: var(--soft-text);
+}

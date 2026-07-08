@@ -1,20 +1,10 @@
 /* ============================================================
    BookMindAI Editorial Redesign v2
-   Premium editorial — warm ivory, serif headings, soft shadows
+   Layout & component styles — colors in css/tokens.css
    ============================================================ */
 
 :root {
-  --ivory: #FAF8F4;
-  --off-white: #F5F2EC;
-  --white: #FFFFFF;
-  --navy: #1E2A32;
-  --charcoal: #2C3338;
-  --muted: #7A848E;
-  --border-neutral: #E8E4DC;
   --border-light: rgba(30, 42, 50, 0.08);
-  --forest: #2F4A3A;
-  --forest-hover: #243A2D;
-  --beige: #EDE8DF;
   --warm-glow: rgba(196, 162, 74, 0.15);
   --shadow-soft: 0 2px 12px rgba(30, 42, 50, 0.04);
   --shadow-card: 0 8px 32px rgba(30, 42, 50, 0.06);
@@ -26,37 +16,27 @@
   --sidebar-width: 240px;
   --font-serif: "Playfair Display", "Cormorant Garamond", Georgia, serif;
   --font-sans: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
-  --surface: var(--ivory);
-  --sidebar-bg: var(--white);
-  --card: var(--white);
-  --text: var(--charcoal);
-  --ink: var(--navy);
-
-  --readable-body: #374151;
-  --readable-secondary: #4B5563;
-  --readable-heading: #1F2937;
-  --readable-link: #B45309;
 }
 
 body {
-  background: var(--ivory) !important;
-  color: var(--charcoal);
+  background: var(--bg) !important;
+  color: var(--body-text);
 }
 
 h1, h2, h3, .display-serif {
   font-family: var(--font-serif);
   font-weight: 600;
   letter-spacing: -0.02em;
-  color: var(--readable-heading, var(--navy));
+  color: var(--heading-text);
 }
 
 .card {
-  background: var(--white);
+  background: var(--card);
   border: 1px solid var(--border-light);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-soft);
   transition: box-shadow 0.3s ease, transform 0.3s ease;
-  color: var(--readable-body, var(--charcoal));
+  color: var(--body-text);
 }
 
 .card:hover {
@@ -64,22 +44,23 @@ h1, h2, h3, .display-serif {
 }
 
 .btn-primary {
-  background: var(--navy);
+  background: var(--button-bg);
+  color: var(--button-text);
   border-radius: var(--radius-sm);
   font-weight: 600;
   letter-spacing: 0.01em;
-  box-shadow: 0 4px 16px rgba(30, 42, 50, 0.18);
+  box-shadow: 0 4px 16px rgba(31, 49, 58, 0.18);
 }
 
 .btn-primary:hover {
-  background: var(--charcoal);
+  background: #2a4552;
   transform: translateY(-1px);
 }
 
 .btn-secondary {
-  background: var(--white);
-  color: var(--navy);
-  border: 1px solid var(--border-neutral);
+  background: var(--card);
+  color: var(--text);
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm);
 }
 
@@ -88,7 +69,7 @@ h1, h2, h3, .display-serif {
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--readable-secondary, var(--muted));
+  color: var(--muted-text);
 }
 
 /* ---- App shell ---- */
@@ -96,7 +77,7 @@ h1, h2, h3, .display-serif {
   display: grid;
   grid-template-columns: var(--sidebar-width) 1fr;
   min-height: 100vh;
-  background: var(--ivory);
+  background: var(--bg);
   gap: 0;
 }
 
@@ -128,8 +109,8 @@ h1, h2, h3, .display-serif {
 .sidebar-editorial {
   display: flex;
   flex-direction: column;
-  background: var(--white);
-  border-right: 1px solid var(--border-light);
+  background: var(--card);
+  border-right: 1px solid var(--border);
   padding: 28px 16px 24px;
   min-height: 100vh;
   position: sticky;

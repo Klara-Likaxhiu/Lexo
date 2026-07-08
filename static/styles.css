@@ -1,76 +1,8 @@
 @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap');
+@import url('css/tokens.css');
 
 :root {
-  /* Editorial Summer 2026 — neutrals + restrained accents */
-  --ivory: #F8F7F4;
-  --off-white: #FAFAF8;
-  --white: #FFFFFF;
-  --navy: #2F3E4F;
-  --charcoal: #33383F;
-  --border-neutral: #E8E6E1;
-
-  /* Green — accent only (buttons, progress, success) */
-  --forest: #2F4A3A;
-  --forest-hover: #243A2D;
-  --progress-green: #4A6B58;
-  --success: #4A6B58;
-  --success-soft: #E8F0EB;
-
-  /* Section accent washes */
-  --beige: #EDE8DF;
-  --sky: #DCE8F4;
-  --coral: #F8E8E3;
-  --lavender: #E8E4F0;
-  --butter: #FBF5E0;
-  --sage-section: #E8EFE9;
-
-  /* Semantic mapping */
-  --surface: var(--ivory);
-  --background: var(--white);
-  --sidebar-bg: var(--off-white);
-  --card: var(--white);
-  --bg: var(--ivory);
-  --border: var(--border-neutral);
-  --text: var(--charcoal);
-  --ink: var(--navy);
-  --muted: #6B7280;
-  --text-secondary: #5C6670;
-
-  /* WCAG-friendly readable text (light surfaces) */
-  --readable-body: #374151;
-  --readable-secondary: #4B5563;
-  --readable-heading: #1F2937;
-  --readable-link: #B45309;
-
-  --primary: var(--forest);
-  --primary-strong: var(--forest-hover);
-  --primary-light: var(--progress-green);
-  --primary-soft: var(--beige);
-  --primary-softer: var(--ivory);
-  --sage-light: #EEF2EE;
-
-  --accent: #C4A24A;
-  --blue: #A9C8E8;
-  --red: #C47A6E;
-  --red-soft: #F5E8E6;
-  --green: var(--forest);
-  --green-soft: var(--success-soft);
-  --gold: var(--accent);
-
-  /* legacy aliases — neutrals, not green */
-  --cream: var(--ivory);
-  --lilac: var(--lavender);
-  --teal: var(--navy);
-  --yellow: var(--butter);
-  --muskmelon: var(--coral);
-  --mandarin: var(--accent);
-  --amaranth: var(--navy);
-  --pink: var(--coral);
-  --orchid: var(--lavender);
-  --sienna: var(--accent);
-  --dark: var(--navy);
-  --soft-card: var(--white);
-
+  /* Layout & motion — colors live in css/tokens.css */
   --shadow-sm: 0 4px 14px rgba(47, 62, 79, 0.05);
   --shadow-md: 0 10px 28px rgba(47, 62, 79, 0.07);
   --shadow-lg: 0 18px 40px rgba(47, 62, 79, 0.09);
@@ -78,6 +10,26 @@
   --radius-btn: 14px;
   --transition-fast: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-smooth: 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Legacy aliases still referenced in older rules */
+  --primary-soft: var(--beige);
+  --primary-softer: var(--bg);
+  --sage-light: #eef2ee;
+  --blue: #a9c8e8;
+  --green: var(--forest);
+  --green-soft: var(--success-soft);
+  --cream: var(--bg);
+  --lilac: var(--lavender);
+  --teal: var(--navy);
+  --yellow: var(--butter);
+  --muskmelon: var(--coral);
+  --mandarin: var(--gold);
+  --amaranth: var(--navy);
+  --pink: var(--coral);
+  --orchid: var(--lavender);
+  --sienna: var(--gold);
+  --dark: var(--navy);
+  --soft-card: var(--card);
 }
 
 .visually-hidden {
@@ -99,8 +51,8 @@
 body {
   margin: 0;
   font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  background: var(--surface);
-  color: var(--text);
+  background: var(--bg);
+  color: var(--body-text);
   -webkit-font-smoothing: antialiased;
   line-height: 1.6;
   animation: pageFadeIn 0.5s ease;
@@ -128,9 +80,9 @@ button, .btn {
 }
 
 .btn-primary {
-  background: var(--forest);
-  color: #fff;
-  box-shadow: 0 8px 20px rgba(47, 74, 58, 0.22);
+  background: var(--button-bg);
+  color: var(--button-text);
+  box-shadow: 0 8px 20px rgba(31, 49, 58, 0.22);
 }
 
 .btn-secondary {
@@ -140,8 +92,8 @@ button, .btn {
 }
 
 .btn-primary:hover {
-  background: var(--forest-hover);
-  box-shadow: 0 12px 26px rgba(47, 74, 58, 0.28);
+  background: #2a4552;
+  box-shadow: 0 12px 26px rgba(31, 49, 58, 0.28);
 }
 
 .btn-secondary:hover {
@@ -160,7 +112,7 @@ button, .btn {
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-sm);
   transition: box-shadow var(--transition-smooth), transform var(--transition-smooth);
-  color: var(--readable-body, var(--text));
+  color: var(--body-text);
 }
 
 .card:hover {
@@ -2681,79 +2633,10 @@ html[data-reading-font="large"] { font-size: 18px; }
 html[data-reading-font="xlarge"] { font-size: 20px; }
 
 html.theme-dark {
-  /* Relaxing dusk palette — warm charcoal, soft moonlight text */
-  --ivory: #1A1F24;
-  --off-white: #212830;
-  --white: #2A3139;
-  --surface: #181C21;
-  --background: #242B33;
-  --sidebar-bg: #1F252C;
-  --card: #2A3139;
-  --bg: #181C21;
-
-  --border-neutral: #3A4452;
-  --border: #384150;
-
-  --navy: #D8E0E8;
-  --charcoal: #C5CDD6;
-  --text: #C8D0D9;
-  --ink: #E2E8EF;
-  --muted: #8B96A3;
-  --text-secondary: #9AA5B1;
-
-  --readable-body: #E5E7EB;
-  --readable-secondary: #D1D5DB;
-  --readable-heading: #F3F4F6;
-  --readable-link: #FCD34D;
-
-  /* Muted sage — gentle, not bright */
-  --forest: #4F7262;
-  --forest-hover: #426055;
-  --progress-green: #5E8A74;
-  --success: #6B9A82;
-  --success-soft: #263229;
-
-  /* Desaturated section washes */
-  --beige: #2C2A26;
-  --sky: #232B34;
-  --coral: #2E2828;
-  --lavender: #282633;
-  --butter: #2A2924;
-  --sage-section: #252D28;
-
-  --primary: var(--forest);
-  --primary-strong: var(--forest-hover);
-  --primary-light: var(--progress-green);
-  --primary-soft: #2A332E;
-  --primary-softer: #1E2429;
-  --sage-light: #2A332E;
-
-  --accent: #B8A67A;
-  --blue: #6B8A9E;
-  --red: #B87F76;
-  --red-soft: #3A2E2C;
-  --green: var(--forest);
-  --green-soft: var(--success-soft);
-  --gold: var(--accent);
-
-  --cream: #1A1F24;
-  --lilac: var(--lavender);
-  --teal: var(--navy);
-  --yellow: var(--butter);
-  --muskmelon: var(--coral);
-  --mandarin: var(--accent);
-  --amaranth: var(--navy);
-  --pink: var(--coral);
-  --orchid: var(--lavender);
-  --sienna: var(--accent);
-  --dark: var(--navy);
-  --soft-card: #2A3139;
-
+  /* Color tokens: css/tokens.css */
   --shadow-sm: 0 4px 16px rgba(0, 0, 0, 0.22);
   --shadow-md: 0 10px 30px rgba(0, 0, 0, 0.28);
   --shadow-lg: 0 18px 44px rgba(0, 0, 0, 0.32);
-
-  color-scheme: dark;
 }
 
 html.theme-dark body {
@@ -3358,13 +3241,6 @@ html.theme-dark .bd-input:focus {
 }
 
 /* Dark mode — contrast fixes (readable text on dark surfaces) */
-html.theme-dark .book-hub-pill,
-html.theme-dark .bookmind-badge {
-  background: rgba(255, 255, 255, 0.12);
-  color: #ffd6e7;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-}
-
 html.theme-dark .book-hub-card-v2,
 html.theme-dark .review-card-v2 {
   background: var(--card);
@@ -3477,126 +3353,6 @@ html.theme-dark .path-books-progress-done strong {
 
 html.theme-dark .path-completed-ribbon {
   color: #2a2520;
-}
-
-/* Dark mode — readable text on dark surfaces (app-wide) */
-html.theme-dark .card:not(.dna-archetype-card) {
-  color: var(--readable-body);
-}
-
-html.theme-dark h1,
-html.theme-dark h2,
-html.theme-dark h3,
-html.theme-dark .display-serif,
-html.theme-dark .dashboard h1 {
-  color: var(--readable-heading);
-}
-
-html.theme-dark .page-subtitle,
-html.theme-dark .dashboard-header p {
-  color: var(--readable-secondary);
-}
-
-html.theme-dark .journey-insight,
-html.theme-dark .journey-wrapped .journey-line-chart,
-html.theme-dark .journey-wrapped .journey-donut-wrap,
-html.theme-dark .journey-wrapped .journey-stat-card {
-  background: var(--card);
-  border-color: var(--border-neutral);
-  color: var(--readable-body);
-}
-
-html.theme-dark .journey-insight h2,
-html.theme-dark .journey-wrapped .journey-line-chart h2,
-html.theme-dark .journey-wrapped .journey-donut-wrap h2 {
-  color: var(--readable-heading);
-}
-
-html.theme-dark .journey-insight p,
-html.theme-dark .journey-wrapped #insightList p,
-html.theme-dark .highlight-card p,
-html.theme-dark .home-brief h2 {
-  color: var(--readable-body);
-}
-
-html.theme-dark .dna-trait {
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--readable-body);
-}
-
-html.theme-dark .dna-radar-card {
-  color: var(--readable-body);
-}
-
-html.theme-dark .growth-tag-btn,
-html.theme-dark .growth-tags span {
-  background: rgba(252, 211, 77, 0.1);
-  color: var(--readable-link);
-  border-color: rgba(252, 211, 77, 0.25);
-}
-
-html.theme-dark .growth-hint,
-html.theme-dark .journey-legend-item,
-html.theme-dark .journey-footer-note {
-  color: var(--readable-secondary);
-}
-
-html.theme-dark .library-summary-grid .stats-card p,
-html.theme-dark .stats-card p {
-  color: var(--readable-secondary);
-}
-
-html.theme-dark .community-card-head h3,
-html.theme-dark .community-card-body,
-html.theme-dark .community-card-head .book-author {
-  color: var(--readable-body);
-}
-
-html.theme-dark .companion-hero p,
-html.theme-dark .companion-answer,
-html.theme-dark .chat-shell .message {
-  color: var(--readable-body);
-}
-
-html.theme-dark .journey-stat-pill,
-html.theme-dark .journey-highlight-card {
-  color: var(--readable-body);
-}
-
-html.theme-dark .journey-stat-pill strong {
-  color: var(--readable-heading);
-}
-
-html.theme-dark ::placeholder {
-  color: var(--readable-secondary);
-  opacity: 0.85;
-}
-
-html.theme-dark .journey-donut::after {
-  background: var(--card);
-}
-
-html.theme-dark .dna-archetype-card,
-html.theme-dark .dna-archetype-card.card {
-  color: #fff;
-}
-
-html.theme-dark .home-brief,
-html.theme-dark .stats-card,
-html.theme-dark .goal-card,
-html.theme-dark .companion-hero,
-html.theme-dark .companion-answer,
-html.theme-dark .community-card {
-  color: var(--readable-body);
-}
-
-html.theme-dark .stats-card strong,
-html.theme-dark .home-brief h2 {
-  color: var(--readable-heading);
-}
-
-html.theme-dark .recommendation-reason-box p {
-  color: var(--readable-body);
 }
 
 .settings-modal {
@@ -4861,19 +4617,20 @@ html.reader-dna-complete #continueDiscoveryMain {
   background: none;
   border: none;
   padding: 0;
-  font-size: 34px;
+  font-size: 30px;
   line-height: 1;
-  color: #d8d3e6;
+  color: var(--star-empty);
   cursor: pointer;
   transition: transform 0.15s, color 0.15s;
 }
 
 .bd-star-rating button:hover {
-  transform: scale(1.15);
+  transform: scale(1.12);
+  color: var(--star-hover);
 }
 
 .bd-star-rating button.on {
-  color: var(--gold);
+  color: var(--star-active);
 }
 
 .bd-hint {
@@ -5685,13 +5442,15 @@ html.reader-dna-complete #continueDiscoveryMain {
 .star-rating-v2 button {
   border: none;
   background: transparent;
-  font-size: 38px;
-  color: #cfc6bc;
+  font-size: 30px;
+  color: var(--star-empty);
   cursor: pointer;
+  transition: color 0.2s ease, transform 0.2s ease;
 }
 
 .star-rating-v2 button:hover {
-  color: var(--gold);
+  color: var(--star-hover);
+  transform: scale(1.12);
 }
 
 .small-muted {
@@ -8177,7 +7936,7 @@ html.theme-dark .journey-review-submit {
 
 .star-rating-v2 button.active,
 .bd-star.active {
-  color: var(--accent);
+  color: var(--star-active);
 }
 
 input:focus,
@@ -8185,8 +7944,8 @@ textarea:focus,
 select:focus,
 .bd-select:focus,
 .bd-input:focus {
-  border-color: var(--navy) !important;
-  box-shadow: 0 0 0 3px rgba(47, 62, 79, 0.1) !important;
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 3px var(--focus-ring) !important;
 }
 
 .discovery-search-status-success { color: var(--success); }
@@ -8288,75 +8047,4 @@ select:focus,
   display: grid;
   gap: 16px;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-}
-
-/* ============================================================
-   Readable text on light surfaces (WCAG AA)
-   ============================================================ */
-::placeholder {
-  color: var(--readable-secondary, var(--text-secondary));
-  opacity: 0.85;
-}
-
-.dashboard h1 {
-  color: var(--readable-heading, var(--ink));
-}
-
-.card h2,
-.card h3 {
-  color: var(--readable-heading, var(--ink));
-}
-
-.card p,
-.stats-card p,
-.home-brief p,
-.companion-hero p,
-.companion-answer p,
-.community-card-body,
-.community-card-body p,
-.reasoning-box p,
-.recommendation-reason-box p {
-  color: var(--readable-body, var(--text));
-}
-
-.stats-card span,
-.stats-row span,
-.journey-stat-pill span {
-  color: var(--readable-secondary, var(--text-secondary));
-}
-
-.stats-card strong,
-.journey-stat-pill strong {
-  color: var(--readable-heading, var(--ink));
-}
-
-.section-title a,
-a.text-link {
-  color: var(--readable-link, #B45309);
-  font-weight: 600;
-  text-decoration: none;
-}
-
-.section-title a:hover,
-a.text-link:hover {
-  opacity: 0.85;
-}
-
-/* Dark-surface cards keep light text — do not inherit readable-body */
-.dna-archetype-card,
-.dna-archetype-card.card,
-.path-hero-card,
-.journey-modal-premium,
-.journey-modal-inner,
-.user-message,
-.btn-primary,
-.library-toast,
-#pathsToast {
-  color: inherit;
-}
-
-.dna-archetype-card h2,
-.dna-archetype-card p,
-.dna-archetype-card .eyebrow {
-  color: inherit;
 }
