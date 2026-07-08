@@ -6,21 +6,63 @@ const BookMindUserData = {
 
   async loadSettings() {
     if (!window.BookMindAuth?.isLoggedIn()) return null;
-    const data = await BookMindAPI.get("/api/user/settings");
-    if (data.settings) {
-      localStorage.setItem("bookmind_settings", JSON.stringify(data.settings));
+
+    let local = {};
+    try {
+      local = JSON.parse(localStorage.getItem("bookmind_settings") || "{}");
+    } catch {
+      local = {};
     }
-    return data.settings || null;
+
+    const localTheme = localStorage.getItem("bookmind_theme");
+    const localSize = localStorage.getItem("bookmind_reading_size");
+
+    const data = await BookMindAPI.get("/api/user/settings");
+    const server = data.settings || {};
+    const merged = {
+      ...local,
+      ...server,
+      reading: { ...(local.reading || {}), ...(server.reading || {}) },
+      appearance: {
+        ...(local.appearance || {}),
+        ...(server.appearance || {}),
+        ...(localTheme ? { theme: localTheme } : {}),
+        ...(localSize ? { readingFontSize: localSize } : {}),
+      },
+      notifications: { ...(local.notifications || {}), ...(server.notifications || {}) },
+      privacy: { ...(local.privacy || {}), ...(server.privacy || {}) },
+    };
+
+    if (merged.appearance?.theme) {
+      localStorage.setItem("bookmind_theme", merged.appearance.theme === "dark" ? "dark" : "light");
+    }
+    if (merged.appearance?.readingFontSize) {
+      localStorage.setItem("bookmind_reading_size", merged.appearance.readingFontSize);
+    }
+
+    localStorage.setItem("bookmind_settings", JSON.stringify(merged));
+    return merged;
   },
 
   async saveSettings(settings) {
+    const localTheme = localStorage.getItem("bookmind_theme");
+    const localSize = localStorage.getItem("bookmind_reading_size");
+    const merged = {
+      ...settings,
+      appearance: {
+        ...(settings.appearance || {}),
+        ...(localTheme ? { theme: localTheme } : {}),
+        ...(localSize ? { readingFontSize: localSize } : {}),
+      },
+    };
+
     if (!window.BookMindAuth?.isLoggedIn()) {
-      localStorage.setItem("bookmind_settings", JSON.stringify(settings));
-      return settings;
+      localStorage.setItem("bookmind_settings", JSON.stringify(merged));
+      return merged;
     }
-    const data = await BookMindAPI.put("/api/user/settings", { settings });
-    localStorage.setItem("bookmind_settings", JSON.stringify(data.settings || settings));
-    return data.settings || settings;
+    const data = await BookMindAPI.put("/api/user/settings", { settings: merged });
+    localStorage.setItem("bookmind_settings", JSON.stringify(data.settings || merged));
+    return data.settings || merged;
   },
 
   async loadReaderProfile() {

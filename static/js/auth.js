@@ -1,11 +1,17 @@
 (function () {
   try {
-    const settings = JSON.parse(localStorage.getItem("bookmind_settings") || "{}");
-    const appearance = settings.appearance || {};
-    if (appearance.theme === "dark") document.documentElement.classList.add("theme-dark");
-    if (appearance.readingFontSize) {
-      document.documentElement.dataset.readingFont = appearance.readingFontSize;
+    let theme = localStorage.getItem("bookmind_theme");
+    let readingSize = localStorage.getItem("bookmind_reading_size");
+
+    if (!theme || !readingSize) {
+      const settings = JSON.parse(localStorage.getItem("bookmind_settings") || "{}");
+      const appearance = settings.appearance || {};
+      if (!theme) theme = appearance.theme || "light";
+      if (!readingSize) readingSize = appearance.readingFontSize || "medium";
     }
+
+    document.documentElement.classList.toggle("theme-dark", theme === "dark");
+    document.documentElement.dataset.readingFont = readingSize || "medium";
   } catch (_) {
     /* ignore */
   }

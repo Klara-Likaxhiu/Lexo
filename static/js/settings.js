@@ -1,6 +1,8 @@
 /** BookMindAI Settings page controller. */
 const BookMindSettings = {
   STORAGE_KEY: "bookmind_settings",
+  THEME_KEY: "bookmind_theme",
+  READING_SIZE_KEY: "bookmind_reading_size",
   get GENRES() {
     return window.BookMindGenres?.ALL || [
       "Fantasy", "Romance", "Mystery", "Thriller", "Horror", "Sci-Fi",
@@ -33,19 +35,65 @@ const BookMindSettings = {
 
   load() {
     const defaults = this.defaults();
+    const prefs = this.readAppearancePrefs();
     try {
       const stored = JSON.parse(localStorage.getItem(this.STORAGE_KEY) || "{}");
       return {
         ...defaults,
         ...stored,
         reading: { ...defaults.reading, ...(stored.reading || {}) },
-        appearance: { ...defaults.appearance, ...(stored.appearance || {}) },
+        appearance: { ...defaults.appearance, ...(stored.appearance || {}), ...prefs },
         notifications: { ...defaults.notifications, ...(stored.notifications || {}) },
         privacy: { ...defaults.privacy, ...(stored.privacy || {}) }
       };
     } catch {
-      return defaults;
+      return { ...defaults, appearance: { ...defaults.appearance, ...prefs } };
     }
+  },
+
+  readAppearancePrefs() {
+    let theme = localStorage.getItem(this.THEME_KEY);
+    let readingFontSize = localStorage.getItem(this.READING_SIZE_KEY);
+
+    if (!theme || !readingFontSize) {
+      try {
+        const stored = JSON.parse(localStorage.getItem(this.STORAGE_KEY) || "{}");
+        const appearance = stored.appearance || {};
+        if (!theme && appearance.theme) theme = appearance.theme;
+        if (!readingFontSize && appearance.readingFontSize) {
+          readingFontSize = appearance.readingFontSize;
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+
+    const prefs = {
+      theme: theme === "dark" ? "dark" : "light",
+      readingFontSize: readingFontSize || "medium",
+    };
+
+    if (!localStorage.getItem(this.THEME_KEY)) {
+      localStorage.setItem(this.THEME_KEY, prefs.theme);
+    }
+    if (!localStorage.getItem(this.READING_SIZE_KEY)) {
+      localStorage.setItem(this.READING_SIZE_KEY, prefs.readingFontSize);
+    }
+
+    return prefs;
+  },
+
+  saveAppearancePrefs(appearance) {
+    const theme = appearance.theme === "dark" ? "dark" : "light";
+    const readingFontSize = appearance.readingFontSize || "medium";
+
+    localStorage.setItem(this.THEME_KEY, theme);
+    localStorage.setItem(this.READING_SIZE_KEY, readingFontSize);
+
+    const settings = this.load();
+    settings.appearance = { ...settings.appearance, theme, readingFontSize };
+    localStorage.setItem(this.STORAGE_KEY, JSON.stringify(settings));
+    return settings;
   },
 
   save(settings) {
@@ -53,11 +101,11 @@ const BookMindSettings = {
   },
 
   applyAppearance(settings) {
-    const appearance = settings.appearance || {};
-    document.documentElement.classList.toggle("theme-dark", appearance.theme === "dark");
-    if (appearance.readingFontSize) {
-      document.documentElement.dataset.readingFont = appearance.readingFontSize;
-    }
+    const appearance = settings?.appearance || settings || {};
+    const theme = appearance.theme === "dark" ? "dark" : "light";
+    const readingFontSize = appearance.readingFontSize || "medium";
+    document.documentElement.classList.toggle("theme-dark", theme === "dark");
+    document.documentElement.dataset.readingFont = readingFontSize;
   },
 
   showToast(message, type = "success") {
@@ -84,6 +132,7 @@ const BookMindSettings = {
     if (!token) return;
 
     this.settings = this.load();
+    this.applyAppearance(this.settings);
     this.authUser = window.BookMindAuth ? window.BookMindAuth.getCurrentUser() : null;
     this.readerProfile = JSON.parse(localStorage.getItem("readerProfile") || "null");
     this.userProfile = JSON.parse(localStorage.getItem("bookmind_user_profile") || "{}");
@@ -229,23 +278,28 @@ const BookMindSettings = {
   bindAppearance() {
     const themeToggle = document.getElementById("settingsThemeToggle");
     const fontSelect = document.getElementById("settingsFontSize");
+    const prefs = this.readAppearancePrefs();
 
-    const isDark = this.settings.appearance?.theme === "dark";
-    if (themeToggle) themeToggle.checked = isDark;
-    if (fontSelect) fontSelect.value = this.settings.appearance?.readingFontSize || "medium";
+    if (themeToggle) themeToggle.checked = prefs.theme === "dark";
+    if (fontSelect) fontSelect.value = prefs.readingFontSize;
 
     themeToggle?.addEventListener("change", () => {
-      this.settings.appearance = this.settings.appearance || {};
-      this.settings.appearance.theme = themeToggle.checked ? "dark" : "light";
-      this.save(this.settings);
+      const theme = themeToggle.checked ? "dark" : "light";
+      this.settings = this.saveAppearancePrefs({
+        ...this.settings.appearance,
+        theme,
+        readingFontSize: fontSelect?.value || prefs.readingFontSize,
+      });
       this.applyAppearance(this.settings);
       this.showToast(`${themeToggle.checked ? "Dark" : "Light"} mode enabled.`);
     });
 
     fontSelect?.addEventListener("change", () => {
-      this.settings.appearance = this.settings.appearance || {};
-      this.settings.appearance.readingFontSize = fontSelect.value;
-      this.save(this.settings);
+      this.settings = this.saveAppearancePrefs({
+        ...this.settings.appearance,
+        theme: themeToggle?.checked ? "dark" : "light",
+        readingFontSize: fontSelect.value,
+      });
       this.applyAppearance(this.settings);
       this.showToast("Reading font size updated.");
     });
