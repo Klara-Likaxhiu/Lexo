@@ -1586,6 +1586,20 @@ html.auth-pending body {
   flex-direction: column;
 }
 
+.companion-page .chat-shell {
+  padding: 0;
+  height: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.companion-page .chat-messages {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  margin: 0 24px;
+}
+
 .chat-header h1 {
   font-family: Georgia, serif;
   font-size: 42px;

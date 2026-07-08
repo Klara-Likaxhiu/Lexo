@@ -21,9 +21,6 @@
   <main class="dashboard companion-page">
 
     <div class="companion-layout">
-      <div class="companion-room">
-        <div class="companion-room-art" role="img" aria-label="Cozy reading room"></div>
-      </div>
       <div class="companion-chat-panel">
         <nav class="companion-tabs" aria-label="Companion modes">
           <button type="button" class="companion-tab active" data-mode="ask">Ask</button>
@@ -40,9 +37,8 @@
       </div>
 
       <div id="chatMessages" class="chat-messages">
-        <div class="message ai-message">
-          <strong>BookMindAI</strong>
-          <p>Hi! Tell me what you're in the mood for and I’ll recommend books based on your Reader DNA.</p>
+        <div class="companion-empty-state" id="companionEmptyState">
+          <p>📚 Ask me anything about books, discover your next read, or explore your Reader DNA.</p>
         </div>
       </div>
 
@@ -122,6 +118,8 @@
   }
 
   function addUserMessage(text) {
+    document.getElementById("companionEmptyState")?.remove();
+
     const div = document.createElement("div");
     div.className = "message user-message";
 

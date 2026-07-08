@@ -1269,69 +1269,43 @@ html.reader-dna-complete #continueDiscoveryTop {
 }
 
 /* ============================================================
-   AI COMPANION — Cozy reading room
+   AI COMPANION — Chat-first layout
    ============================================================ */
 .companion-page {
   padding: 0 !important;
   max-width: none !important;
+  min-height: 100vh;
 }
 
 .companion-layout {
-  display: grid;
-  grid-template-columns: 1fr 1.2fr;
-  min-height: calc(100vh - 80px);
-}
-
-.companion-room {
-  background: linear-gradient(160deg, #E8E4DC 0%, #D4CFC4 100%);
-  padding: 48px;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  position: relative;
-}
-
-.companion-room-art {
-  width: 100%;
-  max-width: 360px;
-  aspect-ratio: 4/5;
-  background: linear-gradient(180deg, #C9D4E0 0%, #E8DDD0 60%, #D4C4B0 100%);
-  border-radius: var(--radius-xl);
-  position: relative;
-  box-shadow: var(--shadow-card);
-}
-
-.companion-room-art::before {
-  content: "📚";
-  position: absolute;
-  bottom: 20%;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 4rem;
-  opacity: 0.3;
+  min-height: 100vh;
 }
 
 .companion-chat-panel {
   display: flex;
   flex-direction: column;
-  background: var(--white);
-  border-left: 1px solid var(--border-light);
+  flex: 1;
+  min-height: 100vh;
+  background: var(--card);
 }
 
 .companion-tabs {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  padding: 20px 24px 0;
-  border-bottom: 1px solid var(--border-light);
+  padding: 16px 24px 0;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
 }
 
 .companion-tab {
   padding: 8px 16px;
   border-radius: 99px;
-  border: 1px solid var(--border-neutral);
-  background: var(--white);
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
@@ -1339,9 +1313,9 @@ html.reader-dna-complete #continueDiscoveryTop {
 }
 
 .companion-tab.active {
-  background: var(--navy);
-  color: #fff;
-  border-color: var(--navy);
+  background: var(--button-bg);
+  color: var(--button-text);
+  border-color: var(--button-bg);
 }
 
 .companion-chat-panel .chat-shell {
@@ -1349,19 +1323,66 @@ html.reader-dna-complete #continueDiscoveryTop {
   display: flex;
   flex-direction: column;
   padding: 0;
+  height: auto;
+  min-height: 0;
+}
+
+.companion-page .chat-header {
+  padding: 20px 24px 0;
+  flex-shrink: 0;
+}
+
+.companion-page .chat-header h1 {
+  font-size: clamp(1.75rem, 3vw, 2.25rem);
+  margin: 6px 0 8px;
+}
+
+.companion-page .chat-header p {
+  margin: 0 0 4px;
+  color: var(--muted-text);
+  font-size: 0.95rem;
 }
 
 .companion-chat-panel .chat-messages {
   flex: 1;
-  padding: 24px;
+  min-height: 0;
+  padding: 16px 24px 24px;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.companion-empty-state {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 280px;
+  padding: 24px;
+  text-align: center;
+}
+
+.companion-empty-state p {
+  margin: 0;
+  max-width: 440px;
+  font-size: 0.98rem;
+  line-height: 1.65;
+  color: var(--muted-text);
+  font-weight: 500;
+}
+
+.companion-page .prompt-chips {
+  flex-shrink: 0;
+  padding: 0 24px 12px;
 }
 
 .companion-input-row {
-  padding: 20px 24px;
-  border-top: 1px solid var(--border-light);
+  padding: 16px 24px 24px;
+  border-top: 1px solid var(--border);
   display: flex;
   gap: 12px;
+  flex-shrink: 0;
+  margin-top: 0;
 }
 
 .companion-input-row input,
