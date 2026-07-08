@@ -99,8 +99,8 @@
     </div>
 
     <div class="journey-review card" id="journeyReviewBlock">
-      <p class="journey-modal-label">Rate this Reading Path</p>
-      <div class="journey-star-rating" id="journeyStarRating">
+      <h3 class="journey-review-heading">Rate this Reading Path</h3>
+      <div class="journey-star-rating" id="journeyStarRating" role="group" aria-label="Star rating">
         <button type="button" data-star="1" aria-label="1 star">★</button>
         <button type="button" data-star="2" aria-label="2 stars">★</button>
         <button type="button" data-star="3" aria-label="3 stars">★</button>
@@ -108,11 +108,12 @@
         <button type="button" data-star="5" aria-label="5 stars">★</button>
       </div>
       <label class="journey-review-label" for="journeySurpriseInput">What surprised you most?</label>
-      <textarea id="journeySurpriseInput" rows="2" placeholder="A moment, theme, or book that stayed with you…"></textarea>
-      <label class="journey-review-label">
-        <input type="checkbox" id="journeyRecommendInput"> Would you recommend this journey?
+      <textarea id="journeySurpriseInput" class="journey-review-input" rows="3" placeholder="A moment, theme, or book that stayed with you…"></textarea>
+      <label class="journey-review-checkbox">
+        <input type="checkbox" id="journeyRecommendInput">
+        <span>Would you recommend this journey?</span>
       </label>
-      <button type="button" class="btn btn-secondary btn-sm" id="journeySubmitReview">Submit review</button>
+      <button type="button" class="btn btn-primary journey-review-submit" id="journeySubmitReview">Submit review</button>
     </div>
 
     <button type="button" class="btn btn-primary journey-continue-btn" data-action="close-modal">

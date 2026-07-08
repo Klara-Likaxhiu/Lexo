@@ -426,7 +426,9 @@ async function showJourneyModal({ path, badge, xp, daysTaken }) {
 
   document.getElementById("journeySurpriseInput").value = "";
   document.getElementById("journeyRecommendInput").checked = false;
-  document.querySelectorAll("#journeyStarRating button").forEach(b => b.classList.remove("active"));
+  document.querySelectorAll("#journeyStarRating button").forEach(b => {
+    b.classList.remove("active", "hover-preview");
+  });
 
   pathCompletionModal.hidden = false;
   pathCompletionModal.setAttribute("aria-hidden", "false");
@@ -453,14 +455,31 @@ function closeJourneyModal() {
   pendingReviewPathId = null;
 }
 
-document.querySelectorAll("#journeyStarRating button").forEach(btn => {
-  btn.addEventListener("click", () => {
-    selectedStars = Number(btn.dataset.star);
-    document.querySelectorAll("#journeyStarRating button").forEach(b => {
-      b.classList.toggle("active", Number(b.dataset.star) <= selectedStars);
+(() => {
+  const starBtns = [...document.querySelectorAll("#journeyStarRating button")];
+  if (!starBtns.length) return;
+
+  starBtns.forEach(starBtn => {
+    starBtn.addEventListener("mouseenter", () => {
+      const hover = Number(starBtn.dataset.star);
+      starBtns.forEach(b => {
+        b.classList.toggle("hover-preview", Number(b.dataset.star) <= hover);
+      });
+    });
+
+    starBtn.addEventListener("mouseleave", () => {
+      starBtns.forEach(b => b.classList.remove("hover-preview"));
+    });
+
+    starBtn.addEventListener("click", () => {
+      selectedStars = Number(starBtn.dataset.star);
+      starBtns.forEach(b => {
+        b.classList.toggle("active", Number(b.dataset.star) <= selectedStars);
+        b.classList.remove("hover-preview");
+      });
     });
   });
-});
+})();
 
 document.getElementById("journeySubmitReview")?.addEventListener("click", () => {
   if (!pendingReviewPathId || !Passport()) return;

@@ -7642,8 +7642,7 @@ body.journey-modal-open {
   font-weight: 600;
 }
 
-.journey-modal-reflection,
-.journey-review {
+.journey-modal-reflection {
   text-align: left;
   margin-bottom: 20px;
   padding: 20px;
@@ -7652,6 +7651,166 @@ body.journey-modal-open {
   border-radius: 16px;
   color: rgba(255, 255, 255, 0.88);
 }
+
+/* Review form — light premium card inside celebration modal */
+.journey-review.card {
+  text-align: left;
+  margin-bottom: 20px;
+  padding: 24px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-top: 3px solid #f9a8d4;
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(15, 23, 42, 0.08);
+  color: #374151;
+}
+
+.journey-review-heading {
+  margin: 0 0 16px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #1f2937;
+  letter-spacing: -0.01em;
+  text-transform: none;
+  background: none;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.journey-star-rating {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.journey-star-rating button {
+  border: none;
+  background: none;
+  font-size: 30px;
+  line-height: 1;
+  color: #cbd5e1;
+  cursor: pointer;
+  transition: color 0.2s ease, transform 0.2s ease;
+  padding: 2px;
+}
+
+.journey-star-rating button:hover,
+.journey-star-rating button.hover-preview {
+  color: #fbbf24;
+  transform: scale(1.12);
+}
+
+.journey-star-rating button.active {
+  color: #f59e0b;
+  transform: scale(1.05);
+}
+
+.journey-star-rating button.active:hover {
+  color: #f59e0b;
+}
+
+.journey-review-label {
+  display: block;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  margin: 0 0 8px;
+  color: #1f2937;
+}
+
+.journey-review-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 16px 0 20px;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #374151;
+  cursor: pointer;
+}
+
+.journey-review-checkbox input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: #e879b9;
+  cursor: pointer;
+}
+
+.journey-review-input,
+.journey-review textarea {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #1f2937;
+  font-family: inherit;
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  resize: vertical;
+  min-height: 88px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  box-sizing: border-box;
+}
+
+.journey-review-input::placeholder,
+.journey-review textarea::placeholder {
+  color: #6b7280;
+  opacity: 1;
+}
+
+.journey-review-input:focus,
+.journey-review textarea:focus {
+  outline: none;
+  border-color: #e879b9;
+  box-shadow: 0 0 0 3px rgba(232, 121, 185, 0.28);
+}
+
+.journey-review-submit {
+  width: 100%;
+  padding: 14px 20px;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 700;
+  background: var(--forest);
+  color: #ffffff;
+  border: none;
+  box-shadow: 0 6px 20px rgba(47, 74, 58, 0.22);
+  transition: background 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.journey-review-submit:hover {
+  background: var(--forest-hover);
+  color: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 24px rgba(47, 74, 58, 0.3);
+}
+
+html.theme-dark .journey-review.card {
+  background: #ffffff;
+  color: #374151;
+  border-color: #e5e7eb;
+}
+
+html.theme-dark .journey-review-heading,
+html.theme-dark .journey-review-label {
+  color: #1f2937;
+}
+
+html.theme-dark .journey-review-checkbox {
+  color: #374151;
+}
+
+html.theme-dark .journey-review-input,
+html.theme-dark .journey-review textarea {
+  background: #ffffff;
+  color: #1f2937;
+  border-color: #d1d5db;
+}
+
+html.theme-dark .journey-review-submit {
+  background: var(--forest);
+  color: #ffffff;
+}
+
 
 .journey-reflection-text p {
   margin: 0 0 12px;
@@ -7670,46 +7829,6 @@ body.journey-modal-open {
   border-top: 1px solid rgba(255, 255, 255, 0.1);
   font-size: 0.9rem;
   color: #e8c547;
-}
-
-.journey-star-rating {
-  display: flex;
-  gap: 6px;
-  margin-bottom: 14px;
-}
-
-.journey-star-rating button {
-  border: none;
-  background: none;
-  font-size: 1.75rem;
-  color: rgba(255, 255, 255, 0.25);
-  cursor: pointer;
-  transition: color 0.2s, transform 0.2s;
-  padding: 0;
-}
-
-.journey-star-rating button.active,
-.journey-star-rating button:hover {
-  color: #e8c547;
-  transform: scale(1.1);
-}
-
-.journey-review-label {
-  display: block;
-  font-size: 0.88rem;
-  margin: 10px 0 6px;
-  color: rgba(255, 255, 255, 0.7);
-}
-
-.journey-review textarea {
-  width: 100%;
-  padding: 10px 12px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  background: rgba(0, 0, 0, 0.2);
-  color: #fff;
-  font-family: inherit;
-  resize: vertical;
 }
 
 .journey-continue-btn {
