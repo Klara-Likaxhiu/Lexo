@@ -469,10 +469,6 @@ const BookMindDiscovery = {
     });
 
     if (window.BookCover) {
-      BookCover.seedFromBooks(books);
-      BookCover.hydrateLazy(this.els.results, {
-        imgClass: "discovery-card-img book-cover-img",
-      });
       BookCover.resolveMissing(books, this.els.results, {
         imgClass: "discovery-card-img book-cover-img",
       });

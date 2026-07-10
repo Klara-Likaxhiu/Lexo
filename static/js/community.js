@@ -516,8 +516,6 @@ function hydrateCovers() {
     genre: r.genre,
     cover_url: r.cover_url,
   }));
-  BookCover.seedFromBooks(books);
-  BookCover.hydrateLazy(feed, { imgClass: "community-cover-img book-cover-img" });
   BookCover.resolveMissing(books, feed, { imgClass: "community-cover-img book-cover-img" });
 }
 

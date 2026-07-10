@@ -722,8 +722,6 @@ function renderPaths(result) {
   datalist.innerHTML = libraryTitleOptions();
 
   if (window.BookCover) {
-    BookCover.seedFromBooks(paths.flatMap(p => p.books || []));
-    BookCover.hydrateLazy(activePathsGrid, { imgClass: "path-book-cover-img book-cover-img" });
     BookCover.resolveMissing(paths.flatMap(p => p.books || []), activePathsGrid, {
       imgClass: "path-book-cover-img book-cover-img",
     });

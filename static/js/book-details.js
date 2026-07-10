@@ -46,7 +46,7 @@ async function initBookDetails() {
 
   currentBook = saved.ai_recommendation;
   bookKey = BookMindLibrary.normalizeTitle(currentBook.title);
-  bookCover = (saved.book_data && saved.book_data.cover_url) || currentBook.cover_url || null;
+  bookCover = BookCover.getBookCover({ ...currentBook, book_data: saved?.book_data }) || null;
 
   renderBook(saved);
 
@@ -125,7 +125,7 @@ function renderCover(aiBook, book) {
     title: aiBook.title,
     author: aiBook.author || book?.author,
     genre: aiBook.genre || book?.genre,
-    cover_url: (book && book.cover_url) || aiBook.cover_url,
+    cover_url: BookCover.getBookCover({ ...aiBook, book_data: book, ...(book || {}) }),
     isbn: book?.isbn,
     open_library_key: book?.open_library_key,
   };

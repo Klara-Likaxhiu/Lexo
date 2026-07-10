@@ -74,7 +74,6 @@ function renderContinueReading() {
   });
 
   if (window.BookCover) {
-    BookCover.hydrateLazy(card, { imgClass: "book-cover-img" });
     BookCover.resolveMissing([book], card, { imgClass: "book-cover-img" });
   }
 }
@@ -112,8 +111,6 @@ function renderRecentlyAdded() {
   });
 
   if (window.BookCover) {
-    BookCover.seedFromBooks(books);
-    BookCover.hydrateLazy(shelf, { imgClass: "book-cover-img" });
     BookCover.resolveMissing(books, shelf, { imgClass: "book-cover-img" });
   }
 }
@@ -197,7 +194,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         placeholderClass: "ai-pick-cover-ph book-cover-placeholder",
       }
     );
-    BookCover.hydrateLazy(slot, { imgClass: "ai-pick-cover-img book-cover-img" });
     BookCover.resolveMissing(
       [{ title: topPick.title, author: topPick.author, genre: topPick.genre, coverUrl: topPick.cover_url }],
       slot,
@@ -459,7 +455,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       }));
       const coverOptions = { imgClass: "recommendation-cover book-cover-img" };
       BookCover.seedFromBooks(coverBooks);
-      BookCover.hydrateLazy(container, coverOptions);
       BookCover.resolveMissing(coverBooks, container, coverOptions).then(() => {
         persistRecommendationCovers(visibleRecommendations, coverBooks);
       });
