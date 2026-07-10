@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import re
 from datetime import datetime, timezone
 from typing import Any
@@ -20,6 +21,37 @@ LIBRARY_LIST_COLUMNS = (
     "date_added,updated_at,metadata"
 )
 LIBRARY_ROW_COLUMNS = LIBRARY_LIST_COLUMNS
+
+logger = logging.getLogger(__name__)
+
+
+def extract_cover_url_from_book(book: dict[str, Any]) -> str | None:
+    """Normalize cover URL from any common book payload field."""
+    from app.cover_service import normalize_cover_url
+
+    image_links = book.get("imageLinks") if isinstance(book.get("imageLinks"), dict) else {}
+    volume_info = book.get("volumeInfo") if isinstance(book.get("volumeInfo"), dict) else {}
+    volume_links = (
+        volume_info.get("imageLinks") if isinstance(volume_info.get("imageLinks"), dict) else {}
+    )
+    book_data = book.get("book_data") if isinstance(book.get("book_data"), dict) else {}
+    ai = book.get("ai_recommendation") if isinstance(book.get("ai_recommendation"), dict) else {}
+
+    for candidate in (
+        book.get("cover_url"),
+        book.get("coverUrl"),
+        book.get("image"),
+        book.get("thumbnail"),
+        image_links.get("thumbnail"),
+        volume_links.get("thumbnail"),
+        book_data.get("cover_url"),
+        book_data.get("coverUrl"),
+        ai.get("cover_url"),
+    ):
+        normalized = normalize_cover_url(candidate if isinstance(candidate, str) else None)
+        if normalized:
+            return normalized
+    return None
 
 
 class LibraryStoreError(Exception):
@@ -228,7 +260,7 @@ def _book_payload(user_id: str, book: dict[str, Any], status: str) -> dict[str, 
         "title": (book.get("title") or "Untitled").strip(),
         "author": (book.get("author") or "Unknown Author").strip(),
         "genre": book.get("genre") or metadata.get("genre") or "Book",
-        "cover_url": book.get("cover_url"),
+        "cover_url": extract_cover_url_from_book(book),
         "description": book.get("description"),
         "status": status,
         "progress": max(0, min(100, int(progress))),
@@ -328,6 +360,14 @@ def upsert_book(user_id: str, book: dict[str, Any], status: str) -> dict[str, An
         raise LibraryStoreError(f"Invalid status: {status}")
 
     payload = _book_payload(user_id, book, status)
+    logger.info(
+        "[LibraryStore] upsert_book title=%r author=%r cover_url=%r book_id=%r status=%s",
+        payload.get("title"),
+        payload.get("author"),
+        payload.get("cover_url"),
+        payload.get("book_id"),
+        status,
+    )
     existing = _request(
         "GET",
         TABLE,

@@ -6,11 +6,40 @@ const BookMindLibrary = {
   _loading: null,
   _bgRefresh: null,
   _lastError: null,
-  _persistKey: "bookmind_library_cache_v1",
+  _persistKey: "bookmind_library_cache_v2",
   _persistAtKey: "bookmind_library_cache_at",
   _persistTtlMs: 5 * 60 * 1000,
 
   SHELVES: ["read", "reading", "want", "not_interested"],
+
+  normalizeCoverUrl(book) {
+    if (!book || typeof book !== "object") return null;
+    const imageLinks = book.imageLinks && typeof book.imageLinks === "object" ? book.imageLinks : {};
+    const volumeInfo = book.volumeInfo && typeof book.volumeInfo === "object" ? book.volumeInfo : {};
+    const volumeLinks =
+      volumeInfo.imageLinks && typeof volumeInfo.imageLinks === "object" ? volumeInfo.imageLinks : {};
+    const bookData = book.book_data && typeof book.book_data === "object" ? book.book_data : {};
+    const ai =
+      book.ai_recommendation && typeof book.ai_recommendation === "object" ? book.ai_recommendation : {};
+    const candidates = [
+      book.cover_url,
+      book.coverUrl,
+      book.image,
+      book.thumbnail,
+      imageLinks.thumbnail,
+      volumeLinks.thumbnail,
+      bookData.cover_url,
+      bookData.coverUrl,
+      ai.cover_url,
+    ];
+    for (const value of candidates) {
+      if (typeof value !== "string") continue;
+      const trimmed = value.trim();
+      if (!trimmed || ["null", "undefined", "none", "n/a"].includes(trimmed.toLowerCase())) continue;
+      return trimmed;
+    }
+    return null;
+  },
 
   emptyLibrary() {
     return { read: [], reading: [], want: [], not_interested: [] };
@@ -166,13 +195,21 @@ const BookMindLibrary = {
   },
 
   async _fetchLibrary({ silent = false } = {}) {
+    const prevBooks = this._books.slice();
     const data = await this._request("/api/library");
     this._applyPayload(data);
     this._writePersistentCache();
-    if (!silent) {
-      this._emitChange({ action: "refresh" });
+    const coversChanged = silent && this._coversChanged(prevBooks, this._books);
+    if (!silent || coversChanged) {
+      this._emitChange({ action: silent ? "background-refresh" : "refresh" });
     }
     return this._cache;
+  },
+
+  _coversChanged(prev, next) {
+    if (prev.length !== next.length) return true;
+    const prevMap = new Map(prev.map(book => [book.library_id, book.cover_url || ""]));
+    return next.some(book => (book.cover_url || "") !== (prevMap.get(book.library_id) || ""));
   },
 
   _upsertBookInCache(book) {
@@ -369,16 +406,24 @@ const BookMindLibrary = {
       progress = 100;
     }
 
+    const coverUrl = this.normalizeCoverUrl(book);
     const payload = {
       title: book.title,
       author: book.author || "Unknown Author",
       genre: book.genre || "Book",
-      cover_url: book.cover_url || null,
+      cover_url: coverUrl,
       description: book.description || book.description_preview || null,
       status: shelf,
       progress,
       favorite: Boolean(meta.favorite ?? book.favorite),
     };
+
+    console.info("[BookMindLibrary] save payload", {
+      title: payload.title,
+      author: payload.author,
+      cover_url: payload.cover_url,
+      status: payload.status,
+    });
 
     if (book.book_id) payload.book_id = book.book_id;
     else if (book.id) payload.id = book.id;

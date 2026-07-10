@@ -1019,7 +1019,9 @@ def _apply_cached_cover_to_book(book: dict, cached: dict | None) -> None:
         if cached.get("source"):
             book["cover_source"] = cached.get("source")
     else:
-        book["cover_url"] = None
+        # Keep library-stored URLs (including external) so the client can resolve/host them.
+        if not book.get("cover_url"):
+            book["cover_url"] = None
         book["cover_status"] = status
 
 

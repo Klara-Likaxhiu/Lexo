@@ -175,6 +175,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   loadHomeIntelligence();
   window.BookMindPerf?.endPageLoad?.();
 
+  document.addEventListener("bookmind:library-changed", event => {
+    if (event.detail?.action === "background-refresh" || event.detail?.action === "refresh") {
+      renderRecentlyAdded();
+    }
+  });
+
   function renderTopPickCover(topPick) {
     const slot = document.getElementById("topPickCover");
     if (!slot || !window.BookCover) return;

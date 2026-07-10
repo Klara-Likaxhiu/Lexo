@@ -2180,6 +2180,21 @@ html.auth-pending body {
   color: var(--muted);
 }
 
+.book-cover-unavailable {
+  opacity: 0.85;
+}
+
+.book-cover-unavailable::after {
+  content: "Cover unavailable";
+  display: block;
+  margin-top: 6px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
 .premium-book-placeholder {
   position: relative;
   display: flex;

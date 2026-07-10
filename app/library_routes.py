@@ -12,6 +12,7 @@ from app.cover_service import enrich_books_in_list, normalize_cover_url
 from app.library_store import (
     LibraryStoreError,
     delete_book,
+    extract_cover_url_from_book,
     group_by_status,
     list_user_books,
     upsert_book,
@@ -66,11 +67,12 @@ def _raise_store_error(exc: LibraryStoreError) -> None:
 
 
 def _request_to_book(data: LibraryBookRequest) -> dict[str, Any]:
+    raw = data.model_dump()
     book: dict[str, Any] = {
         "title": data.title.strip(),
         "author": (data.author or "Unknown Author").strip(),
         "genre": data.genre or "Book",
-        "cover_url": data.cover_url,
+        "cover_url": extract_cover_url_from_book(raw) or data.cover_url,
         "description": data.description,
         "progress": data.progress,
         "favorite": data.favorite,
