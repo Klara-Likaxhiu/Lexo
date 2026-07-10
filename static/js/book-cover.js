@@ -280,41 +280,73 @@ const BookMindCoverImage = {
     console.groupEnd();
   },
 
-  getKnownUrl(ref) {
-    const rawUrl = getBookCover(ref);
+  getKnownUrl(book) {
+    const images = book?.volumeInfo?.imageLinks || book?.volume_info?.imageLinks || {};
+    const bookData = book?.book_data || {};
+    const ai = book?.ai_recommendation || {};
 
-    if (!rawUrl || typeof rawUrl !== "string" || this.isMissingCoverUrl(rawUrl)) {
+    const rawUrl =
+      book?.cover_url ||
+      book?.coverUrl ||
+      book?.image ||
+      book?.thumbnail ||
+      bookData?.cover_url ||
+      bookData?.coverUrl ||
+      ai?.cover_url ||
+      ai?.coverUrl ||
+      images?.thumbnail ||
+      images?.smallThumbnail ||
+      null;
+
+    if (!rawUrl || typeof rawUrl !== "string") {
       this._loadCaches();
+      const ref = this.bookRef(book || {});
       const cached = this._memoryCache.get(this.cacheKey(ref));
       if (cached && typeof cached === "string" && !this.isMissingCoverUrl(cached)) {
-        const normalizedCache = cached.trim().replace(/^http:/i, "https:");
-        this._logPipeline(ref, ref, "getKnownUrl", {
-          knownUrl: normalizedCache,
-          candidateUrl: normalizedCache,
-          renderPath: "memory_cache",
+        const normalizedUrl = cached.trim().replace(/^http:/i, "https:");
+        console.log("[BookCover getKnownUrl]", {
+          title: book?.title,
+          rawCoverUrl: book?.cover_url,
+          normalizedUrl,
+          rejected: false,
           source: "memory_cache",
-          blocked: false,
         });
-        return normalizedCache;
+        return normalizedUrl;
       }
 
-      this._logPipeline(ref, ref, "getKnownUrl", {
-        knownUrl: null,
-        candidateUrl: null,
-        renderPath: "no_candidate",
-        rawUrl,
-        blocked: false,
+      console.warn("[BookCover getKnownUrl rejected]", {
+        title: book?.title,
+        url: rawUrl ?? null,
+        reason: rawUrl == null ? "missing_cover_url" : "non_string_cover_url",
+      });
+      return null;
+    }
+
+    if (this.isMissingCoverUrl(rawUrl)) {
+      console.warn("[BookCover getKnownUrl rejected]", {
+        title: book?.title,
+        url: rawUrl,
+        reason: "missing_sentinel_value",
       });
       return null;
     }
 
     const normalizedUrl = rawUrl.trim().replace(/^http:/i, "https:");
-    this._logPipeline(ref, ref, "getKnownUrl", {
-      knownUrl: normalizedUrl,
-      candidateUrl: normalizedUrl,
-      renderPath: "book_fields",
-      source: "book_fields",
-      blocked: false,
+
+    if (!normalizedUrl) {
+      console.warn("[BookCover getKnownUrl rejected]", {
+        title: book?.title,
+        url: rawUrl,
+        reason: "empty_after_trim",
+      });
+      return null;
+    }
+
+    console.log("[BookCover getKnownUrl]", {
+      title: book?.title,
+      rawCoverUrl: book?.cover_url,
+      normalizedUrl,
+      rejected: false,
     });
     return normalizedUrl;
   },
@@ -358,7 +390,7 @@ const BookMindCoverImage = {
   html(book, options = {}) {
     const ref = this.bookRef(book);
     const imgClass = options.imgClass || "book-cover-img";
-    const knownUrl = this.getKnownUrl(ref);
+    const knownUrl = this.getKnownUrl(book);
 
     if (knownUrl) {
       const key = this.cacheKey(ref);
@@ -576,12 +608,14 @@ const BookMindCoverImage = {
     this._loadCaches();
     const missing = [];
     const refs = [];
+    const sourceBooks = [];
 
     books.forEach(book => {
       const ref = this.bookRef(book);
-      const known = this.getKnownUrl(ref);
+      const known = this.getKnownUrl(book);
       if (known) {
         ref.cover_url = known;
+        book.cover_url = known;
         return;
       }
       if (this._pending.has(this.cacheKey(ref))) return;
@@ -591,11 +625,12 @@ const BookMindCoverImage = {
         title: ref.title,
         author: ref.author,
         isbn: ref.isbn,
-        cover_url: null,
+        cover_url: getBookCover(book) || null,
         google_id: ref.google_id,
         open_library_key: ref.open_library_key,
       });
       refs.push(ref);
+      sourceBooks.push(book);
     });
 
     if (!missing.length) return Promise.resolve(refs);
@@ -621,6 +656,8 @@ const BookMindCoverImage = {
           const url = normalizeCoverUrl(result.cover_url);
           if (url) {
             ref.cover_url = url;
+            const source = sourceBooks[index];
+            if (source) source.cover_url = url;
             this._rememberSuccess(key, url, { ref });
             this.debugCoverState(ref, url, {
               reason: "api_resolved",
@@ -673,14 +710,14 @@ const BookMindCoverImage = {
     const ref = book ? this.bookRef(book) : this.refFromWrap(wrap);
     wrap.__bookRef = ref;
 
-    const known = this.getKnownUrl(ref);
+    const known = this.getKnownUrl(book || ref);
     if (known) {
       this.renderImage(wrap, ref, known, options);
       return Promise.resolve(known);
     }
 
-    return this._batchResolveBooks([ref]).then(() => {
-      const url = this.getKnownUrl(ref);
+    return this._batchResolveBooks([book || ref]).then(() => {
+      const url = this.getKnownUrl(book || ref);
       if (url) {
         this.renderImage(wrap, ref, url, options);
         return url;
@@ -738,7 +775,7 @@ const BookMindCoverImage = {
 
     (books || []).forEach(book => {
       const ref = this.bookRef(book);
-      const url = this.getKnownUrl(ref);
+      const url = this.getKnownUrl(book);
       if (url) {
         book.cover_url = url;
         if (book.book_data && typeof book.book_data === "object") {
