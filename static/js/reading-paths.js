@@ -181,7 +181,8 @@ generateBtn.addEventListener("click", async () => {
       today_goal: localStorage.getItem("bookmind_today_goal"),
     });
     state = normalize(result);
-    const genrePaths = (await loadPathsFromServer())?.paths?.filter(p => p.genre_slug) || [];
+    const serverData = await BookMindAPI.get("/api/reading-paths").catch(() => null);
+    const genrePaths = (serverData?.paths || []).filter(p => p.genre_slug) || [];
     const ids = new Set(state.paths.map(p => p.id));
     genrePaths.forEach(path => {
       if (!ids.has(path.id)) state.paths.push(path);

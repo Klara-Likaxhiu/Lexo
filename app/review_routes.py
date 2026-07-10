@@ -134,6 +134,12 @@ def unpublish_review(data: UnpublishRequest, user: dict = Depends(get_verified_u
     return {"status": "removed", "id": data.id}
 
 
+COMMUNITY_REVIEW_COLUMNS = (
+    "id,username,book_title,author,genre,cover_url,rating,review_title,"
+    "review_text,recommend,created_at,updated_at"
+)
+
+
 def _empty_feed() -> dict:
     return {
         "reviews": [],
@@ -146,7 +152,7 @@ def _empty_feed() -> dict:
 @router.get("/community")
 def community_feed(book: str | None = None, limit: int = 50) -> dict:
     params: dict[str, str] = {
-        "select": "*",
+        "select": COMMUNITY_REVIEW_COLUMNS,
         "order": "updated_at.desc",
         "limit": str(max(1, min(limit, 100))),
     }

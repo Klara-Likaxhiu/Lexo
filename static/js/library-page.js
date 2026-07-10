@@ -176,9 +176,19 @@ function showToast(message, isError = false) {
   }, 3200);
 }
 
+const SHELF_PAGE_SIZE = 20;
+const shelfVisibleCounts = {
+  reading: SHELF_PAGE_SIZE,
+  want: SHELF_PAGE_SIZE,
+  read: SHELF_PAGE_SIZE,
+  not_interested: SHELF_PAGE_SIZE,
+};
+
 function renderShelf(shelf) {
   const library = BookMindLibrary.getLibrary();
   const books = library[shelf] || [];
+  const visibleCount = shelfVisibleCounts[shelf] || SHELF_PAGE_SIZE;
+  const visibleBooks = books.slice(0, visibleCount);
 
   const titles = {
     reading: "Currently Reading",
@@ -209,7 +219,7 @@ function renderShelf(shelf) {
   shelfTitle.textContent = titles[shelf] || shelf;
   libraryBooks.innerHTML = "";
 
-  if (books.length === 0) {
+  if (visibleBooks.length === 0) {
     const copy = emptyCopy[shelf] || emptyCopy.want;
     libraryBooks.innerHTML = `
       <div class="empty-library card">
@@ -221,7 +231,7 @@ function renderShelf(shelf) {
     return;
   }
 
-  books.forEach(book => {
+  visibleBooks.forEach(book => {
     const wrapper = document.createElement("div");
     wrapper.innerHTML = BookMindBookCard.render(book, { showProgress: true });
 
@@ -259,6 +269,18 @@ function renderShelf(shelf) {
 
     libraryBooks.appendChild(card);
   });
+
+  if (books.length > visibleBooks.length) {
+    const loadMore = document.createElement("button");
+    loadMore.type = "button";
+    loadMore.className = "btn btn-secondary library-load-more";
+    loadMore.textContent = `Load more (${books.length - visibleBooks.length} remaining)`;
+    loadMore.addEventListener("click", () => {
+      shelfVisibleCounts[shelf] = (shelfVisibleCounts[shelf] || SHELF_PAGE_SIZE) + SHELF_PAGE_SIZE;
+      renderShelf(shelf);
+    });
+    libraryBooks.appendChild(loadMore);
+  }
 }
 
 function escapeHtml(value) {

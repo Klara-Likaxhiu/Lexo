@@ -205,7 +205,12 @@ const BookMindAPI = {
   },
 
   _intelligenceCacheKey(context) {
-    return `${context.today_mood || ""}|${context.today_goal || ""}`;
+    const library = context.library || {};
+    const shelves = ["read", "reading", "want", "not_interested"];
+    const librarySig = shelves
+      .map(shelf => `${shelf}:${(library[shelf] || []).length}`)
+      .join("|");
+    return `${context.today_mood || ""}|${context.today_goal || ""}|${librarySig}|${context.profile_completion || "0"}`;
   },
 
   _readIntelligenceCache(context) {

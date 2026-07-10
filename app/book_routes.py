@@ -2,6 +2,7 @@ import logging
 import os
 import re
 import time
+from concurrent.futures import ThreadPoolExecutor
 from typing import Literal
 
 import httpx
@@ -319,6 +320,13 @@ def _parse_open_library_doc(item: dict) -> dict | None:
     }
 
 
+def _dual_book_search(q: str, fetch_limit: int, mode: SearchMode) -> tuple[list, list]:
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        google_future = pool.submit(search_google_books, q, limit=fetch_limit, mode=mode)
+        ol_future = pool.submit(search_open_library, q, limit=fetch_limit, mode=mode)
+        return google_future.result(), ol_future.result()
+
+
 @router.get("/search")
 def search_books(
     q: str,
@@ -330,8 +338,7 @@ def search_books(
         raise HTTPException(status_code=400, detail="Search query is required.")
 
     fetch_limit = min(limit * 3, 36)
-    google = search_google_books(q, limit=fetch_limit, mode=mode)
-    open_lib = search_open_library(q, limit=fetch_limit, mode=mode)
+    google, open_lib = _dual_book_search(q, fetch_limit, mode)
 
     books = dedupe_books(google + open_lib)[:limit]
     return {"query": q, "mode": mode, "results": books}
@@ -348,10 +355,8 @@ def google_search_books(
         raise HTTPException(status_code=400, detail="Search query is required.")
 
     fetch_limit = min(limit * 2, 20)
-    results = dedupe_books(
-        search_google_books(q, limit=fetch_limit, mode=mode)
-        + search_open_library(q, limit=fetch_limit, mode=mode)
-    )[:limit]
+    google, open_lib = _dual_book_search(q, fetch_limit, mode)
+    results = dedupe_books(google + open_lib)[:limit]
     return {"query": q, "mode": mode, "results": results}
 
 

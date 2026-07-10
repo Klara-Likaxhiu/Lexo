@@ -1,10 +1,14 @@
-/** My Library — Supabase-backed via /api/library (no localStorage for shelf data). */
+/** My Library — Supabase-backed via /api/library with stale-while-revalidate cache. */
 const BookMindLibrary = {
   _cache: null,
   _books: [],
   _loaded: false,
   _loading: null,
+  _bgRefresh: null,
   _lastError: null,
+  _persistKey: "bookmind_library_cache_v1",
+  _persistAtKey: "bookmind_library_cache_at",
+  _persistTtlMs: 5 * 60 * 1000,
 
   SHELVES: ["read", "reading", "want", "not_interested"],
 
@@ -104,19 +108,96 @@ const BookMindLibrary = {
     if (this._loaded && !force) return this._cache;
     if (this._loading) return this._loading;
 
+    if (!force && !this._loaded) {
+      const persisted = this._readPersistentCache();
+      if (persisted) {
+        this._applyPayload(persisted);
+        this._scheduleBackgroundRefresh();
+        return this._cache;
+      }
+    }
+
     this._loading = this._fetchLibrary().finally(() => {
       this._loading = null;
     });
     return this._loading;
   },
 
-  async _fetchLibrary() {
-    const data = await this._request("/api/library");
+  _applyPayload(data) {
     this._cache = data.library || this.emptyLibrary();
     this._books = Array.isArray(data.books) ? data.books : [];
     this._loaded = true;
     this._lastError = null;
+  },
+
+  _readPersistentCache() {
+    try {
+      const at = Number(localStorage.getItem(this._persistAtKey) || 0);
+      if (!at || Date.now() - at > this._persistTtlMs) return null;
+      const raw = localStorage.getItem(this._persistKey);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object") return null;
+      return parsed;
+    } catch {
+      return null;
+    }
+  },
+
+  _writePersistentCache() {
+    try {
+      localStorage.setItem(
+        this._persistKey,
+        JSON.stringify({ library: this._cache, books: this._books })
+      );
+      localStorage.setItem(this._persistAtKey, String(Date.now()));
+    } catch {
+      /* storage full or unavailable */
+    }
+  },
+
+  _scheduleBackgroundRefresh() {
+    if (this._bgRefresh) return;
+    this._bgRefresh = this._fetchLibrary({ silent: true })
+      .catch(() => this._cache)
+      .finally(() => {
+        this._bgRefresh = null;
+      });
+  },
+
+  async _fetchLibrary({ silent = false } = {}) {
+    const data = await this._request("/api/library");
+    this._applyPayload(data);
+    this._writePersistentCache();
+    if (!silent) {
+      this._emitChange({ action: "refresh" });
+    }
     return this._cache;
+  },
+
+  _upsertBookInCache(book) {
+    if (!book?.library_id) return;
+    const index = this._books.findIndex(entry => entry.library_id === book.library_id);
+    if (index >= 0) {
+      this._books[index] = { ...this._books[index], ...book };
+    } else {
+      this._books.push(book);
+    }
+    const status = this.normalizeStatus(book.status);
+    Object.keys(this._cache).forEach(key => {
+      this._cache[key] = (this._cache[key] || []).filter(entry => entry.library_id !== book.library_id);
+    });
+    if (!this._cache[status]) this._cache[status] = [];
+    this._cache[status].unshift(book);
+    this._writePersistentCache();
+  },
+
+  _removeBookFromCache(libraryId) {
+    this._books = this._books.filter(entry => entry.library_id !== libraryId);
+    Object.keys(this._cache).forEach(key => {
+      this._cache[key] = (this._cache[key] || []).filter(entry => entry.library_id !== libraryId);
+    });
+    this._writePersistentCache();
   },
 
   async refresh() {
@@ -250,8 +331,8 @@ const BookMindLibrary = {
       }
     );
 
-    await this.refresh();
     const book = data.book;
+    if (book) this._upsertBookInCache(book);
     if (book?.status === "read") {
       this.syncFinishState(book, "read");
     }
@@ -272,8 +353,8 @@ const BookMindLibrary = {
         `/api/library/${encodeURIComponent(libraryId)}/open`,
         { method: "POST" }
       );
-      if (!options.skipRefresh) {
-        await this.refresh();
+      if (!options.skipRefresh && data.book) {
+        this._upsertBookInCache(data.book);
       }
       return data.book;
     } catch {
@@ -328,7 +409,7 @@ const BookMindLibrary = {
       body: this._bookPayload(book, shelf, meta),
     });
 
-    await this.refresh();
+    if (data.book) this._upsertBookInCache(data.book);
     this.syncFinishState(book, shelf);
     this._emitChange({ action: "save", book: data.book, status: shelf, created: data.created });
     return data;
@@ -364,8 +445,8 @@ const BookMindLibrary = {
       body,
     });
 
-    await this.refresh();
     const book = data.book;
+    if (book) this._upsertBookInCache(book);
     if (book && patch.status) {
       this.syncFinishState(book, patch.status);
     }
@@ -379,11 +460,11 @@ const BookMindLibrary = {
       throw new Error("Book is not in your library.");
     }
 
-    const data = await this._request(`/api/library/${encodeURIComponent(entry.library_id)}`, {
+    await this._request(`/api/library/${encodeURIComponent(entry.library_id)}`, {
       method: "DELETE",
     });
 
-    await this.refresh();
+    this._removeBookFromCache(entry.library_id);
     this.clearFinish(book);
     this._emitChange({ action: "remove", book: entry });
 

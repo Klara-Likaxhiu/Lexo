@@ -6,6 +6,7 @@ from typing import Any
 
 import httpx
 
+from app.http_client import get_http_client
 from app.supabase_client import supabase_anon_key, supabase_service_role_key, supabase_url
 
 
@@ -68,8 +69,8 @@ def request(
     if not supabase_url():
         raise SupabaseRestError("SUPABASE_URL is not configured.", status_code=503)
 
-    with httpx.Client(timeout=20.0) as client:
-        response = client.request(
+    client = get_http_client()
+    response = client.request(
             method,
             rest_url(table),
             headers=headers(prefer=prefer),

@@ -1,10 +1,14 @@
-/** Temporary page-load performance instrumentation. */
+/** Temporary page-load performance instrumentation (enable with ?debug=perf). */
 window.BookMindPerf = {
+  enabled: false,
   _requests: [],
   _started: false,
 
   startPageLoad() {
-    if (this._started) return;
+    this.enabled =
+      new URLSearchParams(window.location.search).has("debug") ||
+      localStorage.getItem("bookmind_debug_perf") === "1";
+    if (!this.enabled || this._started) return;
     this._started = true;
     console.time("page-load");
     console.time("auth-load");
@@ -15,6 +19,7 @@ window.BookMindPerf = {
   },
 
   endAuthLoad() {
+    if (!this.enabled) return;
     try {
       console.timeEnd("auth-load");
     } catch {
@@ -23,6 +28,7 @@ window.BookMindPerf = {
   },
 
   endBooksLoad() {
+    if (!this.enabled) return;
     try {
       console.timeEnd("books-load");
     } catch {
@@ -31,6 +37,7 @@ window.BookMindPerf = {
   },
 
   endCoversLoad() {
+    if (!this.enabled) return;
     try {
       console.timeEnd("covers-load");
     } catch {
@@ -39,6 +46,7 @@ window.BookMindPerf = {
   },
 
   endRecommendationsLoad() {
+    if (!this.enabled) return;
     try {
       console.timeEnd("recommendations-load");
     } catch {
@@ -47,6 +55,7 @@ window.BookMindPerf = {
   },
 
   endPageLoad() {
+    if (!this.enabled) return;
     try {
       console.timeEnd("page-load");
     } catch {
@@ -60,7 +69,7 @@ window.BookMindPerf = {
   },
 
   _hookFetch() {
-    if (window.__bookmindPerfFetchHooked) return;
+    if (!this.enabled || window.__bookmindPerfFetchHooked) return;
     window.__bookmindPerfFetchHooked = true;
     const originalFetch = window.fetch.bind(window);
     window.fetch = async (...args) => {

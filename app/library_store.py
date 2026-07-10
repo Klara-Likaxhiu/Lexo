@@ -9,10 +9,17 @@ from typing import Any
 
 import httpx
 
+from app.http_client import get_http_client
 from app.supabase_client import supabase_anon_key, supabase_service_role_key, supabase_url
 
 TABLE = "user_library"
 VALID_STATUSES = {"want", "reading", "read", "not_interested"}
+LIBRARY_LIST_COLUMNS = (
+    "id,book_id,title,author,genre,cover_url,description,status,progress,"
+    "current_page,total_pages,started_at,finished_at,last_opened_at,favorite,"
+    "date_added,updated_at,metadata"
+)
+LIBRARY_ROW_COLUMNS = LIBRARY_LIST_COLUMNS
 
 
 class LibraryStoreError(Exception):
@@ -97,8 +104,8 @@ def _request(
     if not supabase_url():
         raise LibraryStoreError("Supabase is not configured.", status_code=503)
 
-    with httpx.Client(timeout=20.0) as client:
-        response = client.request(
+    client = get_http_client()
+    response = client.request(
             method,
             _rest_url(path),
             headers=_headers(prefer=prefer),
@@ -259,7 +266,7 @@ def list_user_books(user_id: str) -> list[dict[str, Any]]:
         params={
             "user_id": f"eq.{user_id}",
             "order": "updated_at.desc",
-            "select": "*",
+            "select": LIBRARY_LIST_COLUMNS,
         },
     )
     if not isinstance(rows, list):
@@ -284,7 +291,7 @@ def find_book_by_title(user_id: str, title: str) -> dict[str, Any] | None:
     trimmed = (title or "").strip()
     params: dict[str, str] = {
         "user_id": f"eq.{user_id}",
-        "select": "*",
+        "select": LIBRARY_ROW_COLUMNS,
         "limit": "8",
     }
     if trimmed:
@@ -389,7 +396,7 @@ def update_book(
     progress: int | None = None,
     favorite: bool | None = None,
 ) -> dict[str, Any]:
-    params: dict[str, str] = {"user_id": f"eq.{user_id}", "select": "*"}
+    params: dict[str, str] = {"user_id": f"eq.{user_id}", "select": LIBRARY_ROW_COLUMNS}
     if library_id:
         params["id"] = f"eq.{library_id}"
     elif book_id:
@@ -441,7 +448,7 @@ def update_book_cover(
     if not normalized:
         return None
 
-    params: dict[str, str] = {"user_id": f"eq.{user_id}", "select": "*", "limit": "1"}
+    params: dict[str, str] = {"user_id": f"eq.{user_id}", "select": LIBRARY_ROW_COLUMNS, "limit": "1"}
     if library_id:
         params["id"] = f"eq.{library_id}"
     elif title:
@@ -462,7 +469,7 @@ def update_book_cover(
     patched = _request(
         "PATCH",
         TABLE,
-        params={"id": f"eq.{row['id']}", "user_id": f"eq.{user_id}", "select": "*"},
+        params={"id": f"eq.{row['id']}", "user_id": f"eq.{user_id}", "select": LIBRARY_ROW_COLUMNS},
         json={"cover_url": normalized, "updated_at": _utcnow_iso()},
         prefer="return=representation",
     )
@@ -478,7 +485,7 @@ def _get_book_row(user_id: str, *, library_id: str) -> dict[str, Any]:
         params={
             "id": f"eq.{library_id}",
             "user_id": f"eq.{user_id}",
-            "select": "*",
+            "select": LIBRARY_LIST_COLUMNS,
             "limit": "1",
         },
     )
@@ -531,7 +538,7 @@ def update_reading_progress(
     rows = _request(
         "PATCH",
         TABLE,
-        params={"id": f"eq.{library_id}", "user_id": f"eq.{user_id}", "select": "*"},
+        params={"id": f"eq.{library_id}", "user_id": f"eq.{user_id}", "select": LIBRARY_ROW_COLUMNS},
         json=patch,
         prefer="return=representation",
     )
@@ -548,7 +555,7 @@ def touch_last_opened(user_id: str, *, library_id: str) -> dict[str, Any]:
     rows = _request(
         "PATCH",
         TABLE,
-        params={"id": f"eq.{library_id}", "user_id": f"eq.{user_id}", "select": "*"},
+        params={"id": f"eq.{library_id}", "user_id": f"eq.{user_id}", "select": LIBRARY_ROW_COLUMNS},
         json={"last_opened_at": now, "updated_at": now},
         prefer="return=representation",
     )

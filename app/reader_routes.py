@@ -8,6 +8,7 @@ from app.reader import (
     generate_genre_reading_path,
     generate_reader_intelligence,
     generate_path_reflection,
+    build_intelligence_cache_key,
 )
 
 from app.reader_models import (
@@ -27,6 +28,7 @@ from app.reading_paths_store import (
     upsert_path,
 )
 from app.deps import get_verified_user
+from app.user_store import get_intelligence_cache, set_intelligence_cache
 
 router = APIRouter(prefix="/api/reader", tags=["Reader"])
 
@@ -40,11 +42,14 @@ def analyze_reader(data: ReaderProfileRequest) -> dict:
 
 
 @router.post("/recommend-with-data")
-def recommend_reader_with_data(data: ReaderProfileRequest) -> dict:
+def recommend_reader_with_data(
+    data: ReaderProfileRequest,
+    user: dict = Depends(get_verified_user),
+) -> dict:
     if not data.quiz_answers:
         raise HTTPException(status_code=400, detail="Quiz answers are required.")
 
-    return recommend_with_book_data(data)
+    return recommend_with_book_data(data, user_id=user["id"])
 
 
 @router.post("/companion")
@@ -69,13 +74,28 @@ def reading_paths(data: ReadingPathsRequest) -> dict:
 
 
 @router.post("/intelligence")
-def reader_intelligence(data: ReaderIntelligenceRequest) -> dict:
-    return generate_reader_intelligence(
+def reader_intelligence(
+    data: ReaderIntelligenceRequest,
+    user: dict = Depends(get_verified_user),
+) -> dict:
+    cache_key = build_intelligence_cache_key(
+        data.reader_profile,
+        data.library,
+        data.today_mood,
+        data.today_goal,
+    )
+    cached = get_intelligence_cache(user["id"], cache_key)
+    if cached:
+        return {**cached, "cached": True}
+
+    result = generate_reader_intelligence(
         reader_profile=data.reader_profile,
         library=data.library,
         today_mood=data.today_mood,
         today_goal=data.today_goal,
     )
+    set_intelligence_cache(user["id"], cache_key, result)
+    return result
 
 
 @router.post("/badges")

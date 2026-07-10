@@ -92,11 +92,9 @@ const BookMindUserData = {
   },
 
   async loadQuizProgress() {
-    if (!window.BookMindAuth?.isLoggedIn()) return null;
-    const data = await BookMindAPI.get("/api/user/reader-profile");
-    const quizState = data.profile?.profile_data?.quiz_state;
-    if (!quizState) return null;
-
+    const profile = await this.loadReaderProfile();
+    if (!profile?.profile_data?.quiz_state) return null;
+    const quizState = profile.profile_data.quiz_state;
     localStorage.setItem("reader_quiz_answers", JSON.stringify(quizState.answers || {}));
     localStorage.setItem("reader_quiz_step", String(quizState.current_step ?? 0));
     localStorage.setItem("reader_profile_completion", String(quizState.completion ?? 0));

@@ -9,9 +9,13 @@ from typing import Any
 
 import httpx
 
+from app.http_client import get_http_client
 from app.supabase_client import supabase_anon_key, supabase_service_role_key, supabase_url
 
 TABLE = "user_reading_paths"
+PATH_LIST_COLUMNS = (
+    "id,user_id,path_name,genre_slug,genre_label,path_data,updated_at,created_at"
+)
 
 
 class ReadingPathsStoreError(Exception):
@@ -85,8 +89,8 @@ def _request(
     if not supabase_url():
         raise ReadingPathsStoreError("Supabase is not configured.", status_code=503)
 
-    with httpx.Client(timeout=20.0) as client:
-        response = client.request(
+    client = get_http_client()
+    response = client.request(
             method,
             _rest_url(path),
             headers=_headers(prefer=prefer),
@@ -131,7 +135,7 @@ def list_user_paths(user_id: str) -> list[dict[str, Any]]:
         TABLE,
         params={
             "user_id": f"eq.{user_id}",
-            "select": "*",
+            "select": PATH_LIST_COLUMNS,
             "order": "updated_at.desc",
         },
     )
@@ -147,7 +151,7 @@ def get_path_by_id(user_id: str, path_id: str) -> dict[str, Any] | None:
         params={
             "user_id": f"eq.{user_id}",
             "id": f"eq.{path_id}",
-            "select": "*",
+            "select": PATH_LIST_COLUMNS,
             "limit": "1",
         },
     )
@@ -163,7 +167,7 @@ def get_path_by_genre_slug(user_id: str, genre_slug: str) -> dict[str, Any] | No
         params={
             "user_id": f"eq.{user_id}",
             "genre_slug": f"eq.{genre_slug}",
-            "select": "*",
+            "select": PATH_LIST_COLUMNS,
             "limit": "1",
         },
     )

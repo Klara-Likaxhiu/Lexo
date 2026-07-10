@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from app.supabase_rest import SupabaseRestError, request
 
 TABLE = "profiles"
+PROFILE_COLUMNS = "id,username,email,auth_provider,provider_subject,created_at"
 
 
 def _utcnow_iso() -> str:
@@ -64,7 +65,7 @@ def get_profile_by_id(user_id: str) -> dict | None:
     rows = request(
         "GET",
         TABLE,
-        params={"id": f"eq.{user_id}", "select": "*", "limit": "1"},
+        params={"id": f"eq.{user_id}", "select": PROFILE_COLUMNS, "limit": "1"},
     )
     if isinstance(rows, list) and rows:
         return _row_to_profile(rows[0])
@@ -75,7 +76,7 @@ def get_profile_by_username(username: str) -> dict | None:
     rows = request(
         "GET",
         TABLE,
-        params={"username": f"ilike.{username.strip()}", "select": "*", "limit": "1"},
+        params={"username": f"ilike.{username.strip()}", "select": PROFILE_COLUMNS, "limit": "1"},
     )
     if isinstance(rows, list) and rows:
         return _row_to_profile(rows[0])
@@ -86,7 +87,7 @@ def get_profile_by_email(email: str) -> dict | None:
     rows = request(
         "GET",
         TABLE,
-        params={"email": f"eq.{email.strip().lower()}", "select": "*", "limit": "1"},
+        params={"email": f"eq.{email.strip().lower()}", "select": PROFILE_COLUMNS, "limit": "1"},
     )
     if isinstance(rows, list) and rows:
         return _row_to_profile(rows[0])
@@ -100,7 +101,7 @@ def get_profile_by_provider(auth_provider: str, provider_subject: str) -> dict |
         params={
             "auth_provider": f"eq.{auth_provider}",
             "provider_subject": f"eq.{provider_subject}",
-            "select": "*",
+            "select": PROFILE_COLUMNS,
             "limit": "1",
         },
     )

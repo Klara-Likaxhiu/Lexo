@@ -1,5 +1,4 @@
 /** BookMindAI centralized cover component — hosted Supabase URLs only. */
-console.log("BOOK COVER BUILD VERSION: perf-v1");
 
 const HOSTED_COVER_MARKER = "/storage/v1/object/public/book-covers/";
 
@@ -321,7 +320,11 @@ const BookMindCoverImage = {
     wrap.dataset.coverStatus = "ready";
     wrap.dataset.title = ref.title || "";
     wrap.dataset.author = ref.author || "";
-    wrap.innerHTML = `<img class="${imgClass} book-cover-image" src="${this.escape(url)}" alt="${this.escape(ref.title)} cover" loading="lazy" decoding="async" onerror="BookCover.onError(this)">`;
+    const lazyAttrs =
+      options.lazy === false
+        ? 'loading="eager" fetchpriority="high"'
+        : 'loading="lazy" decoding="async"';
+    wrap.innerHTML = `<img class="${imgClass} book-cover-image" src="${this.escape(url)}" alt="${this.escape(ref.title)} cover" ${lazyAttrs} onerror="BookCover.onError(this)">`;
     wrap.classList.add("cover-has-image", "cover-loaded");
     wrap.dataset.coverResolved = "true";
     this._persistCoverUrl(this.bookRef(sourceBook), url);

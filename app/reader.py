@@ -1,3 +1,4 @@
+import hashlib
 import json
 import re
 
@@ -24,6 +25,50 @@ def _safe_json_loads(result: str, fallback: dict) -> dict:
 # ---------------------------------------------------------------------------
 
 _SHELVES = ("read", "reading", "want", "not_interested")
+
+
+def _quiz_inputs_hash(data: ReaderProfileRequest) -> str:
+    payload = {
+        "quiz_answers": data.quiz_answers,
+        "books_read": data.books_read,
+        "reading_level": data.reading_level,
+    }
+    return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
+
+
+def _compact_library_signature(library: dict | None) -> str:
+    if not isinstance(library, dict):
+        return ""
+    parts: list[str] = []
+    for shelf in _SHELVES:
+        books = library.get(shelf) or []
+        if not isinstance(books, list):
+            continue
+        parts.append(f"{shelf}:{len(books)}")
+        for book in books[:40]:
+            if isinstance(book, dict):
+                parts.append(_normalize_title(book.get("title")))
+    return "|".join(parts)
+
+
+def build_intelligence_cache_key(
+    reader_profile: dict | None,
+    library: dict | None,
+    today_mood: str | None,
+    today_goal: str | None,
+) -> str:
+    profile = reader_profile if isinstance(reader_profile, dict) else {}
+    payload = {
+        "mood": today_mood or "",
+        "goal": today_goal or "",
+        "library": _compact_library_signature(library),
+        "profile_completion": str(profile.get("profile_completion") or ""),
+        "quiz_hash": hashlib.sha256(
+            json.dumps(profile.get("quiz_answers") or "", sort_keys=True).encode()
+        ).hexdigest()[:16],
+        "excluded_count": len(profile.get("excluded_books") or []),
+    }
+    return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
 
 
 def _normalize_title(title) -> str:
@@ -141,8 +186,15 @@ Return ONLY valid JSON in this exact structure:
     return parsed_result
 
 
-def recommend_with_book_data(data: ReaderProfileRequest) -> dict:
+def recommend_with_book_data(data: ReaderProfileRequest, *, user_id: str | None = None) -> dict:
     from app.cover_service import enrich_profile_recommendations
+    from app.user_store import get_cached_quiz_recommendations, save_quiz_recommendations_cache
+
+    quiz_hash = _quiz_inputs_hash(data)
+    if user_id:
+        cached = get_cached_quiz_recommendations(user_id, quiz_hash)
+        if cached:
+            return cached
 
     reader_result = analyze_reader_profile(data)
     profile_payload = {
@@ -158,7 +210,7 @@ def recommend_with_book_data(data: ReaderProfileRequest) -> dict:
     }
     enrich_profile_recommendations(profile_payload, cache_only=True)
 
-    return {
+    result = {
         "reader_type": profile_payload.get("reader_type"),
         "favorite_genres": profile_payload.get("favorite_genres"),
         "confirmed_reading_level": profile_payload.get("confirmed_reading_level"),
@@ -166,6 +218,19 @@ def recommend_with_book_data(data: ReaderProfileRequest) -> dict:
         "recommendations": profile_payload.get("recommendations", []),
         "engine": reader_result.get("engine"),
     }
+
+    if user_id:
+        save_quiz_recommendations_cache(
+            user_id,
+            quiz_hash=quiz_hash,
+            payload={
+                **result,
+                "quiz_answers": data.quiz_answers,
+                "books_read": data.books_read,
+            },
+        )
+
+    return result
 
 
 def reading_companion(question: str, reader_profile: dict | None = None) -> dict:
@@ -331,9 +396,28 @@ Use this exact structure:
 
     from app.cover_service import enrich_books_in_list
 
-    for path in parsed.get("paths", []) or []:
-        if isinstance(path, dict):
-            path["books"] = enrich_books_in_list(path.get("books"), cache_only=True)
+    paths = [path for path in (parsed.get("paths") or []) if isinstance(path, dict)]
+    all_books: list[dict] = []
+    for path in paths:
+        books = path.get("books") or []
+        if isinstance(books, list):
+            all_books.extend(book for book in books if isinstance(book, dict))
+
+    if all_books:
+        enriched = enrich_books_in_list(all_books, cache_only=True)
+        enriched_by_title = {
+            _normalize_title(book.get("title")): book for book in enriched if book.get("title")
+        }
+        for path in paths:
+            books = path.get("books") or []
+            if not isinstance(books, list):
+                continue
+            path["books"] = [
+                enriched_by_title.get(_normalize_title(book.get("title")), book)
+                if isinstance(book, dict)
+                else book
+                for book in books
+            ]
 
     parsed["engine"] = ai.engine_name()
 
