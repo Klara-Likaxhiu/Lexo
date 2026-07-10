@@ -1,10 +1,37 @@
 /** Centralized book cover rendering, lookup, and caching for BookMindAI. */
 
+function isOpenLibraryUrl(url) {
+  if (!url || typeof url !== "string") return false;
+  const lowered = url.toLowerCase();
+  return lowered.includes("openlibrary.org") || lowered.includes("archive.org");
+}
+
+function pickGoogleImageUrl(images) {
+  if (!images || typeof images !== "object") return null;
+  const raw =
+    images.large ||
+    images.medium ||
+    images.small ||
+    images.thumbnail ||
+    images.smallThumbnail ||
+    images.extraLarge ||
+    null;
+  return raw ? normalizeCoverUrl(raw) : null;
+}
+
+function usableCoverUrl(url) {
+  const normalized = normalizeCoverUrl(url);
+  if (!normalized) return null;
+  if (isBrokenUrl(normalized)) return null;
+  return normalized;
+}
+
 function getBookCover(book) {
   if (!book || typeof book !== "object") return null;
   const ai = book.ai_recommendation || {};
   const bookData = book.book_data || {};
   const images = book.volumeInfo?.imageLinks || book.volume_info?.imageLinks || {};
+  const googleUrl = pickGoogleImageUrl(images);
 
   return (
     book.cover_url ||
@@ -15,11 +42,9 @@ function getBookCover(book) {
     bookData.coverUrl ||
     ai.cover_url ||
     ai.coverUrl ||
+    googleUrl ||
     images.thumbnail ||
     images.smallThumbnail ||
-    images.medium ||
-    images.large ||
-    images.extraLarge ||
     null
   );
 }
@@ -168,8 +193,10 @@ const BookMindCoverImage = {
     const normalized = normalizeCoverUrl(url);
     if (!normalized) return;
     markBrokenUrl(normalized);
-    if (this._memoryCache.get(key) === normalized) this._memoryCache.delete(key);
-    this._schedulePersist();
+    if (this._memoryCache.get(key) === normalized) {
+      this._memoryCache.delete(key);
+      this._schedulePersist();
+    }
   },
 
   _isBrokenUrl(key, url) {
@@ -284,71 +311,86 @@ const BookMindCoverImage = {
     const images = book?.volumeInfo?.imageLinks || book?.volume_info?.imageLinks || {};
     const bookData = book?.book_data || {};
     const ai = book?.ai_recommendation || {};
+    const googleUrl = pickGoogleImageUrl(images);
 
-    const rawUrl =
-      book?.cover_url ||
-      book?.coverUrl ||
-      book?.image ||
-      book?.thumbnail ||
-      bookData?.cover_url ||
-      bookData?.coverUrl ||
-      ai?.cover_url ||
-      ai?.coverUrl ||
-      images?.thumbnail ||
-      images?.smallThumbnail ||
-      null;
+    const fieldCandidates = [
+      book?.cover_url,
+      book?.coverUrl,
+      book?.image,
+      book?.thumbnail,
+      bookData?.cover_url,
+      bookData?.coverUrl,
+      ai?.cover_url,
+      ai?.coverUrl,
+      googleUrl,
+    ];
 
-    if (!rawUrl || typeof rawUrl !== "string") {
-      this._loadCaches();
-      const ref = this.bookRef(book || {});
-      const cached = this._memoryCache.get(this.cacheKey(ref));
-      if (cached && typeof cached === "string" && !this.isMissingCoverUrl(cached)) {
-        const normalizedUrl = cached.trim().replace(/^http:/i, "https:");
+    for (const raw of fieldCandidates) {
+      const normalized = usableCoverUrl(raw);
+      if (normalized && !isOpenLibraryUrl(normalized)) {
         console.log("[BookCover getKnownUrl]", {
           title: book?.title,
           rawCoverUrl: book?.cover_url,
-          normalizedUrl,
+          normalizedUrl: normalized,
+          rejected: false,
+          source: "non_open_library_field",
+        });
+        return normalized;
+      }
+    }
+
+    this._loadCaches();
+    const ref = this.bookRef(book || {});
+    const key = this.cacheKey(ref);
+    const cached = this._memoryCache.get(key);
+    if (cached) {
+      const normalized = usableCoverUrl(cached);
+      if (normalized && !isOpenLibraryUrl(normalized)) {
+        console.log("[BookCover getKnownUrl]", {
+          title: book?.title,
+          rawCoverUrl: book?.cover_url,
+          normalizedUrl: normalized,
           rejected: false,
           source: "memory_cache",
         });
-        return normalizedUrl;
+        return normalized;
       }
-
-      console.warn("[BookCover getKnownUrl rejected]", {
-        title: book?.title,
-        url: rawUrl ?? null,
-        reason: rawUrl == null ? "missing_cover_url" : "non_string_cover_url",
-      });
-      return null;
     }
 
-    if (this.isMissingCoverUrl(rawUrl)) {
-      console.warn("[BookCover getKnownUrl rejected]", {
-        title: book?.title,
-        url: rawUrl,
-        reason: "missing_sentinel_value",
-      });
-      return null;
+    for (const raw of fieldCandidates) {
+      const normalized = usableCoverUrl(raw);
+      if (normalized && isOpenLibraryUrl(normalized)) {
+        console.log("[BookCover getKnownUrl]", {
+          title: book?.title,
+          rawCoverUrl: book?.cover_url,
+          normalizedUrl: normalized,
+          rejected: false,
+          source: "open_library_fallback",
+        });
+        return normalized;
+      }
     }
 
-    const normalizedUrl = rawUrl.trim().replace(/^http:/i, "https:");
-
-    if (!normalizedUrl) {
-      console.warn("[BookCover getKnownUrl rejected]", {
-        title: book?.title,
-        url: rawUrl,
-        reason: "empty_after_trim",
-      });
-      return null;
+    if (cached) {
+      const normalized = usableCoverUrl(cached);
+      if (normalized && isOpenLibraryUrl(normalized)) {
+        console.log("[BookCover getKnownUrl]", {
+          title: book?.title,
+          rawCoverUrl: book?.cover_url,
+          normalizedUrl: normalized,
+          rejected: false,
+          source: "memory_cache_open_library",
+        });
+        return normalized;
+      }
     }
 
-    console.log("[BookCover getKnownUrl]", {
+    console.warn("[BookCover getKnownUrl rejected]", {
       title: book?.title,
-      rawCoverUrl: book?.cover_url,
-      normalizedUrl,
-      rejected: false,
+      url: book?.cover_url ?? null,
+      reason: book?.cover_url ? "broken_or_open_library_blocked" : "missing_cover_url",
     });
-    return normalizedUrl;
+    return null;
   },
 
   _rememberSuccess(key, url, options = {}) {
@@ -556,14 +598,20 @@ const BookMindCoverImage = {
     const failedUrl = normalizeCoverUrl(img.getAttribute("src") || img.dataset.coverSrc);
 
     if (failedUrl) {
-      this._rememberBrokenUrl(key, failedUrl);
+      markBrokenUrl(failedUrl);
+      if (this._memoryCache.get(key) === failedUrl) {
+        this._memoryCache.delete(key);
+        this._schedulePersist();
+      }
       ref.cover_url = null;
       wrap.__bookRef = { ...ref, cover_url: null };
       delete wrap.dataset.coverUrl;
     }
 
     this.renderPlaceholder(wrap, ref);
-    this._logMissingCover(book, ref, null, "onerror_retry_resolve");
+    this._logMissingCover(book, ref, null, failedUrl && isOpenLibraryUrl(failedUrl)
+      ? "open_library_network_error_retry_google"
+      : "onerror_retry_resolve");
     this._queueResolve(wrap);
   },
 
@@ -621,11 +669,15 @@ const BookMindCoverImage = {
       if (this._pending.has(this.cacheKey(ref))) return;
       if (refs.some(item => this.cacheKey(item) === this.cacheKey(ref))) return;
 
+      const rawCover = getBookCover(book) || null;
+      const normalizedCover = normalizeCoverUrl(rawCover);
+      const coverForApi = isOpenLibraryUrl(normalizedCover) ? null : normalizedCover;
+
       missing.push({
         title: ref.title,
         author: ref.author,
         isbn: ref.isbn,
-        cover_url: getBookCover(book) || null,
+        cover_url: coverForApi,
         google_id: ref.google_id,
         open_library_key: ref.open_library_key,
       });
@@ -746,6 +798,15 @@ const BookMindCoverImage = {
       }
 
       if (img) {
+        const src = normalizeCoverUrl(img.getAttribute("src") || img.dataset.coverSrc);
+        if (src && isBrokenUrl(src)) {
+          ref.cover_url = null;
+          wrap.__bookRef = { ...ref, cover_url: null };
+          delete wrap.dataset.coverUrl;
+          this.renderPlaceholder(wrap, ref, options);
+          this._queueResolve(wrap);
+          return;
+        }
         this._activateImage(img, wrap, ref);
         return;
       }
@@ -808,6 +869,7 @@ const BookMindCoverImage = {
 const BookCover = {
   getBookCover,
   normalizeCoverUrl,
+  isOpenLibraryUrl,
 
   html(bookOrProps, options = {}) {
     const props = bookOrProps || {};

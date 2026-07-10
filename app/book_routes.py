@@ -156,6 +156,8 @@ def _book_result_score(book: dict) -> int:
     score = 0
     if book.get("cover_url"):
         score += 4
+    if book.get("source") == "google_books":
+        score += 12
     if book.get("description"):
         score += 2
     if book.get("description_preview"):
@@ -169,8 +171,6 @@ def _book_result_score(book: dict) -> int:
     if book.get("average_rating"):
         score += 2
     if book.get("categories"):
-        score += 1
-    if book.get("source") == "google_books":
         score += 1
     return score
 
@@ -227,6 +227,7 @@ def _parse_google_volume(item: dict) -> dict | None:
         images.get("extraLarge")
         or images.get("large")
         or images.get("medium")
+        or images.get("small")
         or images.get("thumbnail")
         or images.get("smallThumbnail")
     )
@@ -334,6 +335,10 @@ def search_books(
     open_lib = search_open_library(q, limit=fetch_limit, mode=mode)
 
     books = dedupe_books(google + open_lib)[:limit]
+    if books:
+        from app.cover_service import upgrade_search_result_covers
+
+        books = upgrade_search_result_covers(books)
     return {"query": q, "mode": mode, "results": books}
 
 
@@ -352,6 +357,10 @@ def google_search_books(
         search_google_books(q, limit=fetch_limit, mode=mode)
         + search_open_library(q, limit=fetch_limit, mode=mode)
     )[:limit]
+    if results:
+        from app.cover_service import upgrade_search_result_covers
+
+        results = upgrade_search_result_covers(results)
     return {"query": q, "mode": mode, "results": results}
 
 

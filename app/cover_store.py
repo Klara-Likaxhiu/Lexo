@@ -9,11 +9,15 @@ from typing import Any
 from app.supabase_rest import SupabaseRestError, request
 
 COVERS_TABLE = "book_covers"
-LOOKUP_FAILED_TTL = timedelta(minutes=30)
+LOOKUP_FAILED_TTL = timedelta(hours=24)
 
 SOURCE_LABELS = {
     "google_books": "Google Books",
+    "google_books_isbn": "Google Books",
     "open_library": "Open Library",
+    "open_library_isbn": "Open Library",
+    "open_library_provided": "Open Library",
+    "open_library_cache": "Open Library",
     "isbn": "ISBN",
     "provided": "Database",
     "manual": "Manual",

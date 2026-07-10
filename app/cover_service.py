@@ -312,6 +312,25 @@ _TRUSTED_COVER_HOSTS = (
     "googleusercontent.com",
 )
 
+_OPEN_LIBRARY_HOST_MARKERS = (
+    "openlibrary.org",
+    "archive.org",
+)
+
+
+def _is_open_library_url(url: str | None) -> bool:
+    if not url:
+        return False
+    lowered = str(url).lower()
+    return any(marker in lowered for marker in _OPEN_LIBRARY_HOST_MARKERS)
+
+
+def _is_google_books_url(url: str | None) -> bool:
+    if not url:
+        return False
+    lowered = str(url).lower()
+    return "books.google" in lowered or "googleusercontent.com" in lowered
+
 
 def _normalize_title(title: str | None) -> str:
     if not title:
@@ -366,6 +385,13 @@ def _cover_url_is_usable(url: str | None) -> bool:
     normalized = normalize_cover_url(url)
     if not normalized:
         return False
+
+    # Open Library covers redirect to archive.org — skip server-side HEAD probes.
+    if _is_open_library_url(normalized):
+        return True
+
+    if _is_google_books_url(normalized):
+        return True
 
     if _is_trusted_cover_url(normalized):
         return True
@@ -448,6 +474,21 @@ def _pick_best_cover_candidate(
     return best_book
 
 
+def _from_google_isbn(isbn: str | None) -> tuple[str | None, dict | None]:
+    from app.book_routes import google_books_available, search_google_books
+
+    clean = re.sub(r"[^0-9Xx]", "", isbn or "")
+    if not clean or not google_books_available():
+        return None, None
+
+    for query in (f"isbn:{clean}", clean):
+        for book in search_google_books(query, limit=4):
+            url = normalize_cover_url(book.get("cover_url"))
+            if url:
+                return url, book
+    return None, None
+
+
 def _from_google(
     title: str,
     author: str | None,
@@ -459,7 +500,7 @@ def _from_google(
         book = fetch_google_volume(google_id)
         if book and book.get("cover_url"):
             url = normalize_cover_url(book["cover_url"])
-            if url and _cover_url_is_usable(url):
+            if url:
                 return url, book
 
     if not google_books_available():
@@ -494,10 +535,9 @@ def _from_google(
             url = normalize_cover_url(book.get("cover_url"))
             if not url:
                 continue
-            if url and _cover_url_is_usable(url):
-                if score >= _HIGH_CONFIDENCE_SCORE:
-                    return url, book
-                candidates.append((score, book))
+            if score >= _HIGH_CONFIDENCE_SCORE:
+                return url, book
+            candidates.append((score, book))
 
         if candidates:
             break
@@ -520,7 +560,7 @@ def _from_open_library(
         book = fetch_open_library_detail(open_library_key)
         if book and book.get("cover_url"):
             url = normalize_cover_url(book["cover_url"])
-            if url and _cover_url_is_usable(url):
+            if url:
                 return url, book
 
     queries = _open_library_queries(title, author)
@@ -549,10 +589,11 @@ def _from_open_library(
             url = normalize_cover_url(book.get("cover_url"))
             if not url and book.get("open_library_key"):
                 continue
-            if url and _cover_url_is_usable(url):
-                if score >= _HIGH_CONFIDENCE_SCORE:
-                    return url, book
-                candidates.append((score, book))
+            if not url:
+                continue
+            if score >= _HIGH_CONFIDENCE_SCORE:
+                return url, book
+            candidates.append((score, book))
 
         if candidates:
             break
@@ -570,7 +611,7 @@ def _from_isbn(isbn: str | None) -> str | None:
         return None
 
     url = normalize_cover_url(f"https://covers.openlibrary.org/b/isbn/{clean}-L.jpg")
-    if url and _cover_url_is_usable(url):
+    if url:
         return url
     return None
 
@@ -608,18 +649,18 @@ def resolve_cover(
     google_id: str | None = None,
     open_library_key: str | None = None,
 ) -> dict:
-    """Hybrid cover resolution.
+    """Hybrid cover resolution with Google Books as the primary image source.
 
     Priority:
-      1. Existing cover_url on the book payload
-      2. Cached auto success in Supabase (prior Google / Open Library / ISBN)
-      3. Google Books (skipped when lookup_failed_at is within TTL)
-      4. Open Library (+ ISBN CDN)
-      5. Supabase manual_cover_url admin override
-      6. None → frontend shows placeholder
-
-    Every successful auto result is cached in Supabase. Failed auto lookups are
-    recorded with lookup_failed_at to avoid hammering external APIs.
+      1. Existing non-Open-Library cover_url on the book payload
+      2. Cached non-Open-Library auto success in Supabase
+      3. Google Books by ISBN
+      4. Google Books by title + author
+      5. Open Library ISBN CDN
+      6. Open Library search
+      7. Provided / cached Open Library URL (last image resort)
+      8. Supabase manual_cover_url admin override
+      9. None → frontend shows placeholder
     """
     title = (title or "").strip()
     saved_input = cover_url
@@ -635,10 +676,10 @@ def resolve_cover(
     ol_isbn_attempt: str | None = None
     ol_search_attempt: str | None = None
 
-    # 1. Existing cover_url on the book.
+    # 1. Existing non-Open-Library cover_url on the payload.
     if not is_missing_cover_url(cover_url):
         normalized = normalize_cover_url(cover_url)
-        if normalized and _cover_url_is_usable(normalized):
+        if normalized and not _is_open_library_url(normalized):
             result = _cache_and_return(
                 book_id=book_id,
                 title=title,
@@ -651,15 +692,12 @@ def resolve_cover(
                 result,
                 title=title,
                 saved_cover_url=saved_input,
-                google_books=None,
-                open_library_isbn=None,
-                open_library_search=None,
             )
 
-    # Cached auto success from a previous lookup (fast path — no external APIs).
+    # 2. Cached non-Open-Library auto success (fast path).
     if row and row.get("cover_url"):
         cached_url = normalize_cover_url(row["cover_url"])
-        if cached_url:
+        if cached_url and not _is_open_library_url(cached_url):
             result = _result_from_row(
                 row,
                 cover_url=cached_url,
@@ -675,14 +713,36 @@ def resolve_cover(
     resolved_isbn = isbn
     save_id = book_id
 
-    # Retry external APIs whenever no cached cover exists, even after a prior failure.
     cached_cover = normalize_cover_url((row or {}).get("cover_url"))
-    should_lookup_external = not cached_cover or not is_lookup_blocked(row)
+    has_non_ol_cached = bool(cached_cover and not _is_open_library_url(cached_cover))
+    should_lookup_external = not has_non_ol_cached and not is_lookup_blocked(row)
 
     if should_lookup_external:
-        # 2. Google Books (title + author, with normalized variants).
+        # 3. Google Books by ISBN.
+        google_isbn_url, google_isbn_book = _from_google_isbn(resolved_isbn or isbn)
+        google_attempt = google_isbn_url or google_attempt
+        if google_isbn_book:
+            resolved_isbn = resolved_isbn or google_isbn_book.get("isbn")
+            save_id = make_book_id(title, author, resolved_isbn)
+        if google_isbn_url:
+            result = _cache_and_return(
+                book_id=save_id,
+                title=title,
+                author=author,
+                isbn=resolved_isbn,
+                cover_url=google_isbn_url,
+                cover_source="google_books_isbn",
+            )
+            return _attach_cover_debug(
+                result,
+                title=title,
+                saved_cover_url=saved_input,
+                google_books=google_attempt,
+            )
+
+        # 4. Google Books by title + author.
         google_url, google_book = _from_google(title, author, google_id)
-        google_attempt = google_url
+        google_attempt = google_url or google_attempt
         resolved_isbn = resolved_isbn or (google_book or {}).get("isbn")
         save_id = make_book_id(title, author, resolved_isbn)
 
@@ -702,7 +762,7 @@ def resolve_cover(
                 google_books=google_attempt,
             )
 
-        # 3. Open Library ISBN CDN when an ISBN is known.
+        # 5. Open Library ISBN CDN.
         isbn_url = _from_isbn(resolved_isbn or isbn)
         ol_isbn_attempt = isbn_url
         if isbn_url:
@@ -723,7 +783,7 @@ def resolve_cover(
                 open_library_isbn=ol_isbn_attempt,
             )
 
-        # 4. Open Library search (title + author variants).
+        # 6. Open Library search.
         ol_url, ol_book = _from_open_library(title, author, open_library_key)
         ol_search_attempt = ol_url
         resolved_isbn = resolved_isbn or (ol_book or {}).get("isbn")
@@ -747,7 +807,46 @@ def resolve_cover(
                 open_library_search=ol_search_attempt,
             )
 
-    # 5. Manual override — only when automatic sources fail.
+        # 7. Last resort: provided Open Library URL from search payloads.
+        if not is_missing_cover_url(cover_url):
+            normalized = normalize_cover_url(cover_url)
+            if normalized and _is_open_library_url(normalized):
+                result = _cache_and_return(
+                    book_id=save_id,
+                    title=title,
+                    author=author,
+                    isbn=resolved_isbn,
+                    cover_url=normalized,
+                    cover_source="open_library_provided",
+                )
+                return _attach_cover_debug(
+                    result,
+                    title=title,
+                    saved_cover_url=saved_input,
+                    google_books=google_attempt,
+                    open_library_isbn=ol_isbn_attempt,
+                    open_library_search=normalized,
+                )
+
+        if row and row.get("cover_url"):
+            cached_url = normalize_cover_url(row["cover_url"])
+            if cached_url and _is_open_library_url(cached_url):
+                result = _result_from_row(
+                    row,
+                    cover_url=cached_url,
+                    cover_source=row.get("source") or "open_library_cache",
+                )
+                result["author"] = author
+                return _attach_cover_debug(
+                    result,
+                    title=title,
+                    saved_cover_url=saved_input,
+                    google_books=google_attempt,
+                    open_library_isbn=ol_isbn_attempt,
+                    open_library_search=cached_url,
+                )
+
+    # 8. Manual override.
     manual_url = _manual_cover_from_row(row)
     if manual_url:
         result = {
@@ -794,6 +893,44 @@ def resolve_cover(
         open_library_isbn=ol_isbn_attempt,
         open_library_search=ol_search_attempt,
     )
+
+
+def upgrade_search_result_covers(books: list[dict]) -> list[dict]:
+    """Prefer Google Books covers for search results that only have Open Library URLs."""
+    if not books:
+        return []
+
+    payloads = []
+    for book in books:
+        payloads.append(
+            {
+                "title": book.get("title") or "",
+                "author": book.get("author"),
+                "isbn": book.get("isbn"),
+                "cover_url": (
+                    None
+                    if _is_open_library_url(book.get("cover_url"))
+                    else book.get("cover_url")
+                ),
+                "google_id": book.get("id") if book.get("source") == "google_books" else None,
+                "open_library_key": book.get("open_library_key"),
+            }
+        )
+
+    resolved = resolve_covers_batch(payloads)
+    upgraded: list[dict] = []
+    for book, result in zip(books, resolved):
+        url = result.get("cover_url")
+        if url and not _is_open_library_url(url):
+            book = {
+                **book,
+                "cover_url": url,
+                "cover_source": result.get("cover_source"),
+            }
+        elif url:
+            book = {**book, "cover_url": url, "cover_source": result.get("cover_source")}
+        upgraded.append(book)
+    return upgraded
 
 
 def resolve_covers_batch(books: list[dict]) -> list[dict]:
@@ -873,15 +1010,16 @@ def enrich_book_entry(book: dict) -> dict:
 
     if book.get("cover_url"):
         normalized = normalize_cover_url(book["cover_url"])
-        if normalized and (_is_trusted_cover_url(normalized) or _cover_url_is_usable(normalized)):
-            book["cover_url"] = normalized
-            return book
+        if normalized and not _is_open_library_url(normalized):
+            if _is_trusted_cover_url(normalized) or _cover_url_is_usable(normalized):
+                book["cover_url"] = normalized
+                return book
 
     resolved = resolve_cover(
         title=title,
         author=book.get("author"),
         isbn=book.get("isbn"),
-        cover_url=book.get("cover_url"),
+        cover_url=None if _is_open_library_url(book.get("cover_url")) else book.get("cover_url"),
         google_id=book.get("google_id"),
         open_library_key=book.get("open_library_key"),
     )
@@ -904,7 +1042,7 @@ def enrich_books_in_list(books: list | None, *, cache_only: bool = False) -> lis
     for book in valid:
         if book.get("cover_url"):
             normalized = normalize_cover_url(book["cover_url"])
-            if normalized:
+            if normalized and not _is_open_library_url(normalized):
                 if _is_trusted_cover_url(normalized):
                     book["cover_url"] = normalized
                     continue
@@ -923,8 +1061,10 @@ def enrich_books_in_list(books: list | None, *, cache_only: bool = False) -> lis
             auto_url = normalize_cover_url((cached or {}).get("cover_url"))
             manual_url = normalize_cover_url((cached or {}).get("manual_cover_url"))
             url = auto_url or manual_url
-            if url:
+            if url and not _is_open_library_url(url):
                 book["cover_url"] = url
+            elif manual_url:
+                book["cover_url"] = manual_url
             continue
 
         needs_resolve.append(book)
@@ -937,7 +1077,11 @@ def enrich_books_in_list(books: list | None, *, cache_only: bool = False) -> lis
             "title": book.get("title") or "",
             "author": book.get("author"),
             "isbn": book.get("isbn"),
-            "cover_url": book.get("cover_url"),
+            "cover_url": (
+                None
+                if _is_open_library_url(normalize_cover_url(book.get("cover_url")))
+                else book.get("cover_url")
+            ),
             "google_id": book.get("google_id"),
             "open_library_key": book.get("open_library_key"),
         }
