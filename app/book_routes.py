@@ -8,12 +8,8 @@ import httpx
 from fastapi import APIRouter, Header, HTTPException, Query
 from pydantic import BaseModel, Field, HttpUrl
 
-from app.cover_service import (
-    make_book_id,
-    normalize_cover_url,
-    resolve_cover,
-    resolve_covers_batch,
-)
+from app.cover_proxy import resolve_hosted_cover, resolve_hosted_covers_batch
+from app.cover_service import make_book_id, normalize_cover_url
 from app.cover_store import get_cover_row, upsert_manual_cover
 
 router = APIRouter(prefix="/api/books", tags=["Books"])
@@ -26,9 +22,12 @@ class CoverResolveRequest(BaseModel):
     title: str = Field(min_length=1)
     author: str | None = None
     isbn: str | None = None
-    cover_url: str | None = None
+    book_id: str | None = Field(default=None, alias="bookId")
     google_id: str | None = None
     open_library_key: str | None = None
+    force: bool = False
+
+    model_config = {"populate_by_name": True}
 
 
 class CoverBatchRequest(BaseModel):
@@ -56,22 +55,23 @@ def _require_cover_admin(x_cover_admin_key: str | None) -> None:
 
 @router.post("/resolve-cover")
 def resolve_cover_endpoint(data: CoverResolveRequest) -> dict:
-    """Resolve the best available cover for a single book."""
-    return resolve_cover(**data.model_dump())
+    """Resolve, download, and host a cover image on Supabase Storage."""
+    return resolve_hosted_cover(**data.model_dump(by_alias=False))
 
 
 @router.post("/resolve-covers")
 def resolve_covers_endpoint(data: CoverBatchRequest) -> dict:
-    """Resolve covers for multiple books in one request."""
+    """Resolve and host covers for multiple books in one request."""
     try:
-        books = resolve_covers_batch([book.model_dump() for book in data.books])
+        books = resolve_hosted_covers_batch([book.model_dump(by_alias=False) for book in data.books])
     except Exception as exc:
         logger.warning("resolve-covers degraded: %s", exc)
         books = [
             {
-                **book.model_dump(),
-                "cover_url": normalize_cover_url(book.cover_url) if book.cover_url else None,
+                **book.model_dump(by_alias=False),
+                "cover_url": None,
                 "cover_source": "unavailable",
+                "cover_status": "failed",
             }
             for book in data.books
         ]
@@ -92,7 +92,7 @@ def get_cover_record(
     return {
         "book_id": book_id,
         "record": row,
-        "resolved": resolve_cover(title=title, author=author, isbn=isbn),
+        "resolved": resolve_hosted_cover(title=title, author=author, isbn=isbn),
     }
 
 
@@ -117,11 +117,10 @@ def set_manual_cover(
         manual_cover_url=manual_url,
     )
 
-    resolved = resolve_cover(
+    resolved = resolve_hosted_cover(
         title=data.title.strip(),
         author=data.author,
         isbn=data.isbn,
-        cover_url=None,
     )
 
     return {

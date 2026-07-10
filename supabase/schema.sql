@@ -295,6 +295,8 @@ create table if not exists public.book_covers (
   cover_url text,
   manual_cover_url text,
   lookup_failed_at timestamptz,
+  cover_status text not null default 'missing',
+  external_source_url text,
   source text not null default 'Unknown',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()

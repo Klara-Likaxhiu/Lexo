@@ -911,111 +911,71 @@ def resolve_cover(
 
 
 def upgrade_search_result_covers(books: list[dict]) -> list[dict]:
-    """Prefer Google Books covers for search results that only have Open Library URLs."""
+    """Host search-result covers on Supabase Storage (proxy + cache)."""
+    from app.cover_proxy import resolve_hosted_covers_batch
+    from app.cover_storage import is_hosted_cover_url
+
     if not books:
         return []
 
-    payloads = []
-    for book in books:
-        payloads.append(
-            {
-                "title": book.get("title") or "",
-                "author": book.get("author"),
-                "isbn": book.get("isbn"),
-                "cover_url": (
-                    None
-                    if _is_open_library_url(book.get("cover_url"))
-                    else book.get("cover_url")
-                ),
-                "google_id": book.get("id") if book.get("source") == "google_books" else None,
-                "open_library_key": book.get("open_library_key"),
-            }
-        )
+    payloads = [
+        {
+            "title": book.get("title") or "",
+            "author": book.get("author"),
+            "isbn": book.get("isbn"),
+            "google_id": book.get("id") if book.get("source") == "google_books" else None,
+            "open_library_key": book.get("open_library_key"),
+        }
+        for book in books
+    ]
 
-    resolved = resolve_covers_batch(payloads)
+    resolved = resolve_hosted_covers_batch(payloads)
     upgraded: list[dict] = []
     for book, result in zip(books, resolved):
         url = result.get("cover_url")
-        if url and not _is_open_library_url(url):
+        if url and is_hosted_cover_url(url):
             book = {
                 **book,
                 "cover_url": url,
                 "cover_source": result.get("cover_source"),
+                "cover_status": result.get("cover_status"),
             }
-        elif url:
-            book = {**book, "cover_url": url, "cover_source": result.get("cover_source")}
+        else:
+            book = {**book, "cover_url": None, "cover_status": result.get("cover_status") or "missing"}
         upgraded.append(book)
     return upgraded
 
 
 def resolve_covers_batch(books: list[dict]) -> list[dict]:
+    from app.cover_proxy import resolve_hosted_covers_batch
+
     if not books:
         return []
-
-    if len(books) == 1:
-        book = books[0]
-        resolved = resolve_cover(
-            title=book.get("title") or "",
-            author=book.get("author"),
-            isbn=book.get("isbn"),
-            cover_url=book.get("cover_url"),
-            google_id=book.get("google_id") or book.get("id"),
-            open_library_key=book.get("open_library_key"),
-        )
-        return [{**book, **resolved}]
-
-    from concurrent.futures import ThreadPoolExecutor
-
-    def _resolve_one(book: dict) -> dict:
-        resolved = resolve_cover(
-            title=book.get("title") or "",
-            author=book.get("author"),
-            isbn=book.get("isbn"),
-            cover_url=book.get("cover_url"),
-            google_id=book.get("google_id") or book.get("id"),
-            open_library_key=book.get("open_library_key"),
-        )
-        return {**book, **resolved}
-
-    workers = min(8, len(books))
-    with ThreadPoolExecutor(max_workers=workers) as pool:
-        return list(pool.map(_resolve_one, books))
+    return resolve_hosted_covers_batch(books)
 
 
 def enrich_recommendation(title: str, author: str | None = None, genre: str | None = None) -> dict | None:
     """Resolve cover and return minimal book_data for AI recommendations."""
-    from app.book_routes import search_open_library
+    from app.cover_proxy import resolve_hosted_cover
 
-    resolved = resolve_cover(title=title, author=author)
+    resolved = resolve_hosted_cover(title=title, author=author)
     if resolved.get("cover_url"):
         return {
             "title": title,
             "author": author or "Unknown Author",
             "genre": genre,
             "cover_url": resolved["cover_url"],
+            "cover_status": resolved.get("cover_status"),
             "source": resolved.get("cover_source"),
         }
-
-    query = f"{title} {author}".strip() if author else title
-    open_library_results = search_open_library(query, limit=3)
-    for book in open_library_results:
-        if _title_matches(book.get("title"), title):
-            if not book.get("cover_url"):
-                retry = resolve_cover(
-                    title=book.get("title") or title,
-                    author=book.get("author") or author,
-                    isbn=book.get("isbn"),
-                    open_library_key=book.get("open_library_key"),
-                )
-                if retry.get("cover_url"):
-                    book["cover_url"] = retry["cover_url"]
-            return book
-
     return None
 
 
 def enrich_book_entry(book: dict) -> dict:
-    """Attach a resolved cover_url to a book dict when possible."""
+    """Attach a hosted cover_url to a book dict when possible."""
+    from app.cover_proxy import resolve_hosted_cover
+    from app.cover_storage import is_hosted_cover_url
+
     if not isinstance(book, dict):
         return book
 
@@ -1023,29 +983,27 @@ def enrich_book_entry(book: dict) -> dict:
     if not title:
         return book
 
-    if book.get("cover_url"):
-        normalized = normalize_cover_url(book["cover_url"])
-        if normalized and not _is_open_library_url(normalized):
-            if _is_trusted_cover_url(normalized) or _cover_url_is_usable(normalized):
-                book["cover_url"] = normalized
-                return book
+    if book.get("cover_url") and is_hosted_cover_url(book.get("cover_url")):
+        return book
 
-    resolved = resolve_cover(
+    resolved = resolve_hosted_cover(
         title=title,
         author=book.get("author"),
         isbn=book.get("isbn"),
-        cover_url=None if _is_open_library_url(book.get("cover_url")) else book.get("cover_url"),
         google_id=book.get("google_id"),
         open_library_key=book.get("open_library_key"),
     )
     if resolved.get("cover_url"):
         book["cover_url"] = resolved["cover_url"]
         book["cover_source"] = resolved.get("cover_source")
+        book["cover_status"] = resolved.get("cover_status")
 
     return book
 
 
 def enrich_books_in_list(books: list | None, *, cache_only: bool = False) -> list:
+    from app.cover_storage import is_hosted_cover_url
+
     if not isinstance(books, list):
         return []
 
@@ -1055,15 +1013,8 @@ def enrich_books_in_list(books: list | None, *, cache_only: bool = False) -> lis
 
     needs_resolve: list[dict] = []
     for book in valid:
-        if book.get("cover_url"):
-            normalized = normalize_cover_url(book["cover_url"])
-            if normalized and not _is_open_library_url(normalized):
-                if _is_trusted_cover_url(normalized):
-                    book["cover_url"] = normalized
-                    continue
-                if not cache_only and _cover_url_is_usable(normalized):
-                    book["cover_url"] = normalized
-                    continue
+        if book.get("cover_url") and is_hosted_cover_url(book.get("cover_url")):
+            continue
 
         if cache_only:
             book_id = make_book_id(book.get("title"), book.get("author"), book.get("isbn"))
@@ -1073,13 +1024,12 @@ def enrich_books_in_list(books: list | None, *, cache_only: bool = False) -> lis
                 title=book.get("title"),
                 author=book.get("author"),
             )
-            auto_url = normalize_cover_url((cached or {}).get("cover_url"))
-            manual_url = normalize_cover_url((cached or {}).get("manual_cover_url"))
-            url = auto_url or manual_url
-            if url and not _is_open_library_url(url):
-                book["cover_url"] = url
-            elif manual_url:
-                book["cover_url"] = manual_url
+            auto_url = (cached or {}).get("cover_url")
+            if auto_url and is_hosted_cover_url(auto_url) and (cached or {}).get("cover_status") == "ready":
+                book["cover_url"] = auto_url
+                book["cover_status"] = "ready"
+            else:
+                book["cover_url"] = None
             continue
 
         needs_resolve.append(book)
@@ -1092,11 +1042,6 @@ def enrich_books_in_list(books: list | None, *, cache_only: bool = False) -> lis
             "title": book.get("title") or "",
             "author": book.get("author"),
             "isbn": book.get("isbn"),
-            "cover_url": (
-                None
-                if _is_open_library_url(normalize_cover_url(book.get("cover_url")))
-                else book.get("cover_url")
-            ),
             "google_id": book.get("google_id"),
             "open_library_key": book.get("open_library_key"),
         }
@@ -1107,12 +1052,15 @@ def enrich_books_in_list(books: list | None, *, cache_only: bool = False) -> lis
         if result.get("cover_url"):
             book["cover_url"] = result["cover_url"]
             book["cover_source"] = result.get("cover_source")
+            book["cover_status"] = result.get("cover_status")
 
     return valid
 
 
 def enrich_profile_recommendations(profile_data: dict | None, *, cache_only: bool = False) -> dict | None:
-    """Attach cover URLs to stored quiz recommendations (cache-first batch)."""
+    """Attach hosted cover URLs to stored quiz recommendations."""
+    from app.cover_storage import is_hosted_cover_url
+
     if not isinstance(profile_data, dict):
         return profile_data
 
@@ -1130,14 +1078,13 @@ def enrich_profile_recommendations(profile_data: dict | None, *, cache_only: boo
         book_data = item.get("book_data") if isinstance(item.get("book_data"), dict) else {}
 
         existing = book_data.get("cover_url") or ai.get("cover_url")
-        if existing:
-            url = normalize_cover_url(existing)
-            if url:
-                if not book_data:
-                    item["book_data"] = {}
-                    book_data = item["book_data"]
-                book_data["cover_url"] = url
-                ai["cover_url"] = url
+        if existing and is_hosted_cover_url(existing):
+            if not book_data:
+                item["book_data"] = {}
+                book_data = item["book_data"]
+            book_data["cover_url"] = existing
+            if isinstance(ai, dict):
+                ai["cover_url"] = existing
             continue
 
         title = ai.get("title") if isinstance(ai, dict) else None
@@ -1150,18 +1097,16 @@ def enrich_profile_recommendations(profile_data: dict | None, *, cache_only: boo
         if cache_only:
             book_id = make_book_id(title, author, isbn)
             cached = get_cover_row(book_id=book_id, isbn=isbn, title=title, author=author)
-            auto_url = normalize_cover_url((cached or {}).get("cover_url"))
-            manual_url = normalize_cover_url((cached or {}).get("manual_cover_url"))
-            url = auto_url or manual_url
-            if url:
+            auto_url = (cached or {}).get("cover_url")
+            if auto_url and is_hosted_cover_url(auto_url) and (cached or {}).get("cover_status") == "ready":
                 if not isinstance(item.get("book_data"), dict):
                     item["book_data"] = {}
-                item["book_data"]["cover_url"] = url
+                item["book_data"]["cover_url"] = auto_url
                 item["book_data"]["title"] = title
                 item["book_data"]["author"] = author
                 item["book_data"]["genre"] = ai.get("genre") if isinstance(ai, dict) else None
                 if isinstance(ai, dict):
-                    ai["cover_url"] = url
+                    ai["cover_url"] = auto_url
             continue
 
         batch_input.append({"title": title, "author": author, "isbn": isbn})

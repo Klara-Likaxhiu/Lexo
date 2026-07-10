@@ -22,6 +22,9 @@ SOURCE_LABELS = {
     "provided": "Database",
     "manual": "Manual",
     "cache": "Cache",
+    "placeholder": "Placeholder",
+    "failed": "Failed",
+    "resolving": "Resolving",
     "unknown": "Unknown",
 }
 
@@ -65,6 +68,8 @@ def _row_to_cached(row: dict[str, Any]) -> dict[str, Any]:
         "manual_cover_url": row.get("manual_cover_url"),
         "lookup_failed_at": row.get("lookup_failed_at"),
         "source": row.get("source"),
+        "cover_status": row.get("cover_status"),
+        "external_source_url": row.get("external_source_url"),
         "isbn": row.get("isbn"),
         "title": row.get("title"),
         "author": row.get("author"),
@@ -72,7 +77,10 @@ def _row_to_cached(row: dict[str, Any]) -> dict[str, Any]:
 
 
 def _select_fields() -> str:
-    return "book_id,cover_url,manual_cover_url,lookup_failed_at,source,isbn,title,author"
+    return (
+        "book_id,cover_url,manual_cover_url,lookup_failed_at,source,"
+        "cover_status,external_source_url,isbn,title,author"
+    )
 
 
 def is_lookup_blocked(cached: dict[str, Any] | None) -> bool:
@@ -170,6 +178,42 @@ def get_cover_row(
         or get_cached_cover_by_isbn(isbn)
         or get_cached_cover_by_title_author(title, author)
     )
+
+
+def upsert_hosted_cover(
+    *,
+    book_id: str,
+    title: str,
+    author: str | None,
+    isbn: str | None,
+    cover_url: str | None,
+    source: str,
+    cover_status: str,
+    external_source_url: str | None = None,
+) -> None:
+    clean_isbn = _normalize_isbn(isbn) or None
+    payload: dict[str, Any] = {
+        "book_id": book_id,
+        "title": title,
+        "author": author or "",
+        "isbn": clean_isbn,
+        "cover_url": cover_url,
+        "source": format_source(source),
+        "cover_status": cover_status,
+        "external_source_url": external_source_url,
+        "lookup_failed_at": None if cover_status == "ready" else None,
+        "updated_at": _utcnow_iso(),
+    }
+    try:
+        request(
+            "POST",
+            COVERS_TABLE,
+            params={"on_conflict": "book_id"},
+            json=payload,
+            prefer="resolution=merge-duplicates,return=minimal",
+        )
+    except SupabaseRestError:
+        pass
 
 
 def upsert_cover(
