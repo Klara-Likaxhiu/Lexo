@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from app.deps import get_verified_user
+from app.cover_backfill import backfill_user_library_covers
 from app.cover_service import enrich_books_in_list, normalize_cover_url
 from app.library_store import (
     LibraryStoreError,
@@ -60,6 +61,11 @@ class LibraryCoverRequest(BaseModel):
     cover_url: str = Field(..., min_length=8, max_length=2000)
     library_id: str | None = None
     isbn: str | None = None
+
+
+class LibraryBackfillRequest(BaseModel):
+    limit: int = Field(default=100, ge=1, le=200)
+    force: bool = True
 
 
 def _raise_store_error(exc: LibraryStoreError) -> None:
@@ -127,6 +133,23 @@ def save_resolved_cover(data: LibraryCoverRequest, user: dict = Depends(get_veri
         return {"book": None, "message": "Cover cached; no matching library book to update."}
 
     return {"book": saved, "message": "Cover saved to library."}
+
+
+@router.post("/backfill-covers")
+def backfill_library_covers(
+    data: LibraryBackfillRequest,
+    user: dict = Depends(get_verified_user),
+) -> dict:
+    """Resolve and persist hosted covers for existing library books missing cover_url."""
+    result = backfill_user_library_covers(
+        user["id"],
+        limit=data.limit,
+        force=data.force,
+    )
+    return {
+        **result,
+        "message": f"Repaired {result['repaired']} of {result['targets']} books needing covers.",
+    }
 
 
 @router.post("")

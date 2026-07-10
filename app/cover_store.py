@@ -63,13 +63,19 @@ def _normalize_isbn(isbn: str | None) -> str:
 
 
 def _row_to_cached(row: dict[str, Any]) -> dict[str, Any]:
+    from app.cover_storage import is_hosted_cover_url
+
+    cover_url = row.get("cover_url")
+    cover_status = row.get("cover_status")
+    if not cover_status and cover_url:
+        cover_status = "ready" if is_hosted_cover_url(cover_url) else "legacy_external"
     return {
         "book_id": row.get("book_id"),
-        "cover_url": row.get("cover_url"),
+        "cover_url": cover_url,
         "manual_cover_url": row.get("manual_cover_url"),
         "lookup_failed_at": row.get("lookup_failed_at"),
         "source": row.get("source"),
-        "cover_status": row.get("cover_status"),
+        "cover_status": cover_status,
         "external_source_url": row.get("external_source_url"),
         "isbn": row.get("isbn"),
         "title": row.get("title"),
@@ -78,11 +84,41 @@ def _row_to_cached(row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+_SELECT_FIELDS_FULL = (
+    "book_id,cover_url,manual_cover_url,lookup_failed_at,source,"
+    "cover_status,external_source_url,isbn,title,author,updated_at"
+)
+_SELECT_FIELDS_LEGACY = (
+    "book_id,cover_url,manual_cover_url,lookup_failed_at,source,isbn,title,author,updated_at"
+)
+_SELECT_FIELDS_MINIMAL = "book_id,cover_url,source,isbn,title,author,updated_at"
+_cached_select_fields: str | None = None
+
+
+def _probe_select_fields() -> str:
+    for candidate in (_SELECT_FIELDS_FULL, _SELECT_FIELDS_LEGACY, _SELECT_FIELDS_MINIMAL):
+        try:
+            request(
+                "GET",
+                COVERS_TABLE,
+                params={"select": candidate, "limit": "1"},
+            )
+            return candidate
+        except SupabaseRestError:
+            continue
+    return _SELECT_FIELDS_MINIMAL
+
+
 def _select_fields() -> str:
-    return (
-        "book_id,cover_url,manual_cover_url,lookup_failed_at,source,"
-        "cover_status,external_source_url,isbn,title,author,updated_at"
-    )
+    global _cached_select_fields
+    if _cached_select_fields:
+        return _cached_select_fields
+    _cached_select_fields = _probe_select_fields()
+    return _cached_select_fields
+
+
+def _supports_proxy_columns() -> bool:
+    return _select_fields() == _SELECT_FIELDS_FULL
 
 
 def is_resolving_stale(cached: dict[str, Any] | None) -> bool:
@@ -251,12 +287,20 @@ def try_claim_cover_resolution(
         "title": title,
         "author": author or "",
         "isbn": clean_isbn,
-        "cover_status": "resolving",
         "source": format_source("resolving"),
         "updated_at": _utcnow_iso(),
     }
+    if _supports_proxy_columns():
+        base_payload["cover_status"] = "resolving"
 
     row = get_cached_cover(book_id)
+    if row and not _supports_proxy_columns():
+        from app.cover_storage import is_hosted_cover_url
+
+        existing = row.get("cover_url")
+        if existing and is_hosted_cover_url(existing):
+            return False
+        return True
     if row:
         status = (row.get("cover_status") or "missing").lower()
         if status == "ready":
@@ -309,7 +353,9 @@ def try_claim_cover_resolution(
             prefer="resolution=ignore-duplicates,return=representation",
         )
         if isinstance(rows, list) and rows:
-            return (rows[0].get("cover_status") or "").lower() == "resolving"
+            if _supports_proxy_columns():
+                return (rows[0].get("cover_status") or "").lower() == "resolving"
+            return True
     except SupabaseRestError:
         pass
 
@@ -335,11 +381,12 @@ def upsert_hosted_cover(
         "isbn": clean_isbn,
         "cover_url": cover_url,
         "source": format_source(source),
-        "cover_status": cover_status,
-        "external_source_url": external_source_url,
-        "lookup_failed_at": None if cover_status == "ready" else None,
+        "lookup_failed_at": None,
         "updated_at": _utcnow_iso(),
     }
+    if _supports_proxy_columns():
+        payload["cover_status"] = cover_status
+        payload["external_source_url"] = external_source_url
     try:
         request(
             "POST",
@@ -349,7 +396,14 @@ def upsert_hosted_cover(
             prefer="resolution=merge-duplicates,return=minimal",
         )
     except SupabaseRestError:
-        pass
+        upsert_cover(
+            book_id=book_id,
+            title=title,
+            author=author,
+            isbn=isbn,
+            cover_url=cover_url or "",
+            source=source,
+        )
 
 
 def upsert_cover(
@@ -363,16 +417,17 @@ def upsert_cover(
 ) -> None:
     """Persist an auto-resolved cover URL for future lookups."""
     clean_isbn = _normalize_isbn(isbn) or None
-    payload = {
+    payload: dict[str, Any] = {
         "book_id": book_id,
         "title": title,
         "author": author or "",
         "isbn": clean_isbn,
         "cover_url": cover_url,
         "source": format_source(source),
-        "lookup_failed_at": None,
         "updated_at": _utcnow_iso(),
     }
+    if "lookup_failed_at" in _select_fields():
+        payload["lookup_failed_at"] = None
     try:
         request(
             "POST",

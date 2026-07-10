@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import re
 from difflib import SequenceMatcher
+from typing import Any
 
 import httpx
 
@@ -1008,18 +1009,66 @@ def enrich_book_entry(book: dict, *, cache_only: bool = True) -> dict:
     return book
 
 
+def _book_isbn(book: dict[str, Any]) -> str | None:
+    metadata = book.get("metadata") if isinstance(book.get("metadata"), dict) else {}
+    for candidate in (book.get("isbn"), metadata.get("isbn")):
+        if isinstance(candidate, str) and candidate.strip():
+            return candidate.strip()
+    return None
+
+
+def _lookup_cached_cover_for_book(book: dict[str, Any], cached_map: dict[str, dict]) -> dict | None:
+    """Resolve a cover cache row using title|author, ISBN, and stored book_id keys."""
+    title = book.get("title")
+    author = book.get("author")
+    isbn = _book_isbn(book)
+
+    keys = []
+    if isbn:
+        clean = re.sub(r"[^0-9Xx]", "", isbn).lower()
+        if clean:
+            keys.append(f"isbn:{clean}")
+    keys.append(make_book_id(title, author, isbn))
+    keys.append(make_book_id(title, author, None))
+    stored_book_id = book.get("book_id")
+    if stored_book_id:
+        keys.append(str(stored_book_id))
+
+    seen: set[str] = set()
+    for key in keys:
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        cached = cached_map.get(key)
+        if cached:
+            return cached
+
+    from app.cover_store import get_cover_row
+
+    return get_cover_row(
+        book_id=make_book_id(title, author, isbn),
+        isbn=isbn,
+        title=title,
+        author=author,
+    )
+
+
 def _apply_cached_cover_to_book(book: dict, cached: dict | None) -> None:
     from app.cover_storage import is_hosted_cover_url
 
     auto_url = (cached or {}).get("cover_url")
-    status = (cached or {}).get("cover_status") or "missing"
-    if auto_url and is_hosted_cover_url(auto_url) and status == "ready":
+    status = ((cached or {}).get("cover_status") or "missing").lower()
+    if auto_url and is_hosted_cover_url(auto_url):
         book["cover_url"] = auto_url
         book["cover_status"] = "ready"
-        if cached.get("source"):
+        if cached and cached.get("source"):
+            book["cover_source"] = cached.get("source")
+    elif auto_url and not is_hosted_cover_url(auto_url):
+        book["cover_url"] = auto_url
+        book["cover_status"] = "missing"
+        if cached and cached.get("source"):
             book["cover_source"] = cached.get("source")
     else:
-        # Keep library-stored URLs (including external) so the client can resolve/host them.
         if not book.get("cover_url"):
             book["cover_url"] = None
         book["cover_status"] = status
@@ -1035,22 +1084,35 @@ def enrich_books_in_list(books: list | None, *, cache_only: bool = False) -> lis
     if not valid:
         return []
 
-    book_ids = [
-        make_book_id(book.get("title"), book.get("author"), book.get("isbn"))
-        for book in valid
-    ]
-    cached_map = get_cover_rows_batch(book_ids)
+    all_ids: list[str] = []
+    for book in valid:
+        title = book.get("title")
+        author = book.get("author")
+        isbn = _book_isbn(book)
+        all_ids.append(make_book_id(title, author, isbn))
+        all_ids.append(make_book_id(title, author, None))
+        if isbn:
+            clean = re.sub(r"[^0-9Xx]", "", isbn).lower()
+            if clean:
+                all_ids.append(f"isbn:{clean}")
+        stored = book.get("book_id")
+        if stored:
+            all_ids.append(str(stored))
+
+    cached_map = get_cover_rows_batch(all_ids)
 
     needs_resolve: list[dict] = []
-    for book, book_id in zip(valid, book_ids):
+    for book in valid:
         if book.get("cover_url") and is_hosted_cover_url(book.get("cover_url")):
+            book["cover_status"] = book.get("cover_status") or "ready"
             continue
 
         if cache_only:
-            _apply_cached_cover_to_book(book, cached_map.get(book_id))
+            cached = _lookup_cached_cover_for_book(book, cached_map)
+            _apply_cached_cover_to_book(book, cached)
             continue
 
-        cached = cached_map.get(book_id)
+        cached = _lookup_cached_cover_for_book(book, cached_map)
         if cached and cached.get("cover_url") and is_hosted_cover_url(cached["cover_url"]):
             _apply_cached_cover_to_book(book, cached)
             continue
@@ -1064,9 +1126,10 @@ def enrich_books_in_list(books: list | None, *, cache_only: bool = False) -> lis
         {
             "title": book.get("title") or "",
             "author": book.get("author"),
-            "isbn": book.get("isbn"),
-            "google_id": book.get("google_id"),
-            "open_library_key": book.get("open_library_key"),
+            "isbn": _book_isbn(book),
+            "google_id": book.get("google_id") or (book.get("metadata") or {}).get("google_id"),
+            "open_library_key": book.get("open_library_key")
+            or (book.get("metadata") or {}).get("open_library_key"),
         }
         for book in needs_resolve
     ]

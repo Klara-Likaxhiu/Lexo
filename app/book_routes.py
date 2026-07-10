@@ -543,6 +543,87 @@ def search_google_books(q: str, limit: int = 6, mode: SearchMode = "all") -> lis
     return books
 
 
+def search_open_library_by_title_author(
+    title: str,
+    author: str | None,
+) -> tuple[str | None, dict | None]:
+    """Search Open Library by explicit title + author fields and return cover_i URL."""
+    from urllib.parse import urlencode
+
+    from app.cover_service import _combined_match_score, _pick_best_cover_candidate
+
+    clean_title = (title or "").strip()
+    if not clean_title:
+        return None, None
+
+    params = {
+        "title": clean_title,
+        "limit": "8",
+        "fields": "key,title,subtitle,author_name,cover_i,isbn,first_publish_year",
+    }
+    clean_author = (author or "").strip()
+    if clean_author:
+        params["author"] = clean_author
+
+    url = f"https://openlibrary.org/search.json?{urlencode(params)}"
+    logger.info(
+        "[CoverLookup] open_library title_author url=%s title=%r author=%r",
+        url,
+        clean_title,
+        clean_author,
+    )
+
+    try:
+        response = httpx.get(url, timeout=8.0)
+    except httpx.HTTPError as exc:
+        logger.warning("[CoverLookup] open_library title_author failed: %s", exc)
+        return None, None
+
+    logger.info(
+        "[CoverLookup] open_library title_author status=%s title=%r",
+        response.status_code,
+        clean_title,
+    )
+    if response.status_code != 200:
+        return None, None
+
+    candidates: list[tuple[float, dict]] = []
+    for item in response.json().get("docs", []):
+        cover_id = item.get("cover_i")
+        if not cover_id:
+            continue
+        parsed = _parse_open_library_doc(item)
+        if not parsed:
+            continue
+        score = _combined_match_score(
+            parsed.get("title"),
+            parsed.get("author"),
+            clean_title,
+            clean_author or None,
+        )
+        if score < 0.68:
+            continue
+        cover_url = f"https://covers.openlibrary.org/b/id/{cover_id}-M.jpg"
+        parsed["cover_url"] = cover_url
+        candidates.append((score, parsed))
+
+    best = _pick_best_cover_candidate(
+        candidates,
+        target_title=clean_title,
+        target_author=clean_author or None,
+    )
+    if not best:
+        return None, None
+
+    selected_url = best.get("cover_url")
+    logger.info(
+        "[CoverLookup] open_library title_author selected title=%r cover_url=%r",
+        best.get("title"),
+        selected_url,
+    )
+    return selected_url, best
+
+
 def search_open_library(q: str, limit: int = 12, mode: SearchMode = "all") -> list[dict]:
     url = "https://openlibrary.org/search.json"
     params = {

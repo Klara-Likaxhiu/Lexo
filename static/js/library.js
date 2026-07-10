@@ -5,8 +5,9 @@ const BookMindLibrary = {
   _loaded: false,
   _loading: null,
   _bgRefresh: null,
+  _backfillStarted: false,
   _lastError: null,
-  _persistKey: "bookmind_library_cache_v2",
+  _persistKey: "bookmind_library_cache_v3",
   _persistAtKey: "bookmind_library_cache_at",
   _persistTtlMs: 5 * 60 * 1000,
 
@@ -152,9 +153,34 @@ const BookMindLibrary = {
     return this._loading;
   },
 
+  normalizeLibraryBook(row) {
+    if (!row || typeof row !== "object") return row;
+    const nested = row.books || row.book || null;
+    const metadata = row.metadata && typeof row.metadata === "object" ? row.metadata : {};
+    return {
+      ...row,
+      library_id: row.library_id || row.id || nested?.id || null,
+      title: row.title || nested?.title || "Untitled Book",
+      author: row.author || nested?.author || "Unknown Author",
+      isbn: row.isbn || metadata.isbn || nested?.isbn || null,
+      cover_url:
+        row.cover_url ||
+        nested?.cover_url ||
+        row.coverUrl ||
+        nested?.coverUrl ||
+        null,
+    };
+  },
+
   _applyPayload(data) {
+    const books = Array.isArray(data.books) ? data.books.map(book => this.normalizeLibraryBook(book)) : [];
     this._cache = data.library || this.emptyLibrary();
-    this._books = Array.isArray(data.books) ? data.books : [];
+    if (this._cache && typeof this._cache === "object") {
+      Object.keys(this._cache).forEach(key => {
+        this._cache[key] = (this._cache[key] || []).map(book => this.normalizeLibraryBook(book));
+      });
+    }
+    this._books = books;
     this._loaded = true;
     this._lastError = null;
   },
@@ -203,7 +229,23 @@ const BookMindLibrary = {
     if (!silent || coversChanged) {
       this._emitChange({ action: silent ? "background-refresh" : "refresh" });
     }
+    this._maybeBackfillCovers();
     return this._cache;
+  },
+
+  _maybeBackfillCovers() {
+    if (this._backfillStarted) return;
+    this._backfillStarted = true;
+    this._request("/api/library/backfill-covers", {
+      method: "POST",
+      body: { limit: 100, force: true },
+    })
+      .then(result => {
+        if (result?.repaired > 0) {
+          return this._fetchLibrary({ silent: true });
+        }
+      })
+      .catch(() => {});
   },
 
   _coversChanged(prev, next) {

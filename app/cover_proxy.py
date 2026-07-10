@@ -42,22 +42,35 @@ def find_external_cover_url(
     google_id: str | None = None,
     open_library_key: str | None = None,
 ) -> tuple[str | None, str | None]:
-    """Return (external_url, source) with Google Books before Open Library."""
-    google_url, _ = _from_google_isbn(isbn)
-    if google_url:
-        return google_url, "google_books_isbn"
+    """Return (external_url, source).
 
-    google_url, _ = _from_google(title, author, google_id)
-    if google_url:
-        return google_url, "google_books"
+    Priority:
+      1. ISBN (Open Library CDN, then Google Books by ISBN)
+      2. Open Library title + author search (cover_i)
+      3. Google Books title + author fallback
+    """
+    from app.book_routes import search_open_library_by_title_author
 
     ol_isbn_url = _from_isbn(isbn)
     if ol_isbn_url:
         return ol_isbn_url, "open_library_isbn"
 
-    ol_url, _ = _from_open_library(title, author, open_library_key)
+    google_url, _ = _from_google_isbn(isbn)
+    if google_url:
+        return google_url, "google_books_isbn"
+
+    ol_url, _ = search_open_library_by_title_author(title, author)
     if ol_url:
         return ol_url, "open_library"
+
+    google_url, _ = _from_google(title, author, google_id)
+    if google_url:
+        return google_url, "google_books"
+
+    if open_library_key:
+        ol_url, _ = _from_open_library(title, author, open_library_key)
+        if ol_url:
+            return ol_url, "open_library"
 
     return None, None
 
