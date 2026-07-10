@@ -44,15 +44,83 @@ function normalizeCoverUrl(url) {
   return normalized;
 }
 
+const BROKEN_CACHE_KEY = "bookmind_cover_broken_v6";
+const BROKEN_TTL = 24 * 60 * 60 * 1000;
+const BROKEN_MIGRATION_KEY = "bookmind_cover_broken_migrated_v6";
+
+function getBrokenCache() {
+  try {
+    const raw = localStorage.getItem(BROKEN_CACHE_KEY) || sessionStorage.getItem(BROKEN_CACHE_KEY);
+    const cache = JSON.parse(raw || "{}");
+    return cache && typeof cache === "object" ? cache : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveBrokenCache(cache) {
+  try {
+    const payload = JSON.stringify(cache);
+    localStorage.setItem(BROKEN_CACHE_KEY, payload);
+    sessionStorage.setItem(BROKEN_CACHE_KEY, payload);
+  } catch {
+    /* quota */
+  }
+}
+
+function isBrokenUrl(url) {
+  const normalized = normalizeCoverUrl(url);
+  if (!normalized) return false;
+
+  const cache = getBrokenCache();
+  const failedAt = cache[normalized];
+  if (!failedAt) return false;
+
+  if (Date.now() - failedAt > BROKEN_TTL) {
+    delete cache[normalized];
+    saveBrokenCache(cache);
+    return false;
+  }
+
+  return true;
+}
+
+function markBrokenUrl(url) {
+  const normalized = normalizeCoverUrl(url);
+  if (!normalized) return;
+
+  const cache = getBrokenCache();
+  cache[normalized] = Date.now();
+  saveBrokenCache(cache);
+}
+
+function clearBrokenUrl(url) {
+  const normalized = normalizeCoverUrl(url);
+  if (!normalized) return;
+
+  const cache = getBrokenCache();
+  if (!cache[normalized]) return;
+
+  delete cache[normalized];
+  saveBrokenCache(cache);
+}
+
+function migrateBrokenCache() {
+  if (localStorage.getItem(BROKEN_MIGRATION_KEY)) return;
+  localStorage.removeItem("bookmind_cover_broken_v5");
+  sessionStorage.removeItem("bookmind_cover_broken_v5");
+  localStorage.setItem(BROKEN_MIGRATION_KEY, "1");
+}
+
+migrateBrokenCache();
+
 const BookMindCoverImage = {
   _memoryCache: new Map(),
-  _brokenUrls: new Map(),
   _pending: new Map(),
   _batchTimer: null,
   _persistTimer: null,
   _persistedKeys: new Set(),
   _storageKey: "bookmind_cover_cache_v5",
-  _brokenStorageKey: "bookmind_cover_broken_v5",
 
   isMissingCoverUrl(url) {
     if (url == null) return true;
@@ -74,18 +142,6 @@ const BookMindCoverImage = {
           });
         }
       }
-      const brokenRaw =
-        localStorage.getItem(this._brokenStorageKey) || sessionStorage.getItem(this._brokenStorageKey);
-      if (brokenRaw) {
-        const broken = JSON.parse(brokenRaw);
-        if (broken && typeof broken === "object") {
-          Object.entries(broken).forEach(([key, urls]) => {
-            if (Array.isArray(urls) && urls.length) {
-              this._brokenUrls.set(key, new Set(urls));
-            }
-          });
-        }
-      }
     } catch {
       /* ignore */
     }
@@ -96,11 +152,6 @@ const BookMindCoverImage = {
       const payload = JSON.stringify(Object.fromEntries(this._memoryCache));
       localStorage.setItem(this._storageKey, payload);
       sessionStorage.setItem(this._storageKey, payload);
-      const brokenPayload = JSON.stringify(
-        Object.fromEntries([...this._brokenUrls.entries()].map(([key, urls]) => [key, [...urls]]))
-      );
-      localStorage.setItem(this._brokenStorageKey, brokenPayload);
-      sessionStorage.setItem(this._brokenStorageKey, brokenPayload);
     } catch {
       /* quota */
     }
@@ -111,25 +162,20 @@ const BookMindCoverImage = {
     this._persistTimer = setTimeout(() => this._persistCaches(), 400);
   },
 
-  _brokenSet(key) {
-    this._loadCaches();
-    if (!this._brokenUrls.has(key)) this._brokenUrls.set(key, new Set());
-    return this._brokenUrls.get(key);
-  },
-
   _rememberBrokenUrl(key, url) {
     const normalized = normalizeCoverUrl(url);
     if (!normalized) return;
-    const broken = this._brokenSet(key);
-    if (broken.has(normalized)) return;
-    broken.add(normalized);
+    markBrokenUrl(normalized);
     if (this._memoryCache.get(key) === normalized) this._memoryCache.delete(key);
     this._schedulePersist();
   },
 
   _isBrokenUrl(key, url) {
-    const normalized = normalizeCoverUrl(url);
-    return Boolean(normalized && this._brokenSet(key).has(normalized));
+    return isBrokenUrl(url);
+  },
+
+  _isRealCover(img) {
+    return Boolean(img && img.naturalWidth >= 40 && img.naturalHeight >= 60);
   },
 
   bookRef(book) {
@@ -223,6 +269,7 @@ const BookMindCoverImage = {
     const { persist = true, ref = null } = options;
     const normalized = normalizeCoverUrl(url);
     if (!normalized) return;
+    clearBrokenUrl(normalized);
     const unchanged = this._memoryCache.get(key) === normalized;
     this._memoryCache.set(key, normalized);
     if (!unchanged) this._schedulePersist();
@@ -295,6 +342,23 @@ const BookMindCoverImage = {
     if (!img.getAttribute("src")) img.setAttribute("src", src);
 
     const onSuccess = () => {
+      if (!this._isRealCover(img)) {
+        markBrokenUrl(src);
+        const key = this.cacheKey(ref);
+        if (this._memoryCache.get(key) === src) {
+          this._memoryCache.delete(key);
+          this._schedulePersist();
+        }
+        ref.cover_url = null;
+        wrap.__bookRef = { ...ref, cover_url: null };
+        delete wrap.dataset.coverUrl;
+        this.debugCoverState(book || ref, src, { reason: "tiny_placeholder_image" });
+        this.renderPlaceholder(wrap, ref, { imgClass: wrap.dataset.imgClass });
+        this._queueResolve(wrap);
+        return;
+      }
+
+      clearBrokenUrl(src);
       this._markImageSuccess(img, wrap);
       this.debugCoverState(book || ref, src, { reason: "image_loaded" });
     };
@@ -310,7 +374,7 @@ const BookMindCoverImage = {
 
     // Root cause fix: cached images fire onload before handlers if src was set early.
     if (img.complete) {
-      if (img.naturalWidth > 0) onSuccess();
+      if (img.naturalWidth > 0 && img.naturalHeight > 0) onSuccess();
       else onFail();
     }
   },
@@ -324,14 +388,20 @@ const BookMindCoverImage = {
   },
 
   renderImage(wrap, ref, url, options = {}) {
-    if (!wrap || !url) return;
+    if (!wrap || !url) {
+      if (wrap) this.renderPlaceholder(wrap, ref, options);
+      return;
+    }
     const imgClass = options.imgClass || wrap.dataset.imgClass || "book-cover-img";
     const normalized = normalizeCoverUrl(url);
     const key = this.cacheKey(ref);
 
-    if (!normalized || this._isBrokenUrl(key, normalized)) {
+    if (!normalized || isBrokenUrl(normalized)) {
       this.renderPlaceholder(wrap, ref, options);
-      this._logMissingCover(ref, ref, normalized, "broken_or_invalid_url");
+      this._logMissingCover(ref, ref, normalized, normalized ? "temporarily_blocked_url" : "broken_or_invalid_url");
+      if (normalized && normalizeCoverUrl(ref.cover_url) !== normalized) {
+        this._queueResolve(wrap);
+      }
       return;
     }
 
