@@ -554,7 +554,7 @@ function renderActivePathCard(path, pathIndex) {
         ${(path.books || []).map((book, index) => `
           <div class="path-book ${book.completed ? "done" : ""}">
             <div class="path-step">${book.completed ? svg("check", "icon-inline") : index + 1}</div>
-            <div class="path-book-cover">${window.BookCover ? BookCover.html(book, { imgClass: "path-book-cover-img book-cover-img", wrapClass: "book-cover-wrap path-cover-wrap", placeholderClass: "path-book-cover-ph book-cover-placeholder" }) : svg("book")}</div>
+            <div class="path-book-cover">${BookCover.html(book, { imgClass: "path-book-cover-img book-cover-img", wrapClass: "book-cover-wrap path-cover-wrap", placeholderClass: "path-book-cover-ph book-cover-placeholder" })}</div>
             <div class="path-book-info">
               <span>${escapeHtml(book.level || "Recommended")}${book.difficulty ? ` · ${escapeHtml(book.difficulty)}` : ""}</span>
               <h3>${escapeHtml(book.title || "Untitled")}</h3>

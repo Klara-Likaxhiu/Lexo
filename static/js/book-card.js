@@ -16,13 +16,11 @@ const BookMindBookCard = {
     const difficulty = book.difficulty || book.level || "Recommended";
     const reason = book.reason || "";
 
-    const cover = window.BookCover
-      ? BookCover.html(book, {
-          imgClass: "shared-book-cover book-cover-img",
-          wrapClass: "shared-book-cover-wrap book-cover-wrap",
-          placeholderClass: "shared-book-cover book-cover-placeholder",
-        })
-      : `<div class="shared-book-cover fallback-cover"></div>`;
+    const cover = BookCover.html(book, {
+      imgClass: "shared-book-cover book-cover-img",
+      wrapClass: "shared-book-cover-wrap book-cover-wrap",
+      placeholderClass: "shared-book-cover book-cover-placeholder",
+    });
 
     const progressBlock = showProgress ? this.renderProgressBlock(book) : "";
 

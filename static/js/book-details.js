@@ -146,21 +146,7 @@ function renderCover(aiBook, book) {
     return;
   }
 
-  const coverUrl = bookRef.cover_url;
-
-  if (coverUrl) {
-    const img = document.createElement("img");
-    img.className = "bd-cover-img";
-    img.src = coverUrl;
-    img.alt = `${aiBook.title || "Book"} cover`;
-    img.onerror = () => {
-      cover.innerHTML = `<div class="bd-cover-fallback"></div>`;
-    };
-    cover.innerHTML = "";
-    cover.appendChild(img);
-  } else {
-    cover.innerHTML = `<div class="bd-cover-fallback"></div>`;
-  }
+  cover.innerHTML = `<div class="book-cover-wrap bd-cover-wrap"><div class="bd-cover-fallback book-cover-placeholder premium-book-placeholder mystery-cover"><div class="premium-book-face"><span class="book-cover-title">${bookRef.title || "Untitled Book"}</span><span class="book-cover-author">${bookRef.author || "Unknown Author"}</span></div></div></div>`;
 }
 
 /* --------------------------------------------------------------- shelves */

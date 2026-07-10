@@ -18,9 +18,21 @@ from app.cover_store import (
 
 logger = logging.getLogger(__name__)
 
+_MISSING_COVER_VALUES = frozenset({"null", "undefined", "none", "n/a", "false", "0", ""})
+
+
+def is_missing_cover_url(url: str | None) -> bool:
+    """Treat empty, junk strings, and falsy values as missing covers."""
+    if url is None:
+        return True
+    value = str(url).strip()
+    if not value:
+        return True
+    return value.lower() in _MISSING_COVER_VALUES
+
 
 def normalize_cover_url(url: str | None) -> str | None:
-    if not url or not str(url).strip():
+    if is_missing_cover_url(url):
         return None
 
     normalized = str(url).strip().replace("http://", "https://")
@@ -250,14 +262,41 @@ def _open_library_queries(title: str, author: str | None) -> list[str]:
 
 
 def _log_cover_result(title: str, author: str | None, result: dict) -> None:
-    logger.debug(
-        "[BookMindCover] %r by %s -> cover_url=%r source=%s cached=%s",
+    debug = result.get("cover_debug") or {}
+    logger.info(
+        "[BookCover] title=%r saved=%r google=%r ol_isbn=%r ol_search=%r final=%s url=%r",
         title,
-        author or "Unknown",
+        debug.get("saved_cover_url"),
+        debug.get("google_books"),
+        debug.get("open_library_isbn"),
+        debug.get("open_library_search"),
+        debug.get("final_source") or result.get("cover_source") or "placeholder",
         result.get("cover_url"),
-        result.get("source"),
-        result.get("cached"),
     )
+
+
+def _attach_cover_debug(
+    result: dict,
+    *,
+    title: str,
+    saved_cover_url: str | None,
+    google_books: str | None = None,
+    open_library_isbn: str | None = None,
+    open_library_search: str | None = None,
+) -> dict:
+    final_source = result.get("cover_source") or (
+        "placeholder" if not result.get("cover_url") else "unknown"
+    )
+    result["cover_debug"] = {
+        "title": title,
+        "saved_cover_url": saved_cover_url,
+        "google_books": google_books,
+        "open_library_isbn": open_library_isbn,
+        "open_library_search": open_library_search,
+        "final_source": final_source,
+    }
+    _log_cover_result(title, result.get("author"), result)
+    return result
 
 
 _JUNK_TITLE_RE = re.compile(
@@ -361,6 +400,7 @@ def _cache_and_return(
     cover_url: str,
     cover_source: str,
     cached: bool = False,
+    cover_debug: dict | None = None,
 ) -> dict:
     upsert_cover(
         book_id=book_id,
@@ -370,14 +410,18 @@ def _cache_and_return(
         cover_url=cover_url,
         source=cover_source,
     )
-    return {
+    payload = {
         "cover_url": cover_url,
         "cover_source": cover_source,
         "source": format_source(cover_source),
         "cached": cached,
         "book_id": book_id,
         "cache_key": book_id,
+        "author": author,
     }
+    if cover_debug:
+        payload["cover_debug"] = cover_debug
+    return payload
 
 
 def _pick_best_cover_candidate(
@@ -448,6 +492,8 @@ def _from_google(
                 continue
 
             url = normalize_cover_url(book.get("cover_url"))
+            if not url:
+                continue
             if url and _cover_url_is_usable(url):
                 if score >= _HIGH_CONFIDENCE_SCORE:
                     return url, book
@@ -576,17 +622,21 @@ def resolve_cover(
     recorded with lookup_failed_at to avoid hammering external APIs.
     """
     title = (title or "").strip()
+    saved_input = cover_url
     if not title:
         result = {"cover_url": None, "cover_source": None, "cached": False, "cache_key": ""}
-        _log_cover_result(title, author, result)
-        return result
+        return _attach_cover_debug(result, title=title, saved_cover_url=saved_input)
 
     author = (author or "").strip() or None
     book_id = make_book_id(title, author, isbn)
     row = get_cover_row(book_id=book_id, isbn=isbn, title=title, author=author)
 
+    google_attempt: str | None = None
+    ol_isbn_attempt: str | None = None
+    ol_search_attempt: str | None = None
+
     # 1. Existing cover_url on the book.
-    if cover_url:
+    if not is_missing_cover_url(cover_url):
         normalized = normalize_cover_url(cover_url)
         if normalized and _cover_url_is_usable(normalized):
             result = _cache_and_return(
@@ -597,8 +647,14 @@ def resolve_cover(
                 cover_url=normalized,
                 cover_source="provided",
             )
-            _log_cover_result(title, author, result)
-            return result
+            return _attach_cover_debug(
+                result,
+                title=title,
+                saved_cover_url=saved_input,
+                google_books=None,
+                open_library_isbn=None,
+                open_library_search=None,
+            )
 
     # Cached auto success from a previous lookup (fast path — no external APIs).
     if row and row.get("cover_url"):
@@ -609,8 +665,12 @@ def resolve_cover(
                 cover_url=cached_url,
                 cover_source=row.get("source") or "cache",
             )
-            _log_cover_result(title, author, result)
-            return result
+            result["author"] = author
+            return _attach_cover_debug(
+                result,
+                title=title,
+                saved_cover_url=saved_input,
+            )
 
     resolved_isbn = isbn
     save_id = book_id
@@ -619,6 +679,7 @@ def resolve_cover(
     if not is_lookup_blocked(row):
         # 2. Google Books (title + author, with normalized variants).
         google_url, google_book = _from_google(title, author, google_id)
+        google_attempt = google_url
         resolved_isbn = resolved_isbn or (google_book or {}).get("isbn")
         save_id = make_book_id(title, author, resolved_isbn)
 
@@ -631,11 +692,37 @@ def resolve_cover(
                 cover_url=google_url,
                 cover_source="google_books",
             )
-            _log_cover_result(title, author, result)
-            return result
+            return _attach_cover_debug(
+                result,
+                title=title,
+                saved_cover_url=saved_input,
+                google_books=google_attempt,
+            )
 
-        # 3. Open Library (title + author variants).
+        # 3. Open Library ISBN CDN when an ISBN is known.
+        isbn_url = _from_isbn(resolved_isbn or isbn)
+        ol_isbn_attempt = isbn_url
+        if isbn_url:
+            save_id = make_book_id(title, author, resolved_isbn)
+            result = _cache_and_return(
+                book_id=save_id,
+                title=title,
+                author=author,
+                isbn=resolved_isbn,
+                cover_url=isbn_url,
+                cover_source="open_library_isbn",
+            )
+            return _attach_cover_debug(
+                result,
+                title=title,
+                saved_cover_url=saved_input,
+                google_books=google_attempt,
+                open_library_isbn=ol_isbn_attempt,
+            )
+
+        # 4. Open Library search (title + author variants).
         ol_url, ol_book = _from_open_library(title, author, open_library_key)
+        ol_search_attempt = ol_url
         resolved_isbn = resolved_isbn or (ol_book or {}).get("isbn")
         save_id = make_book_id(title, author, resolved_isbn)
 
@@ -648,23 +735,14 @@ def resolve_cover(
                 cover_url=ol_url,
                 cover_source="open_library",
             )
-            _log_cover_result(title, author, result)
-            return result
-
-        # 4. ISBN cover CDN when an ISBN is known.
-        isbn_url = _from_isbn(resolved_isbn or isbn)
-        if isbn_url:
-            save_id = make_book_id(title, author, resolved_isbn)
-            result = _cache_and_return(
-                book_id=save_id,
+            return _attach_cover_debug(
+                result,
                 title=title,
-                author=author,
-                isbn=resolved_isbn,
-                cover_url=isbn_url,
-                cover_source="isbn",
+                saved_cover_url=saved_input,
+                google_books=google_attempt,
+                open_library_isbn=ol_isbn_attempt,
+                open_library_search=ol_search_attempt,
             )
-            _log_cover_result(title, author, result)
-            return result
 
     # 5. Manual override — only when automatic sources fail.
     manual_url = _manual_cover_from_row(row)
@@ -677,9 +755,16 @@ def resolve_cover(
             "book_id": (row or {}).get("book_id") or book_id,
             "cache_key": (row or {}).get("book_id") or book_id,
             "manual_cover_url": manual_url,
+            "author": author,
         }
-        _log_cover_result(title, author, result)
-        return result
+        return _attach_cover_debug(
+            result,
+            title=title,
+            saved_cover_url=saved_input,
+            google_books=google_attempt,
+            open_library_isbn=ol_isbn_attempt,
+            open_library_search=ol_search_attempt,
+        )
 
     record_lookup_failure(
         book_id=book_id,
@@ -696,9 +781,16 @@ def resolve_cover(
         "book_id": book_id,
         "cache_key": book_id,
         "lookup_failed": True,
+        "author": author,
     }
-    _log_cover_result(title, author, result)
-    return result
+    return _attach_cover_debug(
+        result,
+        title=title,
+        saved_cover_url=saved_input,
+        google_books=google_attempt,
+        open_library_isbn=ol_isbn_attempt,
+        open_library_search=ol_search_attempt,
+    )
 
 
 def resolve_covers_batch(books: list[dict]) -> list[dict]:
