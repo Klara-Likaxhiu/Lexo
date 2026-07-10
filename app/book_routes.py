@@ -477,6 +477,11 @@ def _fetch_open_library_author_name(author_key: str) -> str | None:
 
 _GOOGLE_BOOKS_COOLDOWN_UNTIL = 0.0
 _GOOGLE_BOOKS_COOLDOWN_SECONDS = 30 * 60
+_LAST_GOOGLE_SEARCH_DEBUG: dict = {}
+
+
+def get_last_google_search_debug() -> dict:
+    return dict(_LAST_GOOGLE_SEARCH_DEBUG)
 
 
 def google_books_available() -> bool:
@@ -490,6 +495,16 @@ def _mark_google_books_rate_limited() -> None:
 
 
 def search_google_books(q: str, limit: int = 6, mode: SearchMode = "all") -> list[dict]:
+    global _LAST_GOOGLE_SEARCH_DEBUG
+    _LAST_GOOGLE_SEARCH_DEBUG = {
+        "query": None,
+        "requestUrl": None,
+        "status": None,
+        "ok": False,
+        "itemCount": 0,
+        "available": google_books_available(),
+    }
+
     if not google_books_available():
         return []
 
@@ -500,11 +515,18 @@ def search_google_books(q: str, limit: int = 6, mode: SearchMode = "all") -> lis
         "printType": "books",
         "orderBy": "relevance",
     }
+    _LAST_GOOGLE_SEARCH_DEBUG["query"] = params["q"]
 
     try:
         response = httpx.get(url, params=params, timeout=12.0)
-    except httpx.HTTPError:
+    except httpx.HTTPError as exc:
+        _LAST_GOOGLE_SEARCH_DEBUG["status"] = "http_error"
+        _LAST_GOOGLE_SEARCH_DEBUG["error"] = str(exc)
         return []
+
+    _LAST_GOOGLE_SEARCH_DEBUG["requestUrl"] = str(response.request.url)
+    _LAST_GOOGLE_SEARCH_DEBUG["status"] = response.status_code
+    _LAST_GOOGLE_SEARCH_DEBUG["ok"] = response.status_code == 200
 
     if response.status_code == 429:
         _mark_google_books_rate_limited()
@@ -513,8 +535,12 @@ def search_google_books(q: str, limit: int = 6, mode: SearchMode = "all") -> lis
     if response.status_code != 200:
         return []
 
+    payload = response.json()
+    items = payload.get("items", [])
+    _LAST_GOOGLE_SEARCH_DEBUG["itemCount"] = len(items)
+
     books = []
-    for item in response.json().get("items", []):
+    for item in items:
         parsed = _parse_google_volume(item)
         if parsed:
             books.append(parsed)

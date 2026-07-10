@@ -283,7 +283,11 @@ def _attach_cover_debug(
     google_books: str | None = None,
     open_library_isbn: str | None = None,
     open_library_search: str | None = None,
+    pipeline_step: str | None = None,
+    google_selected: dict | None = None,
 ) -> dict:
+    from app.book_routes import get_last_google_search_debug
+
     final_source = result.get("cover_source") or (
         "placeholder" if not result.get("cover_url") else "unknown"
     )
@@ -294,6 +298,9 @@ def _attach_cover_debug(
         "open_library_isbn": open_library_isbn,
         "open_library_search": open_library_search,
         "final_source": final_source,
+        "pipeline_step": pipeline_step,
+        "google_search": get_last_google_search_debug(),
+        "google_selected": google_selected,
     }
     _log_cover_result(title, result.get("author"), result)
     return result
@@ -692,9 +699,8 @@ def resolve_cover(
                 result,
                 title=title,
                 saved_cover_url=saved_input,
+                pipeline_step="provided_non_ol",
             )
-
-    # 2. Cached non-Open-Library auto success (fast path).
     if row and row.get("cover_url"):
         cached_url = normalize_cover_url(row["cover_url"])
         if cached_url and not _is_open_library_url(cached_url):
@@ -708,6 +714,7 @@ def resolve_cover(
                 result,
                 title=title,
                 saved_cover_url=saved_input,
+                pipeline_step="cached_non_ol",
             )
 
     resolved_isbn = isbn
@@ -738,9 +745,13 @@ def resolve_cover(
                 title=title,
                 saved_cover_url=saved_input,
                 google_books=google_attempt,
+                pipeline_step="google_books_isbn",
+                google_selected={
+                    "title": (google_isbn_book or {}).get("title"),
+                    "author": (google_isbn_book or {}).get("author"),
+                    "cover_url": google_isbn_url,
+                },
             )
-
-        # 4. Google Books by title + author.
         google_url, google_book = _from_google(title, author, google_id)
         google_attempt = google_url or google_attempt
         resolved_isbn = resolved_isbn or (google_book or {}).get("isbn")
@@ -760,9 +771,13 @@ def resolve_cover(
                 title=title,
                 saved_cover_url=saved_input,
                 google_books=google_attempt,
+                pipeline_step="google_books",
+                google_selected={
+                    "title": (google_book or {}).get("title"),
+                    "author": (google_book or {}).get("author"),
+                    "cover_url": google_url,
+                },
             )
-
-        # 5. Open Library ISBN CDN.
         isbn_url = _from_isbn(resolved_isbn or isbn)
         ol_isbn_attempt = isbn_url
         if isbn_url:
@@ -781,9 +796,8 @@ def resolve_cover(
                 saved_cover_url=saved_input,
                 google_books=google_attempt,
                 open_library_isbn=ol_isbn_attempt,
+                pipeline_step="open_library_isbn",
             )
-
-        # 6. Open Library search.
         ol_url, ol_book = _from_open_library(title, author, open_library_key)
         ol_search_attempt = ol_url
         resolved_isbn = resolved_isbn or (ol_book or {}).get("isbn")
@@ -805,9 +819,8 @@ def resolve_cover(
                 google_books=google_attempt,
                 open_library_isbn=ol_isbn_attempt,
                 open_library_search=ol_search_attempt,
+                pipeline_step="open_library_search",
             )
-
-        # 7. Last resort: provided Open Library URL from search payloads.
         if not is_missing_cover_url(cover_url):
             normalized = normalize_cover_url(cover_url)
             if normalized and _is_open_library_url(normalized):
@@ -826,6 +839,7 @@ def resolve_cover(
                     google_books=google_attempt,
                     open_library_isbn=ol_isbn_attempt,
                     open_library_search=normalized,
+                    pipeline_step="open_library_provided",
                 )
 
         if row and row.get("cover_url"):
@@ -892,6 +906,7 @@ def resolve_cover(
         google_books=google_attempt,
         open_library_isbn=ol_isbn_attempt,
         open_library_search=ol_search_attempt,
+        pipeline_step="lookup_failed",
     )
 
 
