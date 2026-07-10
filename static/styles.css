@@ -2165,6 +2165,21 @@ html.auth-pending body {
   overflow: hidden;
 }
 
+.book-cover-resolving {
+  opacity: 0.72;
+}
+
+.book-cover-resolving::after {
+  content: "Resolving cover…";
+  display: block;
+  margin-top: 6px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
 .premium-book-placeholder {
   position: relative;
   display: flex;
