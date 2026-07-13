@@ -334,8 +334,8 @@ button, .btn {
 }
 
 .hero-illustration {
-  width: min(100%, 560px);
-  max-width: 560px;
+  width: min(100%, 420px);
+  max-width: 420px;
   height: auto;
   display: block;
   margin-left: auto;
@@ -354,7 +354,7 @@ button, .btn {
   .hero-art {
     min-height: 0;
     order: -1;
-    max-width: 420px;
+    max-width: 320px;
     margin: 0 auto;
     transform: none;
     justify-self: center;
@@ -364,8 +364,8 @@ button, .btn {
   .hero-illustration {
     margin-left: auto;
     margin-right: auto;
-    width: min(100%, 420px);
-    max-width: 420px;
+    width: min(100%, 320px);
+    max-width: 320px;
   }
 
   .hero-text h1 {
