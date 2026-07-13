@@ -209,12 +209,12 @@ button, .btn {
 }
 
 .hero-section {
-  max-width: 1320px;
-  margin: 28px auto 0;
+  max-width: 1380px;
+  margin: 20px auto 0;
   display: grid;
-  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
-  gap: 48px;
-  align-items: start;
+  grid-template-columns: minmax(0, 0.86fr) minmax(0, 1.14fr);
+  gap: 24px;
+  align-items: center;
 }
 
 .hero-text h1 {
@@ -236,9 +236,9 @@ button, .btn {
 }
 
 .hero-text p {
-  margin-top: 28px;
-  font-size: 18px;
-  max-width: 520px;
+  margin-top: 24px;
+  font-size: 17px;
+  max-width: 500px;
   line-height: 1.7;
   color: rgba(16, 43, 67, 0.68);
   font-weight: 500;
@@ -246,36 +246,36 @@ button, .btn {
 
 .hero-buttons {
   display: flex;
-  gap: 16px;
-  margin-top: 34px;
+  gap: 14px;
+  margin-top: 28px;
   flex-wrap: wrap;
 }
 
 .landing-page .hero-buttons .btn.hero-cta-primary {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   background: var(--deep-green);
   color: var(--white);
   -webkit-text-fill-color: var(--white);
   border-radius: 999px;
-  padding: 9px 18px;
-  font-size: 0.9rem;
-  line-height: 1.2;
+  padding: 7px 15px;
+  font-size: 0.8rem;
+  line-height: 1.15;
   font-weight: 600;
-  box-shadow: 0 8px 20px rgba(18, 79, 66, 0.2);
+  box-shadow: 0 7px 18px rgba(18, 79, 66, 0.18);
 }
 
 .landing-page .hero-buttons .btn.hero-cta-primary:hover {
   background: #0e3f35;
-  box-shadow: 0 12px 24px rgba(18, 79, 66, 0.26);
+  box-shadow: 0 10px 22px rgba(18, 79, 66, 0.24);
 }
 
 .landing-page .hero-buttons .btn.hero-cta-secondary {
   border-radius: 999px;
-  padding: 9px 18px;
-  font-size: 0.9rem;
-  line-height: 1.2;
+  padding: 7px 15px;
+  font-size: 0.8rem;
+  line-height: 1.15;
   font-weight: 600;
   background: rgba(255, 255, 255, 0.7);
   border: 1.5px solid rgba(16, 43, 67, 0.16);
@@ -291,8 +291,8 @@ button, .btn {
 }
 
 .hero-cta-arrow {
-  width: 14px;
-  height: 14px;
+  width: 13px;
+  height: 13px;
 }
 
 .trusted {
@@ -327,16 +327,19 @@ button, .btn {
   display: grid;
   place-items: center;
   overflow: visible;
-  align-self: start;
-  margin-top: -48px;
-  transform: translateY(-36px);
+  align-self: center;
+  transform: translateY(-34px);
+  justify-self: end;
+  width: 100%;
 }
 
 .hero-illustration {
-  width: min(100%, 560px);
+  width: min(100%, 760px);
+  max-width: 760px;
   height: auto;
   display: block;
-  filter: drop-shadow(0 18px 40px rgba(16, 43, 67, 0.08));
+  margin-left: auto;
+  filter: drop-shadow(0 20px 44px rgba(16, 43, 67, 0.1));
 }
 
 @media (max-width: 980px) {
@@ -349,9 +352,17 @@ button, .btn {
   .hero-art {
     min-height: 0;
     order: -1;
-    max-width: 480px;
+    max-width: 560px;
     margin: 0 auto;
     transform: none;
+    justify-self: center;
+    align-self: auto;
+  }
+
+  .hero-illustration {
+    margin-left: auto;
+    margin-right: auto;
+    width: min(100%, 560px);
   }
 
   .hero-text h1 {
