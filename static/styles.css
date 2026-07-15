@@ -1750,8 +1750,8 @@ html.auth-pending body {
 }
 
 .companion-book-card .custom-cover {
-  width: 16px;
-  height: 24px;
+  width: 21px;
+  height: 31px;
   margin-bottom: 6px;
   border-radius: 4px;
 }
@@ -2357,8 +2357,8 @@ html.auth-pending body {
 }
 
 .companion-cover-wrap.book-cover-wrap {
-  width: 16px;
-  height: 24px;
+  width: 21px;
+  height: 31px;
   aspect-ratio: auto;
   margin-bottom: 6px;
   border-radius: 4px;
