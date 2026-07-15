@@ -1492,6 +1492,16 @@ html.reader-dna-complete #continueDiscoveryTop {
   opacity: 0.6;
 }
 
+.quest-card-clickable {
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.quest-card-clickable:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-card);
+}
+
 .quest-icon {
   font-size: 2rem;
   margin-bottom: 12px;

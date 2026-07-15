@@ -1369,6 +1369,32 @@ html.auth-pending body {
   font-weight: 900;
 }
 
+.section-title-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.section-refresh-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: var(--navy);
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.section-refresh-btn:hover {
+  opacity: 0.75;
+}
+
+.section-refresh-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 /*library*/
 
 .library-section {

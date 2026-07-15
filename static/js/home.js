@@ -175,6 +175,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   loadHomeIntelligence();
   window.LexoPerf?.endPageLoad?.();
 
+  document.getElementById("refreshRecommendationsBtn")?.addEventListener("click", () => {
+    fetchFreshRecommendations({ mode: "replace" });
+  });
+
   document.addEventListener("lexo:library-changed", event => {
     if (event.detail?.action === "background-refresh" || event.detail?.action === "refresh") {
       renderRecentlyAdded();
@@ -348,11 +352,49 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
+  function normalizeTitleKey(title) {
+    return (title || "").toLowerCase().trim();
+  }
+
+  function renderRecommendationsEmptyState({ title, message, buttonLabel = null }) {
+    const container = document.getElementById("recommendations");
+    if (!container) return;
+    container.innerHTML = `
+      <div class="empty-library card">
+        <h2>${title}</h2>
+        <p>${message}</p>
+        ${buttonLabel ? `<button class="btn btn-primary" id="generateMoreBtn" type="button">${buttonLabel}</button>` : ""}
+      </div>
+    `;
+    document.getElementById("generateMoreBtn")?.addEventListener("click", () => {
+      fetchFreshRecommendations({ mode: "append" });
+    });
+  }
+
+  function renderRecommendationsErrorState(message) {
+    const container = document.getElementById("recommendations");
+    if (!container) return;
+    container.innerHTML = `
+      <div class="empty-library card">
+        <h2>Couldn't load recommendations.</h2>
+        <p>${message}</p>
+        <button class="btn btn-primary" id="retryRecommendationsBtn" type="button">Try again</button>
+      </div>
+    `;
+    document.getElementById("retryRecommendationsBtn")?.addEventListener("click", () => {
+      fetchFreshRecommendations({ mode: "append" });
+    });
+  }
+
   async function renderRecommendations(currentProfile = profile) {
     if (!currentProfile) {
       currentProfile = JSON.parse(localStorage.getItem("readerProfile"));
     }
     if (!currentProfile) {
+      renderRecommendationsEmptyState({
+        title: "No reader profile yet.",
+        message: "Complete your Reader DNA quiz to get personalized book recommendations.",
+      });
       window.LexoPerf?.endRecommendationsLoad?.();
       return;
     }
@@ -362,33 +404,40 @@ document.addEventListener("DOMContentLoaded", async () => {
       currentProfile.confirmed_reading_level || "Not available";
     document.getElementById("genres").textContent = (currentProfile.favorite_genres || []).join(", ");
 
-    const container = document.getElementById("recommendations");
-    container.innerHTML = "";
+    const rawRecommendations = Array.isArray(currentProfile.recommendations)
+      ? currentProfile.recommendations
+      : [];
+    console.log("[home] renderRecommendations: stored recommendations =", rawRecommendations.length);
 
-    if (!currentProfile.recommendations) {
+    if (rawRecommendations.length === 0) {
+      renderRecommendationsEmptyState({
+        title: "You're all caught up.",
+        message: "Want Lexo to find more books you haven't read, aren't reading, and haven't marked \"not interested\"?",
+        buttonLabel: "Yes, generate 3 more",
+      });
       window.LexoPerf?.endRecommendationsLoad?.();
       return;
     }
 
-    const visibleRecommendations = currentProfile.recommendations.filter(item => {
+    const visibleRecommendations = rawRecommendations.filter(item => {
       const rec = item.ai_recommendation || item;
       return !LexoLibrary.findShelf(rec);
     }).slice(0, 6);
+    console.log("[home] renderRecommendations: visible after excluding already-shelved books =", visibleRecommendations.length);
+
+    const container = document.getElementById("recommendations");
 
     if (visibleRecommendations.length === 0) {
-      container.innerHTML = `
-        <div class="empty-library card">
-          <h2>You're all caught up.</h2>
-          <p>Want Lexo to find more books you haven't read, aren't reading, and haven't marked "not interested"?</p>
-          <button class="btn btn-primary" id="generateMoreBtn" type="button">Yes, generate 3 more</button>
-        </div>
-      `;
-
-      const generateBtn = document.getElementById("generateMoreBtn");
-      if (generateBtn) generateBtn.addEventListener("click", generateMoreRecommendations);
+      renderRecommendationsEmptyState({
+        title: "You're all caught up.",
+        message: "Want Lexo to find more books you haven't read, aren't reading, and haven't marked \"not interested\"?",
+        buttonLabel: "Yes, generate 3 more",
+      });
       window.LexoPerf?.endRecommendationsLoad?.();
       return;
     }
+
+    container.innerHTML = "";
 
     visibleRecommendations.forEach(item => {
       const aiBook = item.ai_recommendation;
@@ -510,48 +559,62 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  async function generateMoreRecommendations() {
+  /**
+   * Fetches fresh recommendations from the AI companion endpoint.
+   * mode "append": keep existing visible recommendations and add new ones (empty-state CTA).
+   * mode "replace": discard stored recommendations and fetch an entirely new set (Refresh button).
+   */
+  async function fetchFreshRecommendations({ mode = "append" } = {}) {
     const container = document.getElementById("recommendations");
-    const button = document.getElementById("generateMoreBtn");
+    const refreshBtn = document.getElementById("refreshRecommendationsBtn");
 
-    if (button) {
-      button.disabled = true;
-      button.textContent = "Finding books…";
+    if (refreshBtn) {
+      refreshBtn.disabled = true;
+      refreshBtn.textContent = "Refreshing…";
     }
+    document.getElementById("generateMoreBtn")?.setAttribute("disabled", "true");
+    document.getElementById("retryRecommendationsBtn")?.setAttribute("disabled", "true");
 
-    container.innerHTML = recommendationsSkeleton(3);
+    if (container) container.innerHTML = recommendationsSkeleton(3);
 
     try {
+      const readerContext = await LexoAPI.getReaderContext();
+      console.log("[home] fetchFreshRecommendations: requesting /api/reader/companion", {
+        mode,
+        hasAuthToken: Boolean(window.LexoAuth?.getAccessToken?.()),
+        excludedCount: (readerContext.excluded_books || []).length,
+      });
+
       const result = await LexoAPI.post("/api/reader/companion", {
         question:
           "Recommend 3 books I haven't read yet, based on my Reader DNA, favorite genres, ratings, and reviews. Only suggest books that are not already in my library.",
-        reader_profile: await LexoAPI.getReaderContext(),
+        reader_profile: readerContext,
       });
 
+      console.log("[home] fetchFreshRecommendations: response recommendations =", (result?.recommendations || []).length);
+
+      const stored = JSON.parse(localStorage.getItem("readerProfile")) || {};
+      const existing = mode === "replace" ? [] : Array.isArray(stored.recommendations) ? stored.recommendations : [];
+      const existingTitles = new Set(
+        existing.map(item => normalizeTitleKey((item.ai_recommendation || item).title))
+      );
+
       const fresh = (result.recommendations || [])
+        .filter(book => book?.title)
         .filter(book => !LexoLibrary.findShelf(book))
+        .filter(book => !existingTitles.has(normalizeTitleKey(book.title)))
         .slice(0, 3);
 
       if (fresh.length === 0) {
-        container.innerHTML = `
-        <div class="empty-library card">
-          <h2>No new books right now.</h2>
-          <p>Add a few ratings or reviews, or ask the AI Companion for ideas, then try again.</p>
-        </div>
-      `;
+        renderRecommendationsEmptyState({
+          title: "No new books right now.",
+          message: "Add a few ratings or reviews, or ask the AI Companion for ideas, then try again.",
+          buttonLabel: "Try again",
+        });
         return;
       }
 
-      const mergeItems = fresh.map(book => ({
-        title: book.title,
-        author: book.author,
-        genre: book.genre,
-        reason: book.reason,
-        difficulty: book.difficulty || "AI Pick",
-        cover_url: book.cover_url || null,
-      }));
-
-      const newItems = mergeItems.map(book => ({
+      const newItems = fresh.map(book => ({
         ai_recommendation: {
           title: book.title,
           author: book.author,
@@ -561,28 +624,26 @@ document.addEventListener("DOMContentLoaded", async () => {
           cover_url: book.cover_url || null,
         },
         book_data: book.cover_url
-          ? {
-              title: book.title,
-              author: book.author,
-              genre: book.genre,
-              cover_url: book.cover_url,
-            }
+          ? { title: book.title, author: book.author, genre: book.genre, cover_url: book.cover_url }
           : null,
       }));
 
-      const stored = JSON.parse(localStorage.getItem("readerProfile")) || {};
-      stored.recommendations = [...(stored.recommendations || []), ...newItems];
+      stored.recommendations = [...existing, ...newItems];
       localStorage.setItem("readerProfile", JSON.stringify(stored));
 
       profile = stored;
-      renderRecommendations(profile);
-    } catch {
-      container.innerHTML = `
-      <div class="empty-library card">
-        <h2>Couldn't generate more.</h2>
-        <p>Please try again in a moment.</p>
-      </div>
-    `;
+      await renderRecommendations(profile);
+    } catch (error) {
+      console.error("[home] fetchFreshRecommendations failed:", error);
+      renderRecommendationsErrorState(
+        error?.message ? error.message : "Please check your connection and try again."
+      );
+    } finally {
+      const refreshBtnAfter = document.getElementById("refreshRecommendationsBtn");
+      if (refreshBtnAfter) {
+        refreshBtnAfter.disabled = false;
+        refreshBtnAfter.textContent = "Refresh";
+      }
     }
   }
 });

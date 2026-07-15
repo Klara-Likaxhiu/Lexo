@@ -221,10 +221,67 @@ function filterBadges(badges) {
   });
 }
 
-function updateLevelHero(stats) {
+const SECRET_MISSION = {
+  unlockLevel: 5,
+  icon: "🗺️",
+  title: "Genre Explorer",
+  description: "Add a book from a genre you haven't read yet to your library.",
+  href: "discovery.html",
+};
+
+function updateSecretMission(level) {
+  console.log("[challenges] updateSecretMission: readerLevel =", level, "unlockLevel =", SECRET_MISSION.unlockLevel);
+
+  const card = document.getElementById("secretMissionCard");
+  const icon = document.getElementById("secretMissionIcon");
+  const title = document.getElementById("secretMissionTitle");
+  const text = document.getElementById("secretMissionText");
+  if (!card || !icon || !title || !text) return;
+
+  const unlocked = level >= SECRET_MISSION.unlockLevel;
+
+  card.classList.toggle("locked", !unlocked);
+  card.classList.toggle("quest-card-clickable", unlocked);
+
+  if (unlocked) {
+    icon.textContent = SECRET_MISSION.icon;
+    title.textContent = SECRET_MISSION.title;
+    text.textContent = SECRET_MISSION.description;
+    card.setAttribute("role", "link");
+    card.setAttribute("tabindex", "0");
+    card.onclick = () => {
+      window.location.href = SECRET_MISSION.href;
+    };
+    card.onkeydown = (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        window.location.href = SECRET_MISSION.href;
+      }
+    };
+  } else {
+    icon.textContent = "🔒";
+    title.textContent = "Secret Mission";
+    text.textContent = `Unlock at Level ${SECRET_MISSION.unlockLevel}`;
+    card.removeAttribute("role");
+    card.removeAttribute("tabindex");
+    card.onclick = null;
+    card.onkeydown = null;
+  }
+}
+
+function computeReaderLevel(stats) {
   const pathXp = window.LexoPathCompletion?.readXpBonus?.() || 0;
   const totalXp = stats.totalFinished * 50 + pathXp;
-  const level = Math.max(1, Math.floor(totalXp / 150) + 1);
+  return {
+    level: Math.max(1, Math.floor(totalXp / 150) + 1),
+    totalXp,
+  };
+}
+
+function updateLevelHero(stats) {
+  const { level, totalXp } = computeReaderLevel(stats);
+  console.log("[challenges] updateLevelHero: readerLevel =", level, "totalXp =", totalXp);
+
   const xpPct = stats.goals.yearly
     ? Math.min(100, Math.round((stats.booksThisYear / stats.goals.yearly) * 100))
     : Math.min(100, Math.round(((totalXp % 150) / 150) * 100));
@@ -244,6 +301,10 @@ function updateLevelHero(stats) {
       ? `${stats.booksThisMonth} of ${stats.goals.monthly} books this month`
       : "Finish 1 book this week";
   }
+
+  // Same `level` value that drives the "Level N Reader" title/badge above —
+  // no separate/hardcoded reader level for the Secret Mission card.
+  updateSecretMission(level);
 }
 
 function renderBadgeStats(summary) {
