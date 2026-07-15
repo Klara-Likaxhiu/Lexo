@@ -107,6 +107,9 @@
         title: book.title,
         author: book.author,
         genre: book.genre,
+        pages: book.pages || book.page_count || null,
+        page_count: book.page_count || book.pages || null,
+        cover_url: book.cover_url || null,
         difficulty: "Recommended by AI",
         reason: book.reason
       },
@@ -147,78 +150,179 @@
     return div;
   }
 
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function normalizeCompanionBooks(result) {
+    const raw =
+      result?.recommendations ||
+      result?.recommended_books ||
+      result?.books ||
+      [];
+    const list = Array.isArray(raw) ? raw : raw && typeof raw === "object" ? [raw] : [];
+    return list
+      .map(item => {
+        if (!item || typeof item !== "object") return null;
+        const nested =
+          item.ai_recommendation && typeof item.ai_recommendation === "object"
+            ? item.ai_recommendation
+            : null;
+        const book = nested ? { ...nested, ...item, ...nested } : { ...item };
+        delete book.ai_recommendation;
+        const title = String(book.title || "").trim();
+        if (!title) return null;
+        book.title = title;
+        book.author = book.author || "Unknown Author";
+        book.genre = book.genre || "Book";
+        book.page_count =
+          book.page_count || book.pages || book.total_pages || book.pageCount || null;
+        book.pages = book.pages || book.page_count;
+        return book;
+      })
+      .filter(Boolean);
+  }
+
+  function pageLabel(book) {
+    const pages = Number(book.page_count || book.pages || book.total_pages);
+    if (!pages || pages <= 0) return "Page count unknown";
+    return `${pages} pages`;
+  }
+
   function addAIRecommendationMessage(result, loadingDiv) {
-    // Safety net: never show books already finished, not interested, or in My Library.
-    const recs = (result.recommendations || []).filter(
-      book => !LexoLibrary.findShelf(book)
-    );
-    const reasoning = result.reasoning || [];
+    const allBooks = normalizeCompanionBooks(result);
 
-    loadingDiv.innerHTML = `
-      <strong>Lexo</strong>
+    // Soft library filter — keep books when LexoLibrary isn't ready.
+    let recs = allBooks;
+    try {
+      if (window.LexoLibrary?.findShelf) {
+        recs = allBooks.filter(book => !LexoLibrary.findShelf(book));
+      }
+    } catch (_) {
+      recs = allBooks;
+    }
 
-      <div class="ai-summary">
-        <p>${result.message || "I found some books for you."}</p>
+    const reasoning = Array.isArray(result?.reasoning) ? result.reasoning : [];
+    const hasBooks = recs.length > 0;
+    const message = hasBooks
+      ? result?.message || "I found some books for you."
+      : "I couldn't find a matching book that isn't already in your library. Try a different genre, length, or mood.";
 
-        <div class="mood-pill">
-          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.287 1.288L3 12l5.8 1.9a2 2 0 0 1 1.288 1.287L12 21l1.9-5.8a2 2 0 0 1 1.287-1.288L21 12l-5.8-1.9a2 2 0 0 1-1.288-1.287z"/></svg>
-          Mood detected: ${result.mood_detected || todayMood || "Reading mood"}
-        </div>
+    loadingDiv.classList.add("has-book-cards");
+    loadingDiv.innerHTML = "";
 
-        ${
-          todayGoal
-            ? `<div class="mood-pill"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg> Today’s goal: ${todayGoal}</div>`
-            : ""
-        }
+    const strong = document.createElement("strong");
+    strong.textContent = "Lexo";
+    loadingDiv.appendChild(strong);
 
-        ${
-          reasoning.length > 0
-            ? `
-              <div class="reasoning-box">
-                <h4>Why these books?</h4>
-                ${reasoning.map(reason => `<p><svg class="icon icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> ${reason}</p>`).join("")}
-              </div>
-            `
-            : ""
-        }
-      </div>
+    const summary = document.createElement("div");
+    summary.className = "ai-summary";
 
-      <div class="companion-card-grid">
-        ${recs.map(book => {
-          const coverHtml = window.BookCover
-            ? BookCover.html(book, {
-                imgClass: "companion-cover-img book-cover-img",
-                wrapClass: "companion-cover-wrap book-cover-wrap",
-                placeholderClass: "custom-cover book-cover-placeholder",
-              })
-            : `<div class="custom-cover ${getCoverClass(book.genre)}"><span>${getCoverIcon(book.genre)}</span><p>${book.genre || "Book"}</p></div>`;
+    const messageP = document.createElement("p");
+    messageP.textContent = message;
+    summary.appendChild(messageP);
 
-          return `
-            <div class="companion-book-card card">
-              ${coverHtml}
-
-              <div class="match-badge"><svg class="icon icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.09 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L1.85 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z"/></svg> ${book.match || 90}% Match</div>
-
-              <h3>${book.title}</h3>
-              <p class="book-author">${book.author || "Unknown Author"}</p>
-              <p class="reason">${book.reason || ""}</p>
-
-              <div class="book-actions">
-                <button class="mini-btn" onclick='saveBook(${JSON.stringify(book)}, "want")'><svg class="icon icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg> Want</button>
-                <button class="mini-btn" onclick='saveBook(${JSON.stringify(book)}, "read")'><svg class="icon icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335"/><path d="m9 11 3 3L22 4"/></svg> Read</button>
-                <button class="mini-btn" onclick='openDetails(${JSON.stringify(book)})'><svg class="icon icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg> Details</button>
-                <button class="mini-btn" onclick='window.open("https://www.google.com/maps/search/${encodeURIComponent(book.title + " bookstore near me")}", "_blank")'><svg class="icon icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg> Buy</button>
-              </div>
-            </div>
-          `;
-        }).join("")}
-      </div>
+    const moodPill = document.createElement("div");
+    moodPill.className = "mood-pill";
+    moodPill.innerHTML = `
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.287 1.288L3 12l5.8 1.9a2 2 0 0 1 1.288 1.287L12 21l1.9-5.8a2 2 0 0 1 1.287-1.288L21 12l-5.8-1.9a2 2 0 0 1-1.288-1.287z"/></svg>
+      Mood detected: ${escapeHtml(result?.mood_detected || todayMood || "Reading mood")}
     `;
+    summary.appendChild(moodPill);
+
+    if (todayGoal) {
+      const goalPill = document.createElement("div");
+      goalPill.className = "mood-pill";
+      goalPill.innerHTML = `
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+        Today's goal: ${escapeHtml(todayGoal)}
+      `;
+      summary.appendChild(goalPill);
+    }
+
+    loadingDiv.appendChild(summary);
+
+    const grid = document.createElement("div");
+    grid.className = "companion-card-grid";
+
+    if (!hasBooks) {
+      const empty = document.createElement("div");
+      empty.className = "companion-empty-recs";
+      empty.innerHTML = `<p>No book cards to show yet. Ask again with different constraints, or clear a book from your library shelves.</p>`;
+      grid.appendChild(empty);
+      loadingDiv.appendChild(grid);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+      return;
+    }
+
+    recs.forEach(book => {
+      const card = document.createElement("div");
+      card.className = "companion-book-card card";
+
+      const coverHtml = window.BookCover
+        ? BookCover.html(book, {
+            imgClass: "companion-cover-img book-cover-img",
+            wrapClass: "companion-cover-wrap book-cover-wrap",
+            placeholderClass: "custom-cover book-cover-placeholder",
+          })
+        : `<div class="companion-cover-wrap"><div class="custom-cover ${getCoverClass(book.genre)}"><span>${getCoverIcon(book.genre)}</span><p>${escapeHtml(book.genre || "Book")}</p></div></div>`;
+
+      card.innerHTML = `
+        ${coverHtml}
+        <div class="match-badge">
+          <svg class="icon icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.09 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L1.85 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z"/></svg>
+          ${escapeHtml(book.match || 90)}% Match
+        </div>
+        <h3>${escapeHtml(book.title)}</h3>
+        <p class="book-author">${escapeHtml(book.author || "Unknown Author")}</p>
+        <div class="book-meta companion-book-meta">
+          <span>${escapeHtml(book.genre || "Book")}</span>
+          <span>${escapeHtml(pageLabel(book))}</span>
+        </div>
+        <p class="reason">${escapeHtml(book.reason || "")}</p>
+        <div class="book-actions">
+          <button type="button" class="mini-btn companion-add-btn">Add to Library</button>
+          <button type="button" class="mini-btn companion-details-btn">View Details</button>
+        </div>
+      `;
+
+      card.querySelector(".companion-add-btn")?.addEventListener("click", event => {
+        event.stopPropagation();
+        saveBook(book, "want");
+      });
+      card.querySelector(".companion-details-btn")?.addEventListener("click", event => {
+        event.stopPropagation();
+        openDetails(book);
+      });
+
+      grid.appendChild(card);
+    });
+
+    loadingDiv.appendChild(grid);
+
+    if (reasoning.length > 0) {
+      const box = document.createElement("div");
+      box.className = "reasoning-box";
+      box.innerHTML = `
+        <h4>Why these books?</h4>
+        ${reasoning
+          .map(
+            reason =>
+              `<p><svg class="icon icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> ${escapeHtml(reason)}</p>`
+          )
+          .join("")}
+      `;
+      loadingDiv.appendChild(box);
+    }
 
     chatMessages.scrollTop = chatMessages.scrollHeight;
 
     if (window.BookCover) {
-      BookCover.hydrateMany(recs, chatMessages, { imgClass: "companion-cover-img book-cover-img" });
+      BookCover.hydrateMany(recs, loadingDiv, { imgClass: "companion-cover-img book-cover-img" });
     }
   }
 
@@ -255,22 +359,34 @@
     questionInput.value = "";
 
     const loadingDiv = addLoadingMessage();
+    askBtn.disabled = true;
 
-    const response = await fetch("/api/reader/companion", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(window.LexoAuth ? window.LexoAuth.getAuthHeaders() : {})
-      },
-      body: JSON.stringify({
-        question: question,
-        reader_profile: await LexoAPI.getReaderContext()
-      })
-    });
+    try {
+      const response = await fetch("/api/reader/companion", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(window.LexoAuth ? window.LexoAuth.getAuthHeaders() : {})
+        },
+        body: JSON.stringify({
+          question: question,
+          reader_profile: await LexoAPI.getReaderContext()
+        })
+      });
 
-    const result = await response.json();
-
-    addAIRecommendationMessage(result, loadingDiv);
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result?.detail || result?.message || "Companion request failed.");
+      }
+      addAIRecommendationMessage(result, loadingDiv);
+    } catch (error) {
+      loadingDiv.innerHTML = `
+        <strong>Lexo</strong>
+        <p>${escapeHtml(error?.message || "Something went wrong. Please try again.")}</p>
+      `;
+    } finally {
+      askBtn.disabled = false;
+    }
   });
 
   void (async () => {

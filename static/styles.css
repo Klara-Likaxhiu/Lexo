@@ -1730,19 +1730,51 @@ html.auth-pending body {
 
 .companion-card-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
   gap: 18px;
   margin-top: 20px;
+  width: 100%;
+}
+
+.ai-message.has-book-cards {
+  max-width: min(960px, 100%);
 }
 
 .companion-book-card {
   padding: 18px;
   animation: fadeUp 0.45s ease forwards;
+  min-width: 0;
+  background: var(--card, #fff);
+  color: var(--text, #1f2937);
+  overflow: visible;
 }
 
 .companion-book-card .custom-cover {
   height: 210px;
   margin-bottom: 14px;
+}
+
+.companion-book-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin: 8px 0 10px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--muted, #667085);
+}
+
+.companion-empty-recs {
+  grid-column: 1 / -1;
+  padding: 16px 18px;
+  border-radius: 16px;
+  background: rgba(16, 43, 67, 0.05);
+  border: 1px dashed var(--border, #d8dee6);
+}
+
+.companion-empty-recs p {
+  margin: 0;
+  color: var(--muted, #667085);
 }
 
 .match-badge {

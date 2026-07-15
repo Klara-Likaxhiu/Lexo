@@ -8,11 +8,30 @@ from app.reader_models import ReaderProfileRequest
 
 
 def _safe_json_loads(result: str, fallback: dict) -> dict:
-    try:
-        return json.loads(result)
-    except json.JSONDecodeError:
-        fallback["raw_result"] = result
-        return fallback
+    text = (result or "").strip()
+    if not text:
+        return dict(fallback)
+
+    candidates = [text]
+    fenced = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", text, re.IGNORECASE)
+    if fenced:
+        candidates.insert(0, fenced.group(1).strip())
+    start = text.find("{")
+    end = text.rfind("}")
+    if start != -1 and end > start:
+        candidates.append(text[start : end + 1])
+
+    for candidate in candidates:
+        try:
+            parsed = json.loads(candidate)
+            if isinstance(parsed, dict):
+                return parsed
+        except (json.JSONDecodeError, TypeError):
+            continue
+
+    out = dict(fallback)
+    out["raw_result"] = result
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -108,17 +127,40 @@ def _filter_books(books, excluded: set[str]) -> list:
     ]
 
 
+def _unwrap_recommendation_book(item) -> dict | None:
+    """Normalize nested recommendation wrappers into a flat book dict."""
+    if not isinstance(item, dict):
+        return None
+    book = item
+    nested = item.get("ai_recommendation")
+    if isinstance(nested, dict):
+        book = {**nested, **{k: v for k, v in item.items() if k != "ai_recommendation"}}
+    title = str(book.get("title") or "").strip()
+    if not title:
+        return None
+    book = dict(book)
+    book["title"] = title
+    if book.get("page_count") is None and book.get("pages") is not None:
+        book["page_count"] = book.get("pages")
+    if book.get("pages") is None and book.get("page_count") is not None:
+        book["pages"] = book.get("page_count")
+    return book
+
+
 def _normalize_recommendations(raw) -> list[dict]:
     """Coerce AI output into a list of book dicts (handles a single object)."""
     if isinstance(raw, dict):
-        return [raw] if str(raw.get("title") or "").strip() else []
-    if not isinstance(raw, list):
+        books = [raw]
+    elif isinstance(raw, list):
+        books = raw
+    else:
         return []
-    return [
-        book
-        for book in raw
-        if isinstance(book, dict) and str(book.get("title") or "").strip()
-    ]
+    normalized: list[dict] = []
+    for item in books:
+        book = _unwrap_recommendation_book(item)
+        if book:
+            normalized.append(book)
+    return normalized
 
 
 def _dedupe_recommendations_by_title(books: list[dict]) -> list[dict]:
@@ -138,6 +180,8 @@ def _companion_book_example() -> str:
       "title": "string",
       "author": "string",
       "genre": "string",
+      "pages": 320,
+      "page_count": 320,
       "reason": "why it matches",
       "match": 97
     }"""
@@ -163,11 +207,15 @@ def _build_companion_prompt(
 
     supplement = ""
     if already_recommended:
-        need = max(0, (recommendation_count or 0) - len(already_recommended))
+        need = (
+            max(0, recommendation_count - len(already_recommended))
+            if recommendation_count and recommendation_count > 0
+            else max(1, 3 - len(already_recommended))
+        )
         supplement = f"""
 Already recommended in this session (do NOT repeat any of these titles):
 {json.dumps(already_recommended, ensure_ascii=False)}
-Provide exactly {need} additional unique book(s) to complete the set."""
+Provide exactly {need} additional unique book(s) that are NOT in that list and NOT in excluded_books."""
 
     return f"""
 You are Lexo, an AI librarian.
@@ -185,6 +233,9 @@ Important recommendation rules:
 - Use the reader's star ratings and written reviews (field: reviews): favor books similar to those they rated 4-5 stars or reviewed positively, and avoid the style of books they rated 1-2 stars.
 - Weight favorite genres and Reader DNA heavily, and respect disliked genres.
 - Keep it book-focused, not therapy-focused.
+- Always include at least one book in recommendations when the user asks for a recommendation.
+- Include estimated page count as both "pages" and "page_count" when known.
+- Never claim you found a book unless recommendations contains that book.
 {count_rules}
 
 Respond ONLY in valid JSON.
@@ -417,22 +468,70 @@ def reading_companion(
             count=recommendation_count,
         )
         enriched = enrich_books_in_list(collected, cache_only=True)
+        message = last_parsed.get("message", "I found some ideas for you.")
+        reasoning = last_parsed.get("reasoning", [])
+        if not enriched:
+            message = (
+                "I couldn't find a new book that isn't already in your library. "
+                "Try a different genre, page length, or mood."
+            )
+            reasoning = []
         return {
-            "message": last_parsed.get("message", "I found some ideas for you."),
+            "message": message,
             "mood_detected": last_parsed.get("mood_detected", "Unknown"),
-            "reasoning": last_parsed.get("reasoning", []),
+            "reasoning": reasoning if isinstance(reasoning, list) else [],
             "recommendations": enriched,
             "engine": ai.engine_name(),
             "requested_count": recommendation_count,
             "returned_count": len(enriched),
         }
 
-    parsed = _call_companion_ai(question, reader_profile)
+    # Companion chat defaults to returning 1–3 usable, non-shelved books.
+    # When the model claims a match then we filter it away, retry once.
     excluded = _collect_excluded_titles(reader_profile)
-    parsed["recommendations"] = _filter_books(parsed.get("recommendations", []), excluded)
-    parsed["recommendations"] = enrich_books_in_list(parsed.get("recommendations"), cache_only=True)
-    parsed["engine"] = ai.engine_name()
-    return parsed
+    parsed = _call_companion_ai(question, reader_profile)
+    raw_books = _normalize_recommendations(parsed.get("recommendations"))
+    filtered = _filter_books(raw_books, excluded)
+
+    if not filtered and raw_books:
+        retry = _call_companion_ai(
+            question,
+            reader_profile,
+            already_recommended=[b.get("title") for b in raw_books if b.get("title")],
+        )
+        parsed = retry
+        filtered = _filter_books(parsed.get("recommendations"), excluded)
+
+    if not filtered:
+        # One more attempt with an explicit desired count so the model must return books.
+        collected, last_parsed = _collect_companion_recommendations(
+            question,
+            reader_profile,
+            count=3,
+            max_attempts=2,
+        )
+        if collected:
+            parsed = last_parsed
+            filtered = collected
+
+    enriched = enrich_books_in_list(filtered, cache_only=True)
+    message = parsed.get("message", "I found some ideas for you.")
+    reasoning = parsed.get("reasoning", [])
+    if not enriched:
+        message = (
+            "I couldn't find a new book that isn't already in your library. "
+            "Try a different genre, page length, or mood."
+        )
+        reasoning = []
+
+    return {
+        "message": message,
+        "mood_detected": parsed.get("mood_detected", "Unknown"),
+        "reasoning": reasoning if isinstance(reasoning, list) else [],
+        "recommendations": enriched,
+        "engine": ai.engine_name(),
+        "returned_count": len(enriched),
+    }
 
 
 def generate_reading_paths(
