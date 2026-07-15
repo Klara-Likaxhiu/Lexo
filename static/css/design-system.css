@@ -1,5 +1,5 @@
 /* =============================================================================
-   BookMindAI Design System
+   Lexo Design System
    Enforces readable contrast on all surfaces. Load after styles.css + editorial.css.
    ============================================================================= */
 
@@ -267,7 +267,7 @@ select:focus,
 
 /* --- Badges & pills --- */
 .book-hub-pill,
-.bookmind-badge {
+.lexo-badge {
   background: linear-gradient(135deg, #fce7f3, #fbcfe8);
   color: #9d174d;
   border: 1px solid rgba(157, 23, 77, 0.18);
@@ -478,7 +478,7 @@ html.theme-dark .journey-review textarea {
 }
 
 html.theme-dark .book-hub-pill,
-html.theme-dark .bookmind-badge {
+html.theme-dark .lexo-badge {
   background: linear-gradient(135deg, #fce7f3, #fbcfe8);
   color: #9d174d;
 }

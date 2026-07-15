@@ -1,4 +1,4 @@
-const BookMindIcons = {
+const LexoIcons = {
   book: '<svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>',
   heart: '<svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>',
   check: '<svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335"/><path d="m9 11 3 3L22 4"/></svg>',
@@ -39,14 +39,14 @@ function renderContinueReading() {
   const card = document.getElementById("continueReadingCard");
   if (!section || !card) return;
 
-  const reading = BookMindLibrary.getLibrary().reading || [];
+  const reading = LexoLibrary.getLibrary().reading || [];
   if (!reading.length) {
     section.hidden = true;
     return;
   }
 
   const book = reading[0];
-  const { current, total, percent } = BookMindLibrary.getProgressInfo(book);
+  const { current, total, percent } = LexoLibrary.getProgressInfo(book);
   const pagesLeft = total > 0 ? Math.max(0, total - current) : null;
 
   const coverHtml = window.BookCover
@@ -82,7 +82,7 @@ function renderRecentlyAdded() {
   const shelf = document.getElementById("recentlyAdded");
   if (!shelf) return;
 
-  const books = BookMindLibrary.getBooks().slice(0, 8);
+  const books = LexoLibrary.getBooks().slice(0, 8);
   if (!books.length) {
     shelf.innerHTML = `<p class="small-muted" style="padding:12px 0">Add books from Discovery to see them here.</p>`;
     return;
@@ -129,19 +129,19 @@ function recommendationsSkeleton(count = 3) {
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
-  window.BookMindPerf?.startPageLoad?.();
+  window.LexoPerf?.startPageLoad?.();
 
-  if (window.BookMindAuth?.whenReady) {
-    await window.BookMindAuth.whenReady();
+  if (window.LexoAuth?.whenReady) {
+    await window.LexoAuth.whenReady();
   }
-  window.BookMindPerf?.endAuthLoad?.();
+  window.LexoPerf?.endAuthLoad?.();
 
-  const user = window.BookMindAuth?.getCurrentUser();
+  const user = window.LexoAuth?.getCurrentUser();
   const name = user?.username || "Reader";
 
-  document.getElementById("welcomeText").textContent = window.BookMindAuth?.isLoggedIn()
+  document.getElementById("welcomeText").textContent = window.LexoAuth?.isLoggedIn()
     ? getTimeGreeting(name)
-    : "Welcome to BookMindAI";
+    : "Welcome to Lexo";
 
   const recommendationsEl = document.getElementById("recommendations");
   if (recommendationsEl) {
@@ -149,21 +149,21 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   await Promise.all([
-    window.BookMindUserData?.hydrate?.().catch(() => {}),
-    BookMindLibrary.ensureLoaded().catch(() => {}),
+    window.LexoUserData?.hydrate?.().catch(() => {}),
+    LexoLibrary.ensureLoaded().catch(() => {}),
   ]);
-  window.BookMindPerf?.endBooksLoad?.();
+  window.LexoPerf?.endBooksLoad?.();
 
-  let profile = BookMindUI.readStorageJson("readerProfile");
+  let profile = LexoUI.readStorageJson("readerProfile");
 
-  const stats = BookMindLibrary.getStats();
+  const stats = LexoLibrary.getStats();
   document.getElementById("readCount").textContent = stats.read;
   document.getElementById("readingCount").textContent = stats.reading;
   document.getElementById("wantCount").textContent = stats.want;
 
   const streakEl = document.getElementById("streakCount");
   if (streakEl) {
-    streakEl.textContent = computeStreak(BookMindLibrary.getReadingData().activity);
+    streakEl.textContent = computeStreak(LexoLibrary.getReadingData().activity);
   }
 
   renderContinueReading();
@@ -173,9 +173,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   setupMoodAndGoal();
   renderRecommendations(profile);
   loadHomeIntelligence();
-  window.BookMindPerf?.endPageLoad?.();
+  window.LexoPerf?.endPageLoad?.();
 
-  document.addEventListener("bookmind:library-changed", event => {
+  document.addEventListener("lexo:library-changed", event => {
     if (event.detail?.action === "background-refresh" || event.detail?.action === "refresh") {
       renderRecentlyAdded();
     }
@@ -225,7 +225,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     subtitle.textContent = dashboard.greeting_subtitle || "Your personalized reading world is ready.";
     mission.textContent = dashboard.today_mission || "Choose a book that matches your current mood.";
     topPickLabel.textContent = "AI Pick of the Day";
-    topPickTitle.textContent = topPick.title || "Ask BookMindAI for a recommendation";
+    topPickTitle.textContent = topPick.title || "Ask Lexo for a recommendation";
     topPickReason.textContent = topPick.reason || "Your AI pick will appear here.";
     renderTopPickCover(topPick);
 
@@ -251,31 +251,31 @@ document.addEventListener("DOMContentLoaded", async () => {
     const mission = document.getElementById("todayMission");
 
     if (!force) {
-      const mood = localStorage.getItem("bookmind_today_mood");
-      const goal = localStorage.getItem("bookmind_today_goal");
-      const cached = BookMindAPI._readIntelligenceCache({ today_mood: mood, today_goal: goal });
+      const mood = localStorage.getItem("lexo_today_mood");
+      const goal = localStorage.getItem("lexo_today_goal");
+      const cached = LexoAPI._readIntelligenceCache({ today_mood: mood, today_goal: goal });
       if (cached?.dashboard) {
         applyIntelligence(cached);
         return;
       }
     }
 
-    subtitle.textContent = "BookMindAI is personalizing your dashboard…";
+    subtitle.textContent = "Lexo is personalizing your dashboard…";
     mission.textContent = "Building today's mission…";
 
     try {
-      const intelligence = await BookMindAPI.getReaderIntelligence({ force });
+      const intelligence = await LexoAPI.getReaderIntelligence({ force });
       applyIntelligence(intelligence);
     } catch {
       subtitle.textContent = "Your personalized reading world is ready.";
-      mission.textContent = "Choose a mood and ask BookMindAI for suggestions.";
+      mission.textContent = "Choose a mood and ask Lexo for suggestions.";
     } finally {
       updateDNAProgress();
     }
   }
 
   function updateDNAProgress() {
-    if (window.BookMindReaderDna?.applyHomeVisibility()) {
+    if (window.LexoReaderDna?.applyHomeVisibility()) {
       return;
     }
 
@@ -318,8 +318,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     const moodButtons = document.querySelectorAll(".mood-options button");
     const goalButtons = document.querySelectorAll(".goal-options button");
 
-    const savedMood = localStorage.getItem("bookmind_today_mood");
-    const savedGoal = localStorage.getItem("bookmind_today_goal");
+    const savedMood = localStorage.getItem("lexo_today_mood");
+    const savedGoal = localStorage.getItem("lexo_today_goal");
 
     moodButtons.forEach(button => {
       if (button.dataset.mood === savedMood) button.classList.add("active-mood");
@@ -327,9 +327,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       button.addEventListener("click", function () {
         moodButtons.forEach(btn => btn.classList.remove("active-mood"));
         this.classList.add("active-mood");
-        localStorage.setItem("bookmind_today_mood", this.dataset.mood);
-        localStorage.removeItem("bookmind_reader_intelligence");
-        localStorage.removeItem("bookmind_intelligence_meta");
+        localStorage.setItem("lexo_today_mood", this.dataset.mood);
+        localStorage.removeItem("lexo_reader_intelligence");
+        localStorage.removeItem("lexo_intelligence_meta");
         loadHomeIntelligence({ force: true });
       });
     });
@@ -340,9 +340,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       button.addEventListener("click", function () {
         goalButtons.forEach(btn => btn.classList.remove("active-mood"));
         this.classList.add("active-mood");
-        localStorage.setItem("bookmind_today_goal", this.dataset.goal);
-        localStorage.removeItem("bookmind_reader_intelligence");
-        localStorage.removeItem("bookmind_intelligence_meta");
+        localStorage.setItem("lexo_today_goal", this.dataset.goal);
+        localStorage.removeItem("lexo_reader_intelligence");
+        localStorage.removeItem("lexo_intelligence_meta");
         loadHomeIntelligence({ force: true });
       });
     });
@@ -353,7 +353,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       currentProfile = JSON.parse(localStorage.getItem("readerProfile"));
     }
     if (!currentProfile) {
-      window.BookMindPerf?.endRecommendationsLoad?.();
+      window.LexoPerf?.endRecommendationsLoad?.();
       return;
     }
 
@@ -366,34 +366,34 @@ document.addEventListener("DOMContentLoaded", async () => {
     container.innerHTML = "";
 
     if (!currentProfile.recommendations) {
-      window.BookMindPerf?.endRecommendationsLoad?.();
+      window.LexoPerf?.endRecommendationsLoad?.();
       return;
     }
 
     const visibleRecommendations = currentProfile.recommendations.filter(item => {
       const rec = item.ai_recommendation || item;
-      return !BookMindLibrary.findShelf(rec);
+      return !LexoLibrary.findShelf(rec);
     }).slice(0, 6);
 
     if (visibleRecommendations.length === 0) {
       container.innerHTML = `
         <div class="empty-library card">
           <h2>You're all caught up.</h2>
-          <p>Want BookMindAI to find more books you haven't read, aren't reading, and haven't marked "not interested"?</p>
+          <p>Want Lexo to find more books you haven't read, aren't reading, and haven't marked "not interested"?</p>
           <button class="btn btn-primary" id="generateMoreBtn" type="button">Yes, generate 3 more</button>
         </div>
       `;
 
       const generateBtn = document.getElementById("generateMoreBtn");
       if (generateBtn) generateBtn.addEventListener("click", generateMoreRecommendations);
-      window.BookMindPerf?.endRecommendationsLoad?.();
+      window.LexoPerf?.endRecommendationsLoad?.();
       return;
     }
 
     visibleRecommendations.forEach(item => {
       const aiBook = item.ai_recommendation;
       const bookData = item.book_data;
-      const genre = aiBook.genre || "BookMindAI";
+      const genre = aiBook.genre || "Lexo";
 
       const card = document.createElement("div");
       card.className = "recommendation-card-modern card";
@@ -424,11 +424,11 @@ document.addEventListener("DOMContentLoaded", async () => {
         <p class="reason">${aiBook.reason || ""}</p>
 
         <div class="book-actions">
-          <button class="mini-btn save-btn" data-status="reading">${BookMindIcons.book} Reading</button>
-          <button class="mini-btn save-btn" data-status="want">${BookMindIcons.heart} Want</button>
-          <button class="mini-btn save-btn" data-status="read">${BookMindIcons.check} Finished</button>
-          <button class="mini-btn save-btn" data-status="not_interested">${BookMindIcons.ban} Not Interested</button>
-          <button class="mini-btn buy-btn">${BookMindIcons.cart} Buy</button>
+          <button class="mini-btn save-btn" data-status="reading">${LexoIcons.book} Reading</button>
+          <button class="mini-btn save-btn" data-status="want">${LexoIcons.heart} Want</button>
+          <button class="mini-btn save-btn" data-status="read">${LexoIcons.check} Finished</button>
+          <button class="mini-btn save-btn" data-status="not_interested">${LexoIcons.ban} Not Interested</button>
+          <button class="mini-btn buy-btn">${LexoIcons.cart} Buy</button>
         </div>
       </div>
     `;
@@ -443,7 +443,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           event.stopPropagation();
           button.disabled = true;
           try {
-            await BookMindLibrary.addBook(aiBook, this.dataset.status);
+            await LexoLibrary.addBook(aiBook, this.dataset.status);
             profile = JSON.parse(localStorage.getItem("readerProfile"));
             renderRecommendations(profile);
           } catch {
@@ -469,7 +469,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const coverBooks = visibleRecommendations.map(item => ({
         ...item.ai_recommendation,
         ...item.book_data,
-        genre: item.ai_recommendation?.genre || "BookMindAI",
+        genre: item.ai_recommendation?.genre || "Lexo",
       }));
       const coverOptions = { imgClass: "recommendation-cover book-cover-img" };
       BookCover.seedFromBooks(coverBooks);
@@ -477,7 +477,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         persistRecommendationCovers(visibleRecommendations, coverBooks);
       });
     }
-    window.BookMindPerf?.endRecommendationsLoad?.();
+    window.LexoPerf?.endRecommendationsLoad?.();
   }
 
   function persistRecommendationCovers(items, resolvedBooks) {
@@ -522,14 +522,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     container.innerHTML = recommendationsSkeleton(3);
 
     try {
-      const result = await BookMindAPI.post("/api/reader/companion", {
+      const result = await LexoAPI.post("/api/reader/companion", {
         question:
           "Recommend 3 books I haven't read yet, based on my Reader DNA, favorite genres, ratings, and reviews. Only suggest books that are not already in my library.",
-        reader_profile: await BookMindAPI.getReaderContext(),
+        reader_profile: await LexoAPI.getReaderContext(),
       });
 
       const fresh = (result.recommendations || [])
-        .filter(book => !BookMindLibrary.findShelf(book))
+        .filter(book => !LexoLibrary.findShelf(book))
         .slice(0, 3);
 
       if (fresh.length === 0) {

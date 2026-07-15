@@ -1,5 +1,5 @@
 /** Temporary page-load performance instrumentation (enable with ?debug=perf). */
-window.BookMindPerf = {
+window.LexoPerf = {
   enabled: false,
   _requests: [],
   _started: false,
@@ -7,7 +7,7 @@ window.BookMindPerf = {
   startPageLoad() {
     this.enabled =
       new URLSearchParams(window.location.search).has("debug") ||
-      localStorage.getItem("bookmind_debug_perf") === "1";
+      localStorage.getItem("lexo_debug_perf") === "1";
     if (!this.enabled || this._started) return;
     this._started = true;
     console.time("page-load");
@@ -69,8 +69,8 @@ window.BookMindPerf = {
   },
 
   _hookFetch() {
-    if (!this.enabled || window.__bookmindPerfFetchHooked) return;
-    window.__bookmindPerfFetchHooked = true;
+    if (!this.enabled || window.__lexoPerfFetchHooked) return;
+    window.__lexoPerfFetchHooked = true;
     const originalFetch = window.fetch.bind(window);
     window.fetch = async (...args) => {
       const started = performance.now();
@@ -85,7 +85,7 @@ window.BookMindPerf = {
         return await originalFetch(...args);
       } finally {
         const durationMs = Math.round(performance.now() - started);
-        window.BookMindPerf?.trackRequest(path, durationMs);
+        window.LexoPerf?.trackRequest(path, durationMs);
       }
     };
   },
@@ -94,9 +94,9 @@ window.BookMindPerf = {
     const sorted = [...this._requests].sort((a, b) => b.durationMs - a.durationMs);
     const slowest = sorted[0];
     const duplicates = this._findDuplicates();
-    console.log("[BookMindPerf] slowest frontend request:", slowest || "none");
-    console.log("[BookMindPerf] request count:", this._requests.length);
-    console.log("[BookMindPerf] duplicate requests:", duplicates);
+    console.log("[LexoPerf] slowest frontend request:", slowest || "none");
+    console.log("[LexoPerf] request count:", this._requests.length);
+    console.log("[LexoPerf] duplicate requests:", duplicates);
   },
 
   _findDuplicates() {
@@ -112,5 +112,5 @@ window.BookMindPerf = {
 };
 
 document.addEventListener("DOMContentLoaded", () => {
-  window.BookMindPerf?.startPageLoad?.();
+  window.LexoPerf?.startPageLoad?.();
 });

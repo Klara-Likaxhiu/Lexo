@@ -1,12 +1,12 @@
 /**
- * BookMindAI API client — attaches Supabase Bearer token to protected requests.
- * Refreshes expired sessions automatically via window.BookMindAuth.refreshSession().
+ * Lexo API client — attaches Supabase Bearer token to protected requests.
+ * Refreshes expired sessions automatically via window.LexoAuth.refreshSession().
  * Requires js/auth.js loaded first.
  */
-const BookMindAPI = {
+const LexoAPI = {
   url(path) {
-    if (window.BookMindAuth?.apiUrl) {
-      return window.BookMindAuth.apiUrl(path);
+    if (window.LexoAuth?.apiUrl) {
+      return window.LexoAuth.apiUrl(path);
     }
     const normalized = path.startsWith("/") ? path : `/${path}`;
     return `${window.location.origin}${normalized}`;
@@ -22,61 +22,61 @@ const BookMindAPI = {
   },
 
   _isAuthExpired(status, data, rawBody) {
-    if (window.BookMindAuth?.isAuthExpiredError) {
-      return window.BookMindAuth.isAuthExpiredError(status, data, rawBody);
+    if (window.LexoAuth?.isAuthExpiredError) {
+      return window.LexoAuth.isAuthExpiredError(status, data, rawBody);
     }
     return status === 401;
   },
 
   async _refreshAndRetry({ redirect = false } = {}) {
-    if (!window.BookMindAuth?.refreshSession) return false;
-    const refreshed = await window.BookMindAuth.refreshSession({ clearOnFailure: false });
+    if (!window.LexoAuth?.refreshSession) return false;
+    const refreshed = await window.LexoAuth.refreshSession({ clearOnFailure: false });
     if (refreshed) return true;
 
-    if (redirect && window.BookMindAuth.handleAuthFailure) {
-      window.BookMindAuth.handleAuthFailure();
+    if (redirect && window.LexoAuth.handleAuthFailure) {
+      window.LexoAuth.handleAuthFailure();
       return false;
     }
     return false;
   },
 
   async ensureAuth({ redirect = false } = {}) {
-    if (window.BookMindAuth?.whenReady) {
-      await window.BookMindAuth.whenReady();
+    if (window.LexoAuth?.whenReady) {
+      await window.LexoAuth.whenReady();
     }
-    if (window.BookMindAuth?._syncSessionFromStorage && !window.BookMindAuth._session?.ready) {
-      window.BookMindAuth._syncSessionFromStorage();
+    if (window.LexoAuth?._syncSessionFromStorage && !window.LexoAuth._session?.ready) {
+      window.LexoAuth._syncSessionFromStorage();
     }
 
     let token =
-      window.BookMindAuth?.getAccessToken?.() ||
-      localStorage.getItem(window.BookMindAuth?.ACCESS_KEY || "bookmind_access_token") ||
+      window.LexoAuth?.getAccessToken?.() ||
+      localStorage.getItem(window.LexoAuth?.ACCESS_KEY || "lexo_access_token") ||
       null;
 
     if (!token) {
-      if (redirect && window.BookMindAuth?.handleAuthFailure) {
-        window.BookMindAuth.handleAuthFailure();
+      if (redirect && window.LexoAuth?.handleAuthFailure) {
+        window.LexoAuth.handleAuthFailure();
       }
       return null;
     }
 
-    if (window.BookMindAuth?.isAccessTokenExpired?.(token)) {
-      const fresh = await window.BookMindAuth.ensureFreshSession({ clearOnFailure: redirect });
+    if (window.LexoAuth?.isAccessTokenExpired?.(token)) {
+      const fresh = await window.LexoAuth.ensureFreshSession({ clearOnFailure: redirect });
       if (!fresh) {
-        if (redirect && window.BookMindAuth.handleAuthFailure) {
-          window.BookMindAuth.handleAuthFailure();
+        if (redirect && window.LexoAuth.handleAuthFailure) {
+          window.LexoAuth.handleAuthFailure();
         }
         return null;
       }
-      token = window.BookMindAuth.getAccessToken();
+      token = window.LexoAuth.getAccessToken();
     }
 
     return token;
   },
 
   _extractError(data, rawBody, status) {
-    if (window.BookMindAuth?.extractErrorMessage) {
-      return window.BookMindAuth.extractErrorMessage(data, rawBody, status);
+    if (window.LexoAuth?.extractErrorMessage) {
+      return window.LexoAuth.extractErrorMessage(data, rawBody, status);
     }
     if (typeof data?.detail === "string") return data.detail;
     return `Request failed (HTTP ${status}).`;
@@ -90,12 +90,12 @@ const BookMindAPI = {
         if (redirect) return null;
         throw new Error("Not authenticated. Please sign in.");
       }
-    } else if (window.BookMindAuth?.whenReady) {
-      await window.BookMindAuth.whenReady();
-      if (window.BookMindAuth?._syncSessionFromStorage && !window.BookMindAuth._session?.ready) {
-        window.BookMindAuth._syncSessionFromStorage();
+    } else if (window.LexoAuth?.whenReady) {
+      await window.LexoAuth.whenReady();
+      if (window.LexoAuth?._syncSessionFromStorage && !window.LexoAuth._session?.ready) {
+        window.LexoAuth._syncSessionFromStorage();
       }
-      token = window.BookMindAuth.getAccessToken() || null;
+      token = window.LexoAuth.getAccessToken() || null;
     }
 
     const url = this.url(path);
@@ -153,31 +153,31 @@ const BookMindAPI = {
   },
 
   async getMe({ redirect = false, force = false } = {}) {
-    const token = window.BookMindAuth?.getAccessToken?.();
-    const cachedUser = window.BookMindAuth?.getCurrentUser?.();
+    const token = window.LexoAuth?.getAccessToken?.();
+    const cachedUser = window.LexoAuth?.getCurrentUser?.();
     if (
       !force &&
       token &&
       cachedUser?.id &&
-      !window.BookMindAuth.isAccessTokenExpired?.(token)
+      !window.LexoAuth.isAccessTokenExpired?.(token)
     ) {
       return cachedUser;
     }
 
     const data = await this.get("/api/auth/me", { redirect });
     if (!data) return null;
-    if (data.user && window.BookMindAuth?._persistUser) {
-      window.BookMindAuth._persistUser(data.user);
-      if (window.BookMindAuth._meCache && token) {
-        window.BookMindAuth._meCache = { token, user: data.user, at: Date.now() };
+    if (data.user && window.LexoAuth?._persistUser) {
+      window.LexoAuth._persistUser(data.user);
+      if (window.LexoAuth._meCache && token) {
+        window.LexoAuth._meCache = { token, user: data.user, at: Date.now() };
       }
     }
     return data.user || null;
   },
 
   async getReaderContext() {
-    if (window.BookMindLibrary) {
-      await BookMindLibrary.ensureLoaded();
+    if (window.LexoLibrary) {
+      await LexoLibrary.ensureLoaded();
     }
 
     const readerProfile = JSON.parse(localStorage.getItem("readerProfile"));
@@ -187,7 +187,7 @@ const BookMindAPI = {
       ? {}
       : JSON.parse(localStorage.getItem("reader_extra_discovery_answers"));
 
-    const library = BookMindLibrary.getLibrary();
+    const library = LexoLibrary.getLibrary();
     const reviews = JSON.parse(localStorage.getItem("book_reviews")) || [];
 
     return {
@@ -197,10 +197,10 @@ const BookMindAPI = {
       quiz_answers: quizAnswers,
       profile_completion: localStorage.getItem("reader_profile_completion") || "0",
       library: library,
-      excluded_books: BookMindLibrary.getExcludedBooks(),
+      excluded_books: LexoLibrary.getExcludedBooks(),
       reviews: reviews,
-      today_mood: localStorage.getItem("bookmind_today_mood"),
-      today_goal: localStorage.getItem("bookmind_today_goal"),
+      today_mood: localStorage.getItem("lexo_today_mood"),
+      today_goal: localStorage.getItem("lexo_today_goal"),
     };
   },
 
@@ -215,19 +215,19 @@ const BookMindAPI = {
 
   _readIntelligenceCache(context) {
     try {
-      const meta = JSON.parse(localStorage.getItem("bookmind_intelligence_meta") || "null");
+      const meta = JSON.parse(localStorage.getItem("lexo_intelligence_meta") || "null");
       if (!meta || meta.key !== this._intelligenceCacheKey(context)) return null;
       if (Date.now() - meta.at > 30 * 60 * 1000) return null;
-      return JSON.parse(localStorage.getItem("bookmind_reader_intelligence") || "null");
+      return JSON.parse(localStorage.getItem("lexo_reader_intelligence") || "null");
     } catch {
       return null;
     }
   },
 
   _writeIntelligenceCache(context, intelligence) {
-    localStorage.setItem("bookmind_reader_intelligence", JSON.stringify(intelligence));
+    localStorage.setItem("lexo_reader_intelligence", JSON.stringify(intelligence));
     localStorage.setItem(
-      "bookmind_intelligence_meta",
+      "lexo_intelligence_meta",
       JSON.stringify({ key: this._intelligenceCacheKey(context), at: Date.now() })
     );
   },
@@ -250,4 +250,4 @@ const BookMindAPI = {
   },
 };
 
-window.BookMindAPI = BookMindAPI;
+window.LexoAPI = LexoAPI;

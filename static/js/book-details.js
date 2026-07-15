@@ -7,12 +7,12 @@ let bookCover = null;
 initialize();
 
 function getUserId() {
-  const user = window.BookMindAuth?.getCurrentUser();
+  const user = window.LexoAuth?.getCurrentUser();
   return user?.id || "anonymous";
 }
 
 function getUserName() {
-  const user = window.BookMindAuth?.getCurrentUser();
+  const user = window.LexoAuth?.getCurrentUser();
   return user?.username || "Anonymous Reader";
 }
 
@@ -33,11 +33,11 @@ function initialize() {
 }
 
 async function initBookDetails() {
-  if (window.BookMindAuth?.whenReady) {
-    await window.BookMindAuth.whenReady();
+  if (window.LexoAuth?.whenReady) {
+    await window.LexoAuth.whenReady();
   }
 
-  const saved = BookMindUI.readStorageJson("selectedBook");
+  const saved = LexoUI.readStorageJson("selectedBook");
 
   if (!saved || !saved.ai_recommendation) {
     window.location.href = "library.html";
@@ -45,7 +45,7 @@ async function initBookDetails() {
   }
 
   currentBook = saved.ai_recommendation;
-  bookKey = BookMindLibrary.normalizeTitle(currentBook.title);
+  bookKey = LexoLibrary.normalizeTitle(currentBook.title);
   bookCover = BookCover.getBookCover({ ...currentBook, book_data: saved?.book_data }) || null;
 
   renderBook(saved);
@@ -61,16 +61,16 @@ async function initBookDetails() {
   setupSidebarDna();
   updateReviewEligibility();
 
-  BookMindLibrary.ensureLoaded()
+  LexoLibrary.ensureLoaded()
     .then(() => {
       restoreShelf();
       restoreProgress();
       restoreSource();
       refreshMotivation();
       updateReviewEligibility();
-      const entry = BookMindLibrary.findBook(currentBook);
+      const entry = LexoLibrary.findBook(currentBook);
       if (entry?.library_id) {
-        BookMindLibrary.recordBookOpened(entry.library_id);
+        LexoLibrary.recordBookOpened(entry.library_id);
       }
     })
     .catch(() => {});
@@ -159,21 +159,21 @@ function setupShelfButtons() {
       button.disabled = true;
 
       try {
-        await BookMindLibrary.ensureLoaded();
+        await LexoLibrary.ensureLoaded();
         const current = getCurrentShelf();
         if (current === status) {
-          await BookMindLibrary.removeBook(currentBook, { silent: true });
+          await LexoLibrary.removeBook(currentBook, { silent: true });
           toast(`Removed "${currentBook.title}" from your shelves.`);
         } else {
           const saved = await moveToShelf(status);
-          toast(saved?.message || `Moved to ${BookMindLibrary.getShelfLabel(status)}.`);
+          toast(saved?.message || `Moved to ${LexoLibrary.getShelfLabel(status)}.`);
         }
 
-        await BookMindLibrary.refresh();
+        await LexoLibrary.refresh();
         restoreShelf();
         refreshMotivation();
         updateReviewEligibility();
-        window.BookMindLibraryPage?.refresh?.();
+        window.LexoLibraryPage?.refresh?.();
       } catch (error) {
         toast(error.message || "Could not update shelf.", true);
       } finally {
@@ -191,8 +191,8 @@ function setupAddDropdown() {
     if (!status) return;
     try {
       const saved = await moveToShelf(status);
-      toast(saved?.message || `Moved to ${BookMindLibrary.getShelfLabel(status)}.`);
-      await BookMindLibrary.refresh();
+      toast(saved?.message || `Moved to ${LexoLibrary.getShelfLabel(status)}.`);
+      await LexoLibrary.refresh();
       restoreShelf();
       refreshMotivation();
       updateReviewEligibility();
@@ -203,18 +203,18 @@ function setupAddDropdown() {
 }
 
 async function moveToShelf(status) {
-  const shelf = BookMindLibrary.normalizeStatus(status);
+  const shelf = LexoLibrary.normalizeStatus(status);
   const meta = {
     source: getSavedSource() || undefined,
     totalPages: document.getElementById("totalPages")?.value,
     progress: shelf === "read" ? 100 : getSavedPercent(),
   };
-  const data = await BookMindLibrary.saveBook(currentBook, shelf, meta);
+  const data = await LexoLibrary.saveBook(currentBook, shelf, meta);
   return data;
 }
 
 function getSavedSource() {
-  const entry = BookMindLibrary.findBook(currentBook);
+  const entry = LexoLibrary.findBook(currentBook);
   if (entry?.metadata?.source) return entry.metadata.source;
 
   const sources = JSON.parse(localStorage.getItem("reading_sources")) || {};
@@ -222,7 +222,7 @@ function getSavedSource() {
 }
 
 function getCurrentShelf() {
-  return BookMindLibrary.findShelf(currentBook);
+  return LexoLibrary.findShelf(currentBook);
 }
 
 function restoreShelf() {
@@ -266,14 +266,14 @@ function setupProgress() {
     const percent = computePercent(current, total);
     setProgressUI(percent);
 
-    const entry = BookMindLibrary.findBook(currentBook);
+    const entry = LexoLibrary.findBook(currentBook);
     if (!entry?.library_id) {
       toast("Add this book to your library first.", true);
       return;
     }
 
     try {
-      const result = await BookMindLibrary.updateReadingProgress(
+      const result = await LexoLibrary.updateReadingProgress(
         entry.library_id,
         current,
         total,
@@ -307,13 +307,13 @@ function setProgressUI(percent) {
 }
 
 function getSavedPercent() {
-  const entry = BookMindLibrary.findBook(currentBook);
+  const entry = LexoLibrary.findBook(currentBook);
   return entry ? Number(entry.progress) || 0 : 0;
 }
 
 function restoreProgress() {
-  const entry = BookMindLibrary.findBook(currentBook);
-  const { current, total, percent } = BookMindLibrary.getProgressInfo(entry || {});
+  const entry = LexoLibrary.findBook(currentBook);
+  const { current, total, percent } = LexoLibrary.getProgressInfo(entry || {});
 
   if (!entry || (!total && !percent)) {
     setProgressUI(0);
@@ -431,7 +431,7 @@ function paintRecommend(value) {
 /* ---------------------------------------------------------------- review */
 
 function isBookFinishedForReview() {
-  return Boolean(BookMindLibrary.isFinished?.(currentBook));
+  return Boolean(LexoLibrary.isFinished?.(currentBook));
 }
 
 function updateReviewEligibility() {
@@ -486,7 +486,7 @@ function setupReview() {
 
     const reviews = JSON.parse(localStorage.getItem("book_reviews")) || [];
     const existingIndex = reviews.findIndex(
-      r => BookMindLibrary.normalizeTitle(r.title) === bookKey
+      r => LexoLibrary.normalizeTitle(r.title) === bookKey
     );
     const existing = existingIndex >= 0 ? reviews[existingIndex] : null;
     const isPublic = document.getElementById("reviewPublic").checked;
@@ -532,11 +532,11 @@ function setupReview() {
 }
 
 async function syncReviewVisibility(review) {
-  if (!window.BookMindAPI?.post) {
-    throw new Error("BookMindAPI is not loaded.");
+  if (!window.LexoAPI?.post) {
+    throw new Error("LexoAPI is not loaded.");
   }
 
-  const me = await BookMindAPI.getMe({ redirect: true });
+  const me = await LexoAPI.getMe({ redirect: true });
   if (!me) {
     throw new Error("Sign in to share reviews with the community.");
   }
@@ -545,7 +545,7 @@ async function syncReviewVisibility(review) {
     if (!isBookFinishedForReview()) {
       throw new Error("Finish this book before leaving a review.");
     }
-    await BookMindAPI.post("/api/reviews/publish", {
+    await LexoAPI.post("/api/reviews/publish", {
       id: review.id,
       user: me.username || "Reader",
       book_title: review.title,
@@ -559,7 +559,7 @@ async function syncReviewVisibility(review) {
       created: review.created,
     });
   } else {
-    await BookMindAPI.post("/api/reviews/unpublish", { id: review.id });
+    await LexoAPI.post("/api/reviews/unpublish", { id: review.id });
   }
 }
 
@@ -572,7 +572,7 @@ function setupDeleteReview() {
 
     const reviews = JSON.parse(localStorage.getItem("book_reviews")) || [];
     const remaining = reviews.filter(
-      r => BookMindLibrary.normalizeTitle(r.title) !== bookKey
+      r => LexoLibrary.normalizeTitle(r.title) !== bookKey
     );
     const removedId = reviewId();
 
@@ -591,8 +591,8 @@ function setupDeleteReview() {
       if (hint) hint.textContent = "Click a star to rate";
       button.hidden = true;
 
-      if (window.BookMindAPI?.post) {
-        await BookMindAPI.post("/api/reviews/unpublish", { id: removedId });
+      if (window.LexoAPI?.post) {
+        await LexoAPI.post("/api/reviews/unpublish", { id: removedId });
       }
 
       await loadBookCommunity();
@@ -613,11 +613,11 @@ async function loadBookCommunity() {
   if (!section || !list || !currentBook) return;
 
   try {
-    if (!window.BookMindAPI?.get) {
-      throw new Error("BookMindAPI is not loaded.");
+    if (!window.LexoAPI?.get) {
+      throw new Error("LexoAPI is not loaded.");
     }
 
-    const data = await BookMindAPI.get(
+    const data = await LexoAPI.get(
       `/api/reviews/community?book=${encodeURIComponent(currentBook.title || "")}`,
       { auth: false }
     );
@@ -678,7 +678,7 @@ function renderCommunityCard(review) {
 function restoreReview() {
   const reviews = JSON.parse(localStorage.getItem("book_reviews")) || [];
   const saved = reviews.find(
-    r => BookMindLibrary.normalizeTitle(r.title) === bookKey
+    r => LexoLibrary.normalizeTitle(r.title) === bookKey
   );
 
   if (!saved) return;
@@ -766,7 +766,7 @@ function refreshMotivation() {
 
   if (shelf === "read" || percent === 100) {
     title.textContent = "🎉 Finished!";
-    subtitle.textContent = "Great job. Leave a review to help BookMindAI learn your taste.";
+    subtitle.textContent = "Great job. Leave a review to help Lexo learn your taste.";
   } else if (percent >= 60) {
     title.textContent = "🔥 Almost there!";
     subtitle.textContent = `You're ${percent}% through. The finish line is close.`;

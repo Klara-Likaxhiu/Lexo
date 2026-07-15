@@ -57,7 +57,7 @@ async function onGenreChipClick(button) {
   const genre = button.dataset.genre;
   if (!genre || button.classList.contains("is-loading")) return;
 
-  if (!window.BookMindAPI?.ensureAuth) {
+  if (!window.LexoAPI?.ensureAuth) {
     window.location.href = "/login.html?next=" + encodeURIComponent("/reader-journey.html");
     return;
   }
@@ -66,22 +66,22 @@ async function onGenreChipClick(button) {
   button.disabled = true;
 
   try {
-    if (window.BookMindAuth?.whenReady) {
-      await window.BookMindAuth.whenReady();
+    if (window.LexoAuth?.whenReady) {
+      await window.LexoAuth.whenReady();
     }
 
-    const token = await BookMindAPI.ensureAuth({ redirect: true });
+    const token = await LexoAPI.ensureAuth({ redirect: true });
     if (!token) return;
 
-    await BookMindLibrary.ensureLoaded();
+    await LexoLibrary.ensureLoaded();
 
     const profile = JSON.parse(localStorage.getItem("readerProfile") || "null");
-    const result = await BookMindAPI.post("/api/reader/genre-path", {
+    const result = await LexoAPI.post("/api/reader/genre-path", {
       genre,
       reader_profile: profile,
-      library: BookMindLibrary.getLibrary(),
-      today_mood: localStorage.getItem("bookmind_today_mood"),
-      today_goal: localStorage.getItem("bookmind_today_goal"),
+      library: LexoLibrary.getLibrary(),
+      today_mood: localStorage.getItem("lexo_today_mood"),
+      today_goal: localStorage.getItem("lexo_today_goal"),
     });
 
     const pathId = result?.path_id || result?.path?.id;
@@ -90,7 +90,7 @@ async function onGenreChipClick(button) {
     }
 
     sessionStorage.setItem(
-      "bookmind_path_flash",
+      "lexo_path_flash",
       result.message ||
         (result.created
           ? `Created your "${genre} Starter Path".`
@@ -110,13 +110,13 @@ async function onGenreChipClick(button) {
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
-  if (window.BookMindUserData) {
-    await BookMindUserData.loadReaderProfile();
+  if (window.LexoUserData) {
+    await LexoUserData.loadReaderProfile();
   }
 
   const profile = JSON.parse(localStorage.getItem("readerProfile") || "null");
-  const mood = localStorage.getItem("bookmind_today_mood");
-  const goal = localStorage.getItem("bookmind_today_goal");
+  const mood = localStorage.getItem("lexo_today_mood");
+  const goal = localStorage.getItem("lexo_today_goal");
 
   if (profile) {
     document.getElementById("journeyType").textContent = profile.reader_type || "The Curious Reader";
@@ -136,8 +136,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   let allBooks = [];
   try {
-    await BookMindLibrary.ensureLoaded();
-    const library = BookMindLibrary.getLibrary();
+    await LexoLibrary.ensureLoaded();
+    const library = LexoLibrary.getLibrary();
     allBooks = [
       ...(library.read || []),
       ...(library.reading || []),
@@ -216,11 +216,11 @@ function populateWrappedStats(books, profile) {
 
   let pages = 0;
   books.forEach(b => {
-    const { current, total } = BookMindLibrary.getProgressInfo(b);
+    const { current, total } = LexoLibrary.getProgressInfo(b);
     pages += b.status === "read" ? total || current : current;
   });
 
-  const streak = computeStreak(BookMindLibrary.getReadingData?.().activity || []);
+  const streak = computeStreak(LexoLibrary.getReadingData?.().activity || []);
 
   const set = (id, val) => {
     const el = document.getElementById(id);
@@ -254,7 +254,7 @@ function drawJourneyChart(finishedBooks) {
   const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   const counts = new Array(12).fill(0);
   finishedBooks.forEach(b => {
-    const iso = BookMindLibrary.getReadingData?.().finishes?.[BookMindLibrary.normalizeTitle(b.title)];
+    const iso = LexoLibrary.getReadingData?.().finishes?.[LexoLibrary.normalizeTitle(b.title)];
     if (iso) {
       const m = new Date(iso).getMonth();
       counts[m] += 1;

@@ -286,7 +286,7 @@ def email_redirect(path: str = "verify-email.html") -> str:
     if not base:
         raise SupabaseAuthError(
             "APP_BASE_URL is not set. Configure it to your public app URL "
-            "(e.g. https://bookmindai-0a6u.onrender.com).",
+            "(e.g. https://lexo-0a6u.onrender.com).",
             status_code=503,
         )
 

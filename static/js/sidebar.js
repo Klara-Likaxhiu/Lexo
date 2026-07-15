@@ -1,5 +1,5 @@
 /** Shared app sidebar — premium editorial layout with profile card. */
-window.BookMindSidebar = {
+window.LexoSidebar = {
   NAV: [
     { page: "home", href: "home.html", label: "Home", icon: '<path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/>' },
     { page: "discovery", href: "discovery.html", label: "Discovery", icon: '<circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/>' },
@@ -20,10 +20,10 @@ window.BookMindSidebar = {
   },
 
   getUser() {
-    const user = window.BookMindAuth?.getCurrentUser?.();
+    const user = window.LexoAuth?.getCurrentUser?.();
     const profile = (() => {
       try {
-        return JSON.parse(localStorage.getItem("bookmind_user_profile") || "null");
+        return JSON.parse(localStorage.getItem("lexo_user_profile") || "null");
       } catch {
         return null;
       }
@@ -46,7 +46,7 @@ window.BookMindSidebar = {
       : `<span class="sidebar-profile-initial" aria-hidden="true">${initial}</span>`;
 
     return `
-      <div class="sidebar-brand">${this.brandIcon()}<span>BookMindAI</span></div>
+      <div class="sidebar-brand">${this.brandIcon()}<span>Lexo</span></div>
       <nav class="sidebar-nav" aria-label="Main">${nav}</nav>
       <div class="sidebar-footer">
         <a href="profile.html" class="sidebar-profile-card">
@@ -65,7 +65,7 @@ window.BookMindSidebar = {
     const page = el.dataset.page || "";
     el.classList.add("sidebar", "sidebar-editorial");
     el.innerHTML = this.render(page);
-    window.BookMindAuth?.setupLogoutLinks?.();
+    window.LexoAuth?.setupLogoutLinks?.();
   },
 
   refreshProfile() {
@@ -74,11 +74,11 @@ window.BookMindSidebar = {
   },
 };
 
-document.addEventListener("bookmind:auth-ready", () => {
-  BookMindSidebar.refreshProfile();
+document.addEventListener("lexo:auth-ready", () => {
+  LexoSidebar.refreshProfile();
 });
 
 document.addEventListener("DOMContentLoaded", () => {
   const el = document.querySelector("[data-page].sidebar-editorial, aside[data-page]");
-  if (el) BookMindSidebar.mount(el);
+  if (el) LexoSidebar.mount(el);
 });

@@ -1,4 +1,4 @@
-// BookMindAI — frontend logic
+// Lexo — frontend logic
 (() => {
   "use strict";
 

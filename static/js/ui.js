@@ -1,4 +1,4 @@
-const BookMindUI = {
+const LexoUI = {
     readStorageJson(key, fallback = null) {
       try {
         const raw = localStorage.getItem(key);
@@ -38,7 +38,7 @@ const BookMindUI = {
       return `
         <div class="custom-cover ${coverClass}">
           <span>${coverIcon}</span>
-          <p>${genre || "BookMindAI"}</p>
+          <p>${genre || "Lexo"}</p>
         </div>
       `;
     }

@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Want to Read - BookMindAI</title>
+  <title>Want to Read - Lexo</title>
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="css/editorial.css">
   <link rel="stylesheet" href="css/design-system.css">
@@ -29,8 +29,8 @@
   document.addEventListener("DOMContentLoaded", async () => {
     const container = document.getElementById("wantList");
     try {
-      await BookMindLibrary.ensureLoaded();
-      const books = BookMindLibrary.getBooksByStatus("want");
+      await LexoLibrary.ensureLoaded();
+      const books = LexoLibrary.getBooksByStatus("want");
       if (!books.length) {
         container.innerHTML = `<p class="empty-text">No future reads saved yet.</p>`;
         return;

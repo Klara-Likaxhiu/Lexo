@@ -1,12 +1,12 @@
 /** Discovery UI — cover rendering delegated to BookCover. */
-const BookMindCover = {
+const LexoCover = {
   coverMeta(book) {
     const genre = book.genre || (book.categories && book.categories[0]) || "Book";
     return {
       title: book.title || "Book",
       coverClass:
-        typeof BookMindUI !== "undefined" ? BookMindUI.getCoverClass(genre) : "mystery-cover",
-      icon: typeof BookMindUI !== "undefined" ? BookMindUI.getCoverIcon(genre) : "⌕",
+        typeof LexoUI !== "undefined" ? LexoUI.getCoverClass(genre) : "mystery-cover",
+      icon: typeof LexoUI !== "undefined" ? LexoUI.getCoverIcon(genre) : "⌕",
     };
   },
 
@@ -44,7 +44,7 @@ const BookMindCover = {
   },
 };
 
-const BookMindDiscoveryFormat = {
+const LexoDiscoveryFormat = {
   ratingHtml(book) {
     const rating = Number(book.average_rating);
     if (!rating || Number.isNaN(rating)) return "";
@@ -86,25 +86,25 @@ const BookMindDiscoveryFormat = {
 };
 
 /** Reusable discovery result card. */
-const BookMindDiscoveryCard = {
+const LexoDiscoveryCard = {
   render(book) {
     const preview =
       book.description_preview ||
       book.description ||
       "Open details for the full description and add this book to your library.";
 
-    const rating = BookMindDiscoveryFormat.ratingHtml(book);
+    const rating = LexoDiscoveryFormat.ratingHtml(book);
 
     return `
       <article class="discovery-card card">
         <div class="discovery-card-cover">
-          ${BookMindCover.html(book, "card")}
+          ${LexoCover.html(book, "card")}
         </div>
         <div class="discovery-card-body">
-          <h3>${BookMindCover.escape(book.title)}</h3>
-          <p class="discovery-card-author">${BookMindCover.escape(book.author || "Unknown Author")}</p>
+          <h3>${LexoCover.escape(book.title)}</h3>
+          <p class="discovery-card-author">${LexoCover.escape(book.author || "Unknown Author")}</p>
           ${rating ? `<div class="discovery-card-rating">${rating}</div>` : ""}
-          <p class="discovery-card-preview">${BookMindCover.escape(preview)}</p>
+          <p class="discovery-card-preview">${LexoCover.escape(preview)}</p>
           <button type="button" class="btn btn-secondary discovery-card-action">View Details</button>
         </div>
       </article>`;
@@ -125,7 +125,7 @@ const BookMindDiscoveryCard = {
 };
 
 /** Book detail modal with shelf actions. */
-const BookMindDetailModal = {
+const LexoDetailModal = {
   selectedBook: null,
   isOpen: false,
   _ignoreOpenUntil: 0,
@@ -189,13 +189,13 @@ const BookMindDetailModal = {
   async open(book) {
     if (!book || Date.now() < this._ignoreOpenUntil) return;
 
-    if (window.BookMindAuth?.whenReady) {
-      await window.BookMindAuth.whenReady();
+    if (window.LexoAuth?.whenReady) {
+      await window.LexoAuth.whenReady();
     }
 
-    if (window.BookMindAuth?.isLoggedIn()) {
+    if (window.LexoAuth?.isLoggedIn()) {
       try {
-        await BookMindLibrary.ensureLoaded();
+        await LexoLibrary.ensureLoaded();
       } catch {
         /* library optional for discovery */
       }
@@ -235,14 +235,14 @@ const BookMindDetailModal = {
   },
 
   renderBook(book) {
-    const existing = BookMindLibrary.findShelf(book);
+    const existing = LexoLibrary.findShelf(book);
 
     this.els.title.textContent = book.title || "Untitled";
     this.els.author.textContent = book.author || "Unknown Author";
     this.els.description.textContent =
       book.description || book.description_preview || "No description available for this book.";
 
-    const ratingHtml = BookMindDiscoveryFormat.ratingHtml(book);
+    const ratingHtml = LexoDiscoveryFormat.ratingHtml(book);
     if (ratingHtml) {
       this.els.rating.innerHTML = ratingHtml;
       this.els.rating.hidden = false;
@@ -252,7 +252,7 @@ const BookMindDetailModal = {
     }
 
     this.els.details.innerHTML = this.renderDetailsGrid(book);
-    this.els.cover.innerHTML = BookMindCover.html(book, "modal");
+    this.els.cover.innerHTML = LexoCover.html(book, "modal");
     if (window.BookCover) {
       const wrap = this.els.cover.querySelector(".book-cover-wrap");
       if (wrap) BookCover.hydrateWrap(wrap, book, { imgClass: "discovery-detail-img book-cover-img" });
@@ -264,7 +264,7 @@ const BookMindDetailModal = {
     });
 
     if (existing) {
-      this.els.hint.textContent = `In your library as “${BookMindLibrary.getShelfLabel(existing)}”. Choose a shelf to update.`;
+      this.els.hint.textContent = `In your library as “${LexoLibrary.getShelfLabel(existing)}”. Choose a shelf to update.`;
       this.els.hint.hidden = false;
     } else {
       this.els.hint.hidden = true;
@@ -273,8 +273,8 @@ const BookMindDetailModal = {
 
   renderDetailsGrid(book) {
     const rows = [
-      ["Published", BookMindDiscoveryFormat.publishedText(book)],
-      ["Categories", BookMindDiscoveryFormat.categoriesText(book)],
+      ["Published", LexoDiscoveryFormat.publishedText(book)],
+      ["Categories", LexoDiscoveryFormat.categoriesText(book)],
       ["Pages", book.total_pages ? String(book.total_pages) : null],
       ["Publisher", book.publisher || null],
     ];
@@ -283,7 +283,7 @@ const BookMindDetailModal = {
       .filter(([, value]) => value)
       .map(
         ([label, value]) =>
-          `<div class="discovery-detail-item"><dt>${BookMindCover.escape(label)}</dt><dd>${BookMindCover.escape(value)}</dd></div>`
+          `<div class="discovery-detail-item"><dt>${LexoCover.escape(label)}</dt><dd>${LexoCover.escape(value)}</dd></div>`
       )
       .join("");
   },
@@ -310,35 +310,35 @@ const BookMindDetailModal = {
   },
 
   async saveShelf(status, label) {
-    if (!window.BookMindAPI?.ensureAuth) {
+    if (!window.LexoAPI?.ensureAuth) {
       window.location.href = "/login.html";
       return;
     }
 
-    const token = await BookMindAPI.ensureAuth({ redirect: true });
+    const token = await LexoAPI.ensureAuth({ redirect: true });
     if (!token) return;
 
     const book = this.selectedBook;
     if (!book) return;
 
-    await BookMindLibrary.ensureLoaded();
+    await LexoLibrary.ensureLoaded();
 
-    const entry = BookMindDiscoveryFormat.libraryEntry(book);
-    const existing = BookMindLibrary.findShelf(entry);
+    const entry = LexoDiscoveryFormat.libraryEntry(book);
+    const existing = LexoLibrary.findShelf(entry);
 
     this.els.shelfBtns?.forEach(btn => {
       btn.disabled = true;
     });
 
-    const shelf = BookMindLibrary.normalizeStatus(status);
+    const shelf = LexoLibrary.normalizeStatus(status);
     try {
-      const data = await BookMindLibrary.saveBook(entry, shelf, {
+      const data = await LexoLibrary.saveBook(entry, shelf, {
         source: book.source || "google_books",
         totalPages: book.total_pages,
         progress: shelf === "read" ? 100 : undefined,
       });
 
-      const shelfLabel = BookMindLibrary.getShelfLabel(data.book?.status || shelf);
+      const shelfLabel = LexoLibrary.getShelfLabel(data.book?.status || shelf);
       this.showToast(
         data.message ||
           (!existing
@@ -350,10 +350,10 @@ const BookMindDetailModal = {
         btn.disabled = false;
         btn.classList.toggle("active-shelf", btn.dataset.shelf === status);
       });
-      this.els.hint.textContent = `In your library as “${BookMindLibrary.getShelfLabel(status)}”. Choose a shelf to update.`;
+      this.els.hint.textContent = `In your library as “${LexoLibrary.getShelfLabel(status)}”. Choose a shelf to update.`;
       this.els.hint.hidden = false;
 
-      window.BookMindLibraryPage?.refresh?.();
+      window.LexoLibraryPage?.refresh?.();
     } catch (error) {
       this.showToast(error.message || "Could not save book.", true);
       this.els.shelfBtns?.forEach(btn => {
@@ -378,7 +378,7 @@ const BookMindDetailModal = {
 };
 
 /** Discovery page search controller. */
-const BookMindDiscovery = {
+const LexoDiscovery = {
   searchMode: "all",
 
   init() {
@@ -391,7 +391,7 @@ const BookMindDiscovery = {
       filters: document.querySelectorAll(".discovery-filter"),
     };
 
-    BookMindDetailModal.init("bookDetailModal");
+    LexoDetailModal.init("bookDetailModal");
 
     if (!this.els.form) return;
 
@@ -459,11 +459,11 @@ const BookMindDiscovery = {
 
     books.forEach(book => {
       const wrap = document.createElement("div");
-      wrap.innerHTML = BookMindDiscoveryCard.render(book);
+      wrap.innerHTML = LexoDiscoveryCard.render(book);
       const card = wrap.firstElementChild;
-      BookMindDiscoveryCard.attach(card, book, b => {
-        if (Date.now() < BookMindDetailModal._ignoreOpenUntil) return;
-        BookMindDetailModal.open(b);
+      LexoDiscoveryCard.attach(card, book, b => {
+        if (Date.now() < LexoDetailModal._ignoreOpenUntil) return;
+        LexoDetailModal.open(b);
       });
       this.els.results.appendChild(card);
     });
@@ -483,18 +483,18 @@ const BookMindDiscovery = {
 };
 
 document.addEventListener("DOMContentLoaded", async () => {
-  if (window.BookMindAuth?.whenReady) {
-    await window.BookMindAuth.whenReady();
+  if (window.LexoAuth?.whenReady) {
+    await window.LexoAuth.whenReady();
   }
 
-  if (window.BookMindAuth?.isLoggedIn()) {
+  if (window.LexoAuth?.isLoggedIn()) {
     try {
-      await BookMindLibrary.ensureLoaded();
+      await LexoLibrary.ensureLoaded();
     } catch {
       /* optional */
     }
   }
-  BookMindDiscovery.init();
+  LexoDiscovery.init();
 
   document.getElementById("surpriseMeBtn")?.addEventListener("click", () => {
     const genres = ["mystery", "fantasy", "romance", "literary fiction", "thriller", "historical"];

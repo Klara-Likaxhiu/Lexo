@@ -1,7 +1,7 @@
 /** Reading Path completion — stats, XP, badges, Reader DNA updates. */
-window.BookMindPathCompletion = {
-  STATS_KEY: "bookmind_path_stats",
-  XP_KEY: "bookmind_path_xp",
+window.LexoPathCompletion = {
+  STATS_KEY: "lexo_path_stats",
+  XP_KEY: "lexo_path_xp",
   BASE_XP: 500,
 
   readStats() {
@@ -92,15 +92,15 @@ window.BookMindPathCompletion = {
   },
 
   awardBadge(badge) {
-    if (!window.BookMindBadgeEngine) return false;
-    const earned = BookMindBadgeEngine.loadEarned();
+    if (!window.LexoBadgeEngine) return false;
+    const earned = LexoBadgeEngine.loadEarned();
     if (earned[badge.id]) return false;
     const now = new Date().toISOString();
     earned[badge.id] = now;
-    BookMindBadgeEngine.saveEarned(earned);
-    const seen = BookMindBadgeEngine.loadSeen();
+    LexoBadgeEngine.saveEarned(earned);
+    const seen = LexoBadgeEngine.loadSeen();
     delete seen[badge.id];
-    BookMindBadgeEngine.saveSeen(seen);
+    LexoBadgeEngine.saveSeen(seen);
     return true;
   },
 
@@ -149,7 +149,7 @@ window.BookMindPathCompletion = {
     const active = all.filter(p => !p.path_completed);
     const completed = all.filter(p => p.path_completed);
     const stats = this.readStats();
-    const Passport = window.BookMindPathPassport;
+    const Passport = window.LexoPathPassport;
 
     let finishedBooksOnActive = 0;
     let totalBooksOnActive = 0;
@@ -194,16 +194,16 @@ window.BookMindPathCompletion = {
       next_path_name: "Your Next Chapter",
     };
 
-    if (!window.BookMindAPI?.post) return fallback;
+    if (!window.LexoAPI?.post) return fallback;
 
     try {
-      const token = await BookMindAPI.ensureAuth({ redirect: false });
+      const token = await LexoAPI.ensureAuth({ redirect: false });
       if (!token) return fallback;
 
       const readerProfile = JSON.parse(localStorage.getItem("readerProfile") || "null");
-      const library = window.BookMindLibrary?.getLibrary?.() || {};
+      const library = window.LexoLibrary?.getLibrary?.() || {};
 
-      return await BookMindAPI.post("/api/reader/path-reflection", {
+      return await LexoAPI.post("/api/reader/path-reflection", {
         path,
         reader_profile: readerProfile,
         library,
@@ -262,9 +262,9 @@ window.BookMindPathCompletion = {
     this.awardBadge(badge);
     this.updateReaderDna(path, stats);
 
-    if (window.BookMindBadgeEngine && window.BookMindBadgeCatalog) {
-      const ctx = BookMindBadgeEngine.buildContext();
-      BookMindBadgeEngine.evaluateAll(ctx);
+    if (window.LexoBadgeEngine && window.LexoBadgeCatalog) {
+      const ctx = LexoBadgeEngine.buildContext();
+      LexoBadgeEngine.evaluateAll(ctx);
     }
 
     return { path, badge, xp, daysTaken, stats };
@@ -297,6 +297,6 @@ window.BookMindPathCompletion = {
   },
 
   shareText(path, badge) {
-    return `I completed the "${path.path_name}" Reading Path on BookMindAI! 🏆 Badge: ${badge.title} · +500 XP`;
+    return `I completed the "${path.path_name}" Reading Path on Lexo! 🏆 Badge: ${badge.title} · +500 XP`;
   },
 };

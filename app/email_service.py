@@ -123,7 +123,7 @@ def _send_smtp(to: str, subject: str, body: str) -> None:
     password = os.getenv("SMTP_PASSWORD", "").strip()
     use_tls = os.getenv("SMTP_USE_TLS", "true").lower() == "true"
     use_ssl = os.getenv("SMTP_USE_SSL", "false").lower() == "true"
-    from_addr = os.getenv("SMTP_FROM", "BookMindAI <noreply@bookmind.ai>")
+    from_addr = os.getenv("SMTP_FROM", "Lexo <noreply@lexo.ai>")
 
     msg = EmailMessage()
     msg["Subject"] = subject
@@ -212,23 +212,23 @@ def send_verification_email(to: str, token: str) -> SendResult:
 
 def send_verification_link(to: str, verification_url: str) -> SendResult:
     body = (
-        "Welcome to BookMindAI!\n\n"
+        "Welcome to Lexo!\n\n"
         "Please verify your email address by opening this link:\n"
         f"{verification_url}\n\n"
         "This link expires in 24 hours.\n\n"
         "If you don't see this email, check your Spam or Junk folder.\n\n"
         "If you did not create an account, you can ignore this email."
     )
-    return _send(to, "Verify your BookMindAI email", body)
+    return _send(to, "Verify your Lexo email", body)
 
 
 def send_password_reset_email(to: str, token: str) -> SendResult:
     link = f"{_base_url()}/reset-password.html?token={token}"
     body = (
-        "We received a request to reset your BookMindAI password.\n\n"
+        "We received a request to reset your Lexo password.\n\n"
         f"Reset your password here:\n{link}\n\n"
         "This link expires in 1 hour.\n\n"
         "If you don't see this email, check your Spam or Junk folder.\n\n"
         "If you did not request this, you can safely ignore this email."
     )
-    return _send(to, "Reset your BookMindAI password", body)
+    return _send(to, "Reset your Lexo password", body)

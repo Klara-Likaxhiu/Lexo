@@ -1,4 +1,4 @@
-"""AI engine for BookMindAI.
+"""AI engine for Lexo.
 
 Provides summarization, key-takeaway extraction, and chat Q&A.
 
@@ -211,7 +211,7 @@ def analyze(text: str) -> dict:
         try:
             content = _truncate_for_model(text)
             system = (
-                "You are BookMindAI, an expert literary analyst. Given book or "
+                "You are Lexo, an expert literary analyst. Given book or "
                 "article text, produce a concise, faithful summary and the most "
                 "important takeaways. Never invent facts that are not supported "
                 "by the text."
@@ -294,7 +294,7 @@ def chat(question: str, context: str, history: list[dict] | None = None) -> str:
     if using_openai():
         try:
             system = (
-                "You are BookMindAI, a helpful reading companion. Answer the "
+                "You are Lexo, a helpful reading companion. Answer the "
                 "user's questions using ONLY the provided book context. If the "
                 "answer is not in the context, say so honestly. Be concise and "
                 "cite relevant details from the text."

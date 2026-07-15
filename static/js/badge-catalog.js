@@ -2,7 +2,7 @@
  * Badge metadata catalog — add new badges here only; evaluation logic lives in badge-engine.js.
  * Each entry: { id, category, title, description, icon, rarity, evaluate(ctx) -> { value, goal } }
  */
-window.BookMindBadgeCatalog = {
+window.LexoBadgeCatalog = {
   CATEGORIES: {
     milestones: { label: "Reading Milestones", emoji: "📚" },
     streaks: { label: "Streaks", emoji: "🔥" },

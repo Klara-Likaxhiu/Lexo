@@ -1,5 +1,5 @@
 [project]
-name = "bookmindai"
+name = "lexo"
 version = "0.1.0"
 description = "AI-powered reading companion with personalized discovery and library tracking."
 requires-python = "==3.12.*"

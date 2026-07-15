@@ -2,20 +2,20 @@
  * Badge evaluation engine — gathers reading context, evaluates catalog + dynamic badges,
  * persists unlock dates. Add new static badges in badge-catalog.js only.
  */
-window.BookMindBadgeEngine = {
-  STORAGE_KEY: "bookmind_earned_badges",
-  AI_STORAGE_KEY: "bookmind_ai_badges",
-  AI_FETCH_META_KEY: "bookmind_ai_badges_meta",
-  SEEN_KEY: "bookmind_badges_seen",
+window.LexoBadgeEngine = {
+  STORAGE_KEY: "lexo_earned_badges",
+  AI_STORAGE_KEY: "lexo_ai_badges",
+  AI_FETCH_META_KEY: "lexo_ai_badges_meta",
+  SEEN_KEY: "lexo_badges_seen",
   _aiBadgesTtlMs: 60 * 60 * 1000,
 
   svg(iconName, cls) {
-    const paths = BookMindBadgeCatalog.ICONS[iconName] || BookMindBadgeCatalog.ICONS.star;
+    const paths = LexoBadgeCatalog.ICONS[iconName] || LexoBadgeCatalog.ICONS.star;
     return `<svg class="icon ${cls || ""}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`;
   },
 
   readJson(key, fallback = null) {
-    return window.BookMindUI?.readStorageJson?.(key, fallback) ?? fallback;
+    return window.LexoUI?.readStorageJson?.(key, fallback) ?? fallback;
   },
 
   genreBucket(raw) {
@@ -68,13 +68,13 @@ window.BookMindBadgeEngine = {
   },
 
   buildContext() {
-    const library = window.BookMindLibrary?.getLibrary?.() || {
+    const library = window.LexoLibrary?.getLibrary?.() || {
       read: [],
       reading: [],
       want: [],
       not_interested: [],
     };
-    const data = window.BookMindLibrary?.getReadingData?.() || {
+    const data = window.LexoLibrary?.getReadingData?.() || {
       finishes: {},
       activity: [],
       goals: { yearly: 0, monthly: 0 },
@@ -82,7 +82,7 @@ window.BookMindBadgeEngine = {
     const reviews = this.readJson("book_reviews", []) || [];
     const answers = this.readJson("reader_quiz_answers", {}) || {};
     const profile = this.readJson("readerProfile", {}) || {};
-    const todayMood = localStorage.getItem("bookmind_today_mood") || "";
+    const todayMood = localStorage.getItem("lexo_today_mood") || "";
 
     const allBooks = [
       ...(library.read || []),
@@ -106,7 +106,7 @@ window.BookMindBadgeEngine = {
       const author = (book.author || "").trim();
       if (author) authorCounts[author] = (authorCounts[author] || 0) + 1;
 
-      const finishIso = data.finishes[BookMindLibrary.normalizeTitle(book.title)];
+      const finishIso = data.finishes[LexoLibrary.normalizeTitle(book.title)];
       if (finishIso) {
         const d = new Date(finishIso);
         const hour = d.getHours();
@@ -153,11 +153,11 @@ window.BookMindBadgeEngine = {
     const topAuthorEntry = Object.entries(authorCounts).sort((a, b) => b[1] - a[1])[0];
 
     let pathStats = { pathsCompleted: 0, activePaths: 0, completionRate: 0, avgCompletionDays: 0 };
-    if (window.BookMindPathCompletion) {
+    if (window.LexoPathCompletion) {
       try {
-        const rawPaths = JSON.parse(localStorage.getItem("bookmind_reading_paths") || "null");
+        const rawPaths = JSON.parse(localStorage.getItem("lexo_reading_paths") || "null");
         const paths = rawPaths?.paths || [];
-        pathStats = BookMindPathCompletion.computeAggregateStats(paths);
+        pathStats = LexoPathCompletion.computeAggregateStats(paths);
       } catch {
         /* ignore */
       }
@@ -436,7 +436,7 @@ window.BookMindBadgeEngine = {
   },
 
   evaluateAll(ctx) {
-    const staticBadges = BookMindBadgeCatalog.getStaticBadges();
+    const staticBadges = LexoBadgeCatalog.getStaticBadges();
     const aiBadges = this.buildAiBadges(ctx);
     const allDefs = [...staticBadges, ...aiBadges];
 
@@ -501,7 +501,7 @@ window.BookMindBadgeEngine = {
   },
 
   async fetchAiBadgesFromServer(ctx, { force = false } = {}) {
-    if (!window.BookMindAPI?.post || !window.BookMindAuth?.isLoggedIn?.()) return null;
+    if (!window.LexoAPI?.post || !window.LexoAuth?.isLoggedIn?.()) return null;
 
     if (!force) {
       try {
@@ -521,7 +521,7 @@ window.BookMindBadgeEngine = {
     }
 
     try {
-      const data = await BookMindAPI.post("/api/reader/badges", {
+      const data = await LexoAPI.post("/api/reader/badges", {
         reader_profile: ctx.profile,
         stats: {
           total_finished: ctx.totalFinished,

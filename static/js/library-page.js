@@ -13,7 +13,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initLibraryPage();
 });
 
-document.addEventListener("bookmind:library-changed", () => {
+document.addEventListener("lexo:library-changed", () => {
   renderAll();
 });
 
@@ -22,7 +22,7 @@ async function initLibraryPage() {
   showState("loading");
 
   try {
-    await BookMindLibrary.ensureLoaded();
+    await LexoLibrary.ensureLoaded();
     showImportFlash();
     renderAll();
   } catch (error) {
@@ -44,7 +44,7 @@ function bindTabs() {
 }
 
 function renderAll() {
-  const library = BookMindLibrary.getLibrary();
+  const library = LexoLibrary.getLibrary();
 
   if (readingTotal) readingTotal.textContent = (library.reading || []).length;
   if (wantTotal) wantTotal.textContent = (library.want || []).length;
@@ -61,7 +61,7 @@ function renderAll() {
 
 function scheduleLibraryCoverResolve() {
   if (!window.BookCover) return;
-  const library = BookMindLibrary.getLibrary();
+  const library = LexoLibrary.getLibrary();
   const allBooks = ["reading", "want", "read"].flatMap(key => (library[key] || []).slice(0, 20));
   if (!allBooks.length) return;
   BookCover.resolveMissing(allBooks, document, { imgClass: "book-cover-img" });
@@ -74,7 +74,7 @@ function renderBookshelves() {
     { id: "shelfRead", key: "read" },
   ];
 
-  const library = BookMindLibrary.getLibrary();
+  const library = LexoLibrary.getLibrary();
 
   shelves.forEach(({ id, key }) => {
     const container = document.getElementById(id);
@@ -98,7 +98,7 @@ function renderBookshelves() {
       standing.innerHTML = coverHtml;
       standing.addEventListener("click", () => {
         if (book.library_id) {
-          BookMindLibrary.recordBookOpened(book.library_id, { skipRefresh: true });
+          LexoLibrary.recordBookOpened(book.library_id, { skipRefresh: true });
         }
         localStorage.setItem(
           "selectedBook",
@@ -151,10 +151,10 @@ function showState(type, message = "") {
 }
 
 function showImportFlash() {
-  const message = sessionStorage.getItem("bookmind_import_flash");
+  const message = sessionStorage.getItem("lexo_import_flash");
   if (!message) return;
 
-  sessionStorage.removeItem("bookmind_import_flash");
+  sessionStorage.removeItem("lexo_import_flash");
   showToast(message);
 }
 
@@ -185,7 +185,7 @@ const shelfVisibleCounts = {
 };
 
 function renderShelf(shelf) {
-  const library = BookMindLibrary.getLibrary();
+  const library = LexoLibrary.getLibrary();
   const books = library[shelf] || [];
   const visibleCount = shelfVisibleCounts[shelf] || SHELF_PAGE_SIZE;
   const visibleBooks = books.slice(0, visibleCount);
@@ -233,7 +233,7 @@ function renderShelf(shelf) {
 
   visibleBooks.forEach(book => {
     const wrapper = document.createElement("div");
-    wrapper.innerHTML = BookMindBookCard.render(book, { showProgress: true });
+    wrapper.innerHTML = LexoBookCard.render(book, { showProgress: true });
 
     const card = wrapper.firstElementChild;
 
@@ -241,7 +241,7 @@ function renderShelf(shelf) {
       if (e.target.closest(".library-progress-form, .book-actions")) return;
 
       if (book.library_id) {
-        BookMindLibrary.recordBookOpened(book.library_id, { skipRefresh: true });
+        LexoLibrary.recordBookOpened(book.library_id, { skipRefresh: true });
       }
 
       localStorage.setItem(
@@ -254,7 +254,7 @@ function renderShelf(shelf) {
       window.location.href = "book-details.html";
     });
 
-    BookMindBookCard.attachActions(card, book, {
+    LexoBookCard.attachActions(card, book, {
       onChanged: () => {
         renderAll();
       },
@@ -291,9 +291,9 @@ function escapeHtml(value) {
     .replace(/"/g, "&quot;");
 }
 
-window.BookMindLibraryPage = {
+window.LexoLibraryPage = {
   refresh: async () => {
-    await BookMindLibrary.ensureLoaded(true);
+    await LexoLibrary.ensureLoaded(true);
     renderAll();
   },
   showToast,

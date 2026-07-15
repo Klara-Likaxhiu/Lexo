@@ -1,4 +1,4 @@
--- BookMindAI Supabase schema (idempotent)
+-- Lexo Supabase schema (idempotent)
 -- Safe to re-run in Supabase SQL Editor (Dashboard → SQL → New query).
 -- Creates tables, indexes, enables RLS, and recreates policies without duplicate errors.
 

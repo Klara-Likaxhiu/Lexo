@@ -1,4 +1,4 @@
--- BookMindAI: book_covers cache table (idempotent)
+-- Lexo: book_covers cache table (idempotent)
 -- Safe to run multiple times in Supabase SQL Editor or via CLI.
 -- Caches resolved cover URLs keyed by ISBN when available, else normalized title|author.
 

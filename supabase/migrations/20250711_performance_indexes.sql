@@ -1,4 +1,4 @@
--- BookMindAI: performance indexes (idempotent)
+-- Lexo: performance indexes (idempotent)
 
 create index if not exists idx_user_library_user_updated
   on public.user_library (user_id, updated_at desc);

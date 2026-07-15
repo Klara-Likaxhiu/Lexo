@@ -1,4 +1,4 @@
--- BookMindAI: manual cover overrides + lookup failure tracking (idempotent)
+-- Lexo: manual cover overrides + lookup failure tracking (idempotent)
 -- Adds admin-set manual_cover_url and negative-cache timestamp for auto lookups.
 
 alter table public.book_covers alter column cover_url drop not null;

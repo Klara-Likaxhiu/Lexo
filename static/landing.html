@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>BookMindAI</title>
+  <title>Lexo</title>
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="css/design-system.css">
   <script src="js/auth.js"></script>
@@ -18,7 +18,7 @@
             <path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/>
           </svg>
         </div>
-        <span>BookMindAI</span>
+        <span>Lexo</span>
       </div>
 
       <div class="nav-links">
@@ -67,7 +67,7 @@
         <img
           class="hero-illustration"
           src="images/hero-illustration.svg?v=hero-v6"
-          alt="Open book with genre bars for BookMind, Mystery, Romance, Fantasy, and Thriller under a teal arch with botanical leaves and gold stars"
+          alt="Open book with genre bars for Lexo, Mystery, Romance, Fantasy, and Thriller under a teal arch with botanical leaves and gold stars"
           width="576"
           height="630"
         >
@@ -102,7 +102,7 @@
     </section>
 
     <section class="how-section" id="how">
-      <h2>How BookMindAI works</h2>
+      <h2>How Lexo works</h2>
 
       <div class="how-grid">
         <div class="how-card">
@@ -149,9 +149,9 @@
 
   <script>
     document.addEventListener("DOMContentLoaded", async () => {
-      if (window.BookMindAuth) {
-        await window.BookMindAuth.whenReady();
-        if (window.BookMindAuth.isLoggedIn() && window.BookMindAuth.getCurrentUser()?.id) {
+      if (window.LexoAuth) {
+        await window.LexoAuth.whenReady();
+        if (window.LexoAuth.isLoggedIn() && window.LexoAuth.getCurrentUser()?.id) {
           window.location.replace("/home");
         }
       }

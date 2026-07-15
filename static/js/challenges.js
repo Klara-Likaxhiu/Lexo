@@ -1,4 +1,4 @@
-/* Reading challenges & achievements: goals, streaks, badges via BookMindBadgeEngine. */
+/* Reading challenges & achievements: goals, streaks, badges via LexoBadgeEngine. */
 
 const ICONS = {
   book: '<path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/>',
@@ -74,8 +74,8 @@ function computeStreak(activity) {
 }
 
 function gatherGoalStats() {
-  const library = BookMindLibrary.getLibrary();
-  const data = BookMindLibrary.getReadingData();
+  const library = LexoLibrary.getLibrary();
+  const data = LexoLibrary.getReadingData();
 
   const now = new Date();
   const year = now.getFullYear();
@@ -168,16 +168,16 @@ function rarityLabel(rarity) {
 }
 
 function categoryLabel(category) {
-  const meta = BookMindBadgeCatalog.CATEGORIES[category];
+  const meta = LexoBadgeCatalog.CATEGORIES[category];
   return meta ? `${meta.emoji} ${meta.label}` : category;
 }
 
 function renderBadgeCard(badge, compact) {
-  const engine = BookMindBadgeEngine;
+  const engine = LexoBadgeEngine;
   const earned = badge.earned;
   const animate = badge.isNew ? " badge-pop" : "";
   const rarity = badge.rarity || "common";
-  const cat = BookMindBadgeCatalog.CATEGORIES[badge.category];
+  const cat = LexoBadgeCatalog.CATEGORIES[badge.category];
 
   const progressHtml = !earned
     ? `
@@ -222,7 +222,7 @@ function filterBadges(badges) {
 }
 
 function updateLevelHero(stats) {
-  const pathXp = window.BookMindPathCompletion?.readXpBonus?.() || 0;
+  const pathXp = window.LexoPathCompletion?.readXpBonus?.() || 0;
   const totalXp = stats.totalFinished * 50 + pathXp;
   const level = Math.max(1, Math.floor(totalXp / 150) + 1);
   const xpPct = stats.goals.yearly
@@ -248,7 +248,7 @@ function updateLevelHero(stats) {
 
 function renderBadgeStats(summary) {
   const bar = document.getElementById("badgeStatsBar");
-  const rarityItems = BookMindBadgeCatalog.RARITIES.map(r => {
+  const rarityItems = LexoBadgeCatalog.RARITIES.map(r => {
     const count = summary.byRarity[r] || 0;
     return `<span class="badge-stat-pill rarity-${r}">${rarityLabel(r)}: ${count}</span>`;
   }).join("");
@@ -304,14 +304,14 @@ function renderBadges() {
 
   if (state.badges.some(b => b.isNew)) {
     setTimeout(() => {
-      BookMindBadgeEngine.markSeen(state.badges.filter(b => b.isNew).map(b => b.id));
+      LexoBadgeEngine.markSeen(state.badges.filter(b => b.isNew).map(b => b.id));
     }, 1200);
   }
 }
 
 function populateCategoryFilter() {
   const select = document.getElementById("filterCategory");
-  Object.entries(BookMindBadgeCatalog.CATEGORIES).forEach(([key, meta]) => {
+  Object.entries(LexoBadgeCatalog.CATEGORIES).forEach(([key, meta]) => {
     const opt = document.createElement("option");
     opt.value = key;
     opt.textContent = `${meta.emoji} ${meta.label}`;
@@ -341,7 +341,7 @@ function setupFilters() {
 }
 
 function setupGoals() {
-  const goals = BookMindLibrary.getGoals();
+  const goals = LexoLibrary.getGoals();
   const yearlyInput = document.getElementById("goalYearly");
   const monthlyInput = document.getElementById("goalMonthly");
   const message = document.getElementById("goalMessage");
@@ -350,7 +350,7 @@ function setupGoals() {
   if (goals.monthly) monthlyInput.value = goals.monthly;
 
   document.getElementById("saveGoalsBtn").addEventListener("click", () => {
-    BookMindLibrary.setGoals({
+    LexoLibrary.setGoals({
       yearly: yearlyInput.value,
       monthly: monthlyInput.value,
     });
@@ -366,13 +366,13 @@ async function refresh() {
 
   updateLevelHero(goalStats);
 
-  const ctx = BookMindBadgeEngine.buildContext();
-  await BookMindBadgeEngine.fetchAiBadgesFromServer(ctx);
+  const ctx = LexoBadgeEngine.buildContext();
+  await LexoBadgeEngine.fetchAiBadgesFromServer(ctx);
 
-  const { badges } = BookMindBadgeEngine.evaluateAll(ctx);
+  const { badges } = LexoBadgeEngine.evaluateAll(ctx);
   state.badges = badges;
 
-  const summary = BookMindBadgeEngine.stats(badges);
+  const summary = LexoBadgeEngine.stats(badges);
   renderBadgeStats(summary);
   renderNewestBadges(summary.newest);
   renderBadges();
@@ -385,7 +385,7 @@ setupGoals();
 document.addEventListener("DOMContentLoaded", async () => {
   showLoadingSkeletons();
   try {
-    await BookMindLibrary.ensureLoaded();
+    await LexoLibrary.ensureLoaded();
   } catch {
     /* library optional on challenges page */
   }

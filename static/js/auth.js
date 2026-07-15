@@ -1,10 +1,53 @@
+/**
+ * One-time migration from the old "bookmind_"-prefixed storage keys (and the
+ * bare "bookmind" key) to the "lexo_" equivalents, so existing users don't
+ * lose their session, settings, or reading data after the rebrand. Runs
+ * before anything else touches storage. Safe to run on every page load —
+ * it's a no-op once the old keys are gone.
+ */
+(function migrateLegacyBookMindStorage() {
+  const OLD_PREFIX = "bookmind_";
+  const NEW_PREFIX = "lexo_";
+
+  const migrateStore = (store) => {
+    if (!store) return;
+    let oldKeys;
+    try {
+      oldKeys = Object.keys(store).filter(
+        (key) => key === "bookmind" || key.indexOf(OLD_PREFIX) === 0
+      );
+    } catch (_) {
+      return;
+    }
+    oldKeys.forEach((oldKey) => {
+      const newKey = oldKey === "bookmind" ? "lexo" : NEW_PREFIX + oldKey.slice(OLD_PREFIX.length);
+      try {
+        if (store.getItem(newKey) === null) {
+          const value = store.getItem(oldKey);
+          if (value !== null) store.setItem(newKey, value);
+        }
+        store.removeItem(oldKey);
+      } catch (_) {
+        /* ignore (quota, disabled storage, etc.) */
+      }
+    });
+  };
+
+  try {
+    migrateStore(window.localStorage);
+    migrateStore(window.sessionStorage);
+  } catch (_) {
+    /* ignore (private browsing, storage disabled, etc.) */
+  }
+})();
+
 (function () {
   try {
-    let theme = localStorage.getItem("bookmind_theme");
-    let readingSize = localStorage.getItem("bookmind_reading_size");
+    let theme = localStorage.getItem("lexo_theme");
+    let readingSize = localStorage.getItem("lexo_reading_size");
 
     if (!theme || !readingSize) {
-      const settings = JSON.parse(localStorage.getItem("bookmind_settings") || "{}");
+      const settings = JSON.parse(localStorage.getItem("lexo_settings") || "{}");
       const appearance = settings.appearance || {};
       if (!theme) theme = appearance.theme || "light";
       if (!readingSize) readingSize = appearance.readingFontSize || "medium";
@@ -18,13 +61,13 @@
 })();
 
 /**
- * BookMindAI authentication client.
+ * Lexo authentication client.
  * JWT access tokens + server-side refresh tokens, email verification, OAuth.
  */
-class BookMindApiError extends Error {
+class LexoApiError extends Error {
   constructor(message, { status, url, data, rawBody, method } = {}) {
     super(message);
-    this.name = "BookMindApiError";
+    this.name = "LexoApiError";
     this.status = status ?? 0;
     this.url = url ?? "";
     this.data = data ?? {};
@@ -33,15 +76,15 @@ class BookMindApiError extends Error {
   }
 }
 
-var BookMindAuth = {
-  ACCESS_KEY: "bookmind_access_token",
-  REFRESH_KEY: "bookmind_refresh_token",
-  USER_KEY: "bookmind_auth_user",
-  REMEMBER_KEY: "bookmind_remember_me",
-  PENDING_EMAIL_KEY: "bookmind_pending_signup_email",
+var LexoAuth = {
+  ACCESS_KEY: "lexo_access_token",
+  REFRESH_KEY: "lexo_refresh_token",
+  USER_KEY: "lexo_auth_user",
+  REMEMBER_KEY: "lexo_remember_me",
+  PENDING_EMAIL_KEY: "lexo_pending_signup_email",
   PENDING_VERIFICATION_KEY: "pendingVerificationEmail",
   LEGACY_PENDING_SIGNUP_KEY: "pendingSignupEmail",
-  LEGACY_AUTH_KEYS: ["bookmind_user_id", "bookmind_session", "bookmind_user_name"],
+  LEGACY_AUTH_KEYS: ["lexo_user_id", "lexo_session", "lexo_user_name"],
 
   /** In-memory session — single source of truth after restoreSession(). */
   _session: {
@@ -208,11 +251,11 @@ var BookMindAuth = {
 
   saveSession({ access_token, refresh_token, remember_me, user }) {
     if (!access_token) {
-      console.warn("[BookMindAuth] saveSession: missing access_token");
+      console.warn("[LexoAuth] saveSession: missing access_token");
       return;
     }
     if (!refresh_token) {
-      console.warn("[BookMindAuth] saveSession: missing refresh_token — session cannot be refreshed");
+      console.warn("[LexoAuth] saveSession: missing refresh_token — session cannot be refreshed");
     }
 
     const remember = remember_me !== undefined ? Boolean(remember_me) : true;
@@ -236,7 +279,7 @@ var BookMindAuth = {
 
   _dispatchAuthReady(user) {
     document.dispatchEvent(
-      new CustomEvent("bookmind:auth-ready", {
+      new CustomEvent("lexo:auth-ready", {
         detail: { user: user || null, loggedIn: this.isLoggedIn() }
       })
     );
@@ -254,7 +297,7 @@ var BookMindAuth = {
       accessKey: this.ACCESS_KEY,
       refreshKey: this.REFRESH_KEY,
     };
-    window.__BOOKMIND_AUTH_STATE__ = state;
+    window.__LEXO_AUTH_STATE__ = state;
     this._dispatchAuthReady(state.user);
     return state;
   },
@@ -324,7 +367,7 @@ var BookMindAuth = {
       this.updateAuthUi();
       return user;
     } catch (error) {
-      console.warn("[BookMindAuth] restoreSession failed", error);
+      console.warn("[LexoAuth] restoreSession failed", error);
       this._session.ready = true;
       this._publishAuthState("restore-failed");
       this.updateAuthUi();
@@ -380,7 +423,7 @@ var BookMindAuth = {
     if (allowRefresh && this.isAuthExpiredError(response.status, data, rawBody)) {
       const refreshed = await this.refreshSession({ clearOnFailure: false });
       if (!refreshed) {
-        console.warn("[BookMindAuth] fetchCurrentUser: refresh failed, keeping stored token");
+        console.warn("[LexoAuth] fetchCurrentUser: refresh failed, keeping stored token");
         return this._session.user;
       }
       response = await fetch(this.apiUrl("/api/auth/me"), {
@@ -555,7 +598,7 @@ var BookMindAuth = {
 
     const refreshToken = this.getRefreshToken();
     if (!refreshToken) {
-      console.warn("[BookMindAuth] ensureFreshSession: access token expired, no refresh token");
+      console.warn("[LexoAuth] ensureFreshSession: access token expired, no refresh token");
       if (clearOnFailure) this.handleAuthFailure();
       return false;
     }
@@ -623,7 +666,7 @@ var BookMindAuth = {
   },
 
   formatErrorForUser(error) {
-    if (error instanceof BookMindApiError) {
+    if (error instanceof LexoApiError) {
       const detail = this.extractErrorMessage(error.data, error.rawBody, error.status);
       if (detail && !detail.startsWith("Request failed")) {
         return `[HTTP ${error.status}] ${detail}`;
@@ -660,7 +703,7 @@ var BookMindAuth = {
     if (!response.ok) {
       const detail = this.extractErrorMessage(data, rawBody, response.status);
       const message = `[HTTP ${response.status}] ${detail}`;
-      const error = new BookMindApiError(message, {
+      const error = new LexoApiError(message, {
         status: response.status,
         url,
         data,
@@ -679,10 +722,10 @@ var BookMindAuth = {
   },
 
   async signup(username, email, password) {
-    console.info("[BookMindAuth] signup attempt", { username, email });
+    console.info("[LexoAuth] signup attempt", { username, email });
     try {
       const data = await this.api("/api/auth/signup", { username, email, password });
-      console.info("[BookMindAuth] signup success", {
+      console.info("[LexoAuth] signup success", {
         verification_required: Boolean(data.verification_required),
         hasAccessToken: Boolean(data.access_token),
       });
@@ -693,20 +736,20 @@ var BookMindAuth = {
       }
       return data;
     } catch (error) {
-      console.error("[BookMindAuth] signup failed", error);
+      console.error("[LexoAuth] signup failed", error);
       throw error;
     }
   },
 
   async login(login, password, rememberMe) {
-    console.info("[BookMindAuth] login attempt", { login, rememberMe });
+    console.info("[LexoAuth] login attempt", { login, rememberMe });
     try {
       const data = await this.api("/api/auth/login", {
         login,
         password,
         remember_me: rememberMe
       });
-      console.info("[BookMindAuth] login success", {
+      console.info("[LexoAuth] login success", {
         verification_required: Boolean(data.verification_required),
         hasAccessToken: Boolean(data.access_token),
         hasRefreshToken: Boolean(data.refresh_token),
@@ -721,7 +764,7 @@ var BookMindAuth = {
       }
       return data;
     } catch (error) {
-      console.error("[BookMindAuth] login failed", error);
+      console.error("[LexoAuth] login failed", error);
       throw error;
     }
   },
@@ -959,7 +1002,7 @@ var BookMindAuth = {
   async _performRefresh({ clearOnFailure = false } = {}) {
     const refreshToken = this.getRefreshToken();
     if (!refreshToken) {
-      console.warn("[BookMindAuth] refreshSession: no refresh token in storage");
+      console.warn("[LexoAuth] refreshSession: no refresh token in storage");
       if (clearOnFailure) this.handleAuthFailure();
       return false;
     }
@@ -982,7 +1025,7 @@ var BookMindAuth = {
       }
 
       if (!response.ok) {
-        console.warn("[BookMindAuth] refreshSession failed", response.status, rawBody);
+        console.warn("[LexoAuth] refreshSession failed", response.status, rawBody);
         if (clearOnFailure) {
           this.handleAuthFailure();
         }
@@ -990,7 +1033,7 @@ var BookMindAuth = {
       }
 
       if (!data.access_token) {
-        console.warn("[BookMindAuth] refreshSession: missing access_token in response");
+        console.warn("[LexoAuth] refreshSession: missing access_token in response");
         if (clearOnFailure) this.handleAuthFailure();
         return false;
       }
@@ -1106,8 +1149,8 @@ var BookMindAuth = {
     document.querySelectorAll(".sidebar-logout").forEach(link => {
       link.hidden = !loggedIn;
       link.style.display = loggedIn ? "" : "none";
-      if (link.dataset.bookmindLogoutBound === "1") return;
-      link.dataset.bookmindLogoutBound = "1";
+      if (link.dataset.lexoLogoutBound === "1") return;
+      link.dataset.lexoLogoutBound = "1";
       link.addEventListener("click", event => {
         event.preventDefault();
         this.logout();
@@ -1229,7 +1272,7 @@ var BookMindAuth = {
   },
 
   _authUi() {
-    return window.BookMindAuthUI || (typeof BookMindAuthUI !== "undefined" ? BookMindAuthUI : null);
+    return window.LexoAuthUI || (typeof LexoAuthUI !== "undefined" ? LexoAuthUI : null);
   },
 
   initSignupPage() {
@@ -1249,12 +1292,12 @@ var BookMindAuth = {
       const rememberSelector = document.querySelector("#rememberMe") ? "#rememberMe" : null;
       ui.loadOAuthButtons("oauthButtons", () => this.redirectAfterLogin(), rememberSelector);
     } else {
-      console.warn("[BookMindAuth] auth-ui.js not loaded — password toggles and OAuth unavailable");
+      console.warn("[LexoAuth] auth-ui.js not loaded — password toggles and OAuth unavailable");
     }
 
     const form = document.getElementById("signupForm");
-    if (!form || form.dataset.bookmindBound === "1") return;
-    form.dataset.bookmindBound = "1";
+    if (!form || form.dataset.lexoBound === "1") return;
+    form.dataset.lexoBound = "1";
 
     form.addEventListener("submit", async e => {
       e.preventDefault();
@@ -1319,12 +1362,12 @@ var BookMindAuth = {
       ui.initPasswordToggles();
       ui.loadOAuthButtons("oauthButtons", () => this.redirectAfterLogin(), "#rememberMe");
     } else {
-      console.warn("[BookMindAuth] auth-ui.js not loaded — password toggles and OAuth unavailable");
+      console.warn("[LexoAuth] auth-ui.js not loaded — password toggles and OAuth unavailable");
     }
 
     const form = document.getElementById("loginForm");
-    if (!form || form.dataset.bookmindBound === "1") return;
-    form.dataset.bookmindBound = "1";
+    if (!form || form.dataset.lexoBound === "1") return;
+    form.dataset.lexoBound = "1";
 
     form.addEventListener("submit", async e => {
       e.preventDefault();
@@ -1381,7 +1424,7 @@ var BookMindAuth = {
       this.setPendingSignupEmail(email);
     } else if (pendingEmailEl) {
       pendingEmailEl.textContent = "your email address";
-      BookMindAuthUI.showError(
+      LexoAuthUI.showError(
         "resendError",
         "No email address provided. Use Sign up again to create a new account."
       );
@@ -1391,45 +1434,45 @@ var BookMindAuth = {
 
     if (signupAgainLink) {
       signupAgainLink.addEventListener("click", () => {
-        BookMindAuth.clearAllAuthState();
+        LexoAuth.clearAllAuthState();
       });
     }
 
     if (backToLoginLink) {
       backToLoginLink.addEventListener("click", () => {
-        BookMindAuth.clearAllAuthState();
+        LexoAuth.clearAllAuthState();
       });
     }
 
     if (checkVerifiedBtn) {
       checkVerifiedBtn.addEventListener("click", async () => {
         if (!email) return;
-        BookMindAuthUI.clearAuthMessages({
+        LexoAuthUI.clearAuthMessages({
           errorId: "resendError",
           successId: "resendSuccess",
           statusId: "statusMessage"
         });
 
-        BookMindAuthUI.setLoading(checkVerifiedBtn, true, "I've verified — continue", "Checking…");
+        LexoAuthUI.setLoading(checkVerifiedBtn, true, "I've verified — continue", "Checking…");
         try {
-          const status = await BookMindAuth.checkVerificationStatus(email);
+          const status = await LexoAuth.checkVerificationStatus(email);
           if (!status.account_exists) {
-            BookMindAuthUI.showError(
+            LexoAuthUI.showError(
               "resendError",
               "No account found for this email. Use Sign up again to create a new account."
             );
             return;
           }
           if (status.verified) {
-            BookMindAuth.clearPendingSignupState();
-            BookMindAuthUI.showStatusMessage(
+            LexoAuth.clearPendingSignupState();
+            LexoAuthUI.showStatusMessage(
               "statusMessage",
               "Email verified! Redirecting…",
               "success"
             );
-            BookMindAuthUI.showToast("Email verified! You can log in now.");
+            LexoAuthUI.showToast("Email verified! You can log in now.");
             setTimeout(() => {
-              if (BookMindAuth.isLoggedIn()) {
+              if (LexoAuth.isLoggedIn()) {
                 window.location.href = "/home.html";
               } else {
                 window.location.href = `/login.html?verified=1&email=${encodeURIComponent(email)}`;
@@ -1437,14 +1480,14 @@ var BookMindAuth = {
             }, 900);
             return;
           }
-          BookMindAuthUI.showError("resendError", "Please verify your email first.");
+          LexoAuthUI.showError("resendError", "Please verify your email first.");
         } catch (error) {
-          BookMindAuthUI.showError(
+          LexoAuthUI.showError(
             "resendError",
             error.message || "Could not check verification status."
           );
         } finally {
-          BookMindAuthUI.setLoading(checkVerifiedBtn, false, "I've verified — continue");
+          LexoAuthUI.setLoading(checkVerifiedBtn, false, "I've verified — continue");
         }
       });
     }
@@ -1452,32 +1495,32 @@ var BookMindAuth = {
     if (resendBtn) {
       resendBtn.addEventListener("click", async () => {
         if (!email) return;
-        BookMindAuthUI.clearAuthMessages({
+        LexoAuthUI.clearAuthMessages({
           errorId: "resendError",
           successId: "resendSuccess",
           statusId: "statusMessage"
         });
 
-        BookMindAuthUI.setLoading(resendBtn, true, "Resend verification email", "Sending…");
+        LexoAuthUI.setLoading(resendBtn, true, "Resend verification email", "Sending…");
         try {
-          const data = await BookMindAuth.resendVerification(email);
+          const data = await LexoAuth.resendVerification(email);
           if (data.already_verified) {
-            BookMindAuth.clearPendingSignupState();
+            LexoAuth.clearPendingSignupState();
             window.location.href = `/login.html?verified=1&email=${encodeURIComponent(email)}`;
             return;
           }
           const successText = data.email_sent
             ? "Verification email sent. Check your inbox and Spam/Junk folder."
             : data.message || "Verification email queued.";
-          BookMindAuthUI.showSuccess("resendSuccess", successText);
-          BookMindAuthUI.showToast(data.email_sent ? "Verification email sent." : successText);
+          LexoAuthUI.showSuccess("resendSuccess", successText);
+          LexoAuthUI.showToast(data.email_sent ? "Verification email sent." : successText);
         } catch (error) {
-          BookMindAuthUI.showError(
+          LexoAuthUI.showError(
             "resendError",
             error.message || "Could not send verification email."
           );
         } finally {
-          BookMindAuthUI.setLoading(resendBtn, false, "Resend verification email");
+          LexoAuthUI.setLoading(resendBtn, false, "Resend verification email");
         }
       });
     }
@@ -1509,7 +1552,7 @@ var BookMindAuth = {
 
     if (goLoginBtn) {
       goLoginBtn.addEventListener("click", () => {
-        BookMindAuth.clearAllAuthState();
+        LexoAuth.clearAllAuthState();
         window.location.href = pendingEmail
           ? `/login.html?email=${encodeURIComponent(pendingEmail)}`
           : "/login.html";
@@ -1524,14 +1567,14 @@ var BookMindAuth = {
           pendingEmail = entered.trim();
         }
 
-        BookMindAuthUI.clearAuthMessages({ errorId: "verifyError", successId: "verifySuccess" });
+        LexoAuthUI.clearAuthMessages({ errorId: "verifyError", successId: "verifySuccess" });
         if (successEl) successEl.hidden = true;
-        BookMindAuthUI.setLoading(resendBtn, true, "Resend verification email", "Sending…");
+        LexoAuthUI.setLoading(resendBtn, true, "Resend verification email", "Sending…");
 
         try {
           const data = await this.resendVerification(pendingEmail);
           if (data.already_verified) {
-            BookMindAuth.clearPendingSignupState();
+            LexoAuth.clearPendingSignupState();
             window.location.href = `/login.html?verified=1&email=${encodeURIComponent(pendingEmail)}`;
             return;
           }
@@ -1542,11 +1585,11 @@ var BookMindAuth = {
             successEl.textContent = text;
             successEl.hidden = false;
           }
-          BookMindAuthUI.showToast(text);
+          LexoAuthUI.showToast(text);
         } catch (error) {
           this.showError("verifyError", error.message || "Could not resend verification email.");
         } finally {
-          BookMindAuthUI.setLoading(resendBtn, false, "Resend verification email");
+          LexoAuthUI.setLoading(resendBtn, false, "Resend verification email");
         }
       });
     }
@@ -1583,7 +1626,7 @@ var BookMindAuth = {
         }
         const icon = document.getElementById("verifyIcon");
         if (icon) icon.classList.add("auth-status-icon-success");
-        BookMindAuthUI.showToast("Email verified successfully!");
+        LexoAuthUI.showToast("Email verified successfully!");
         setTimeout(() => this.redirectAfterVerification(result), 1500);
       })
       .catch(error => {
@@ -1607,7 +1650,7 @@ var BookMindAuth = {
   },
 
   showError(id, msg) {
-    console.error("[BookMindAuth]", id, msg);
+    console.error("[LexoAuth]", id, msg);
     const ui = this._authUi();
     if (ui?.showError) {
       ui.showError(id, msg);
@@ -1630,7 +1673,7 @@ var BookMindAuth = {
   }
 };
 
-window.BookMindAuth = BookMindAuth;
+window.LexoAuth = LexoAuth;
 
 function whenDomReady(fn) {
   if (document.readyState === "loading") {
@@ -1641,57 +1684,57 @@ function whenDomReady(fn) {
 }
 
 (async function initAuth() {
-  const page = BookMindAuth.currentPage();
-  const path = BookMindAuth.currentPath();
+  const page = LexoAuth.currentPage();
+  const path = LexoAuth.currentPath();
 
-  // Sync bookmind_access_token / bookmind_refresh_token from localStorage immediately.
-  BookMindAuth._syncSessionFromStorage();
+  // Sync lexo_access_token / lexo_refresh_token from localStorage immediately.
+  LexoAuth._syncSessionFromStorage();
 
   if (page === "signup.html") {
-    BookMindAuth.clearAllAuthState();
-    BookMindAuth._publishAuthState("signup-cleared");
-    whenDomReady(() => BookMindAuth.initSignupPage());
+    LexoAuth.clearAllAuthState();
+    LexoAuth._publishAuthState("signup-cleared");
+    whenDomReady(() => LexoAuth.initSignupPage());
     return;
   }
 
-  if (BookMindAuth.redirectAuthCallbackIfNeeded()) {
+  if (LexoAuth.redirectAuthCallbackIfNeeded()) {
     return;
   }
 
   // Every non-signup page restores the Supabase session before app scripts call APIs.
-  BookMindAuth._sessionReadyPromise = null;
-  await BookMindAuth.whenReady();
-  BookMindAuth.updateAuthUi();
+  LexoAuth._sessionReadyPromise = null;
+  await LexoAuth.whenReady();
+  LexoAuth.updateAuthUi();
 
-  if (BookMindAuth.PUBLIC_PAGES.has(page) || page === "landing.html") {
-    if (BookMindAuth.EMAIL_FEATURE_PAGES.has(page)) {
-      await BookMindAuth.guardEmailFeaturePage();
+  if (LexoAuth.PUBLIC_PAGES.has(page) || page === "landing.html") {
+    if (LexoAuth.EMAIL_FEATURE_PAGES.has(page)) {
+      await LexoAuth.guardEmailFeaturePage();
       if (page === "verify-email-pending.html") {
-        whenDomReady(() => BookMindAuth.initVerifyEmailPendingPage());
+        whenDomReady(() => LexoAuth.initVerifyEmailPendingPage());
       } else if (page === "verify-email.html") {
-        whenDomReady(() => BookMindAuth.initVerifyEmailPage());
+        whenDomReady(() => LexoAuth.initVerifyEmailPage());
       }
-    } else if (BookMindAuth.PUBLIC_AUTH_PAGES.has(page)) {
-      await BookMindAuth.guardPublicAuthPage();
+    } else if (LexoAuth.PUBLIC_AUTH_PAGES.has(page)) {
+      await LexoAuth.guardPublicAuthPage();
       if (page === "login.html") {
         whenDomReady(() => {
-          BookMindAuth.applyAuthUiConfig();
-          BookMindAuth.initLoginPage();
+          LexoAuth.applyAuthUiConfig();
+          LexoAuth.initLoginPage();
         });
       } else if (page === "signup.html") {
-        whenDomReady(() => BookMindAuth.initSignupPage());
+        whenDomReady(() => LexoAuth.initSignupPage());
       }
     }
-    whenDomReady(() => BookMindAuth.setupLogoutLinks());
+    whenDomReady(() => LexoAuth.setupLogoutLinks());
     return;
   }
 
-  if (BookMindAuth.PROTECTED_PAGES.has(page)) {
-    await BookMindAuth.guardPage();
+  if (LexoAuth.PROTECTED_PAGES.has(page)) {
+    await LexoAuth.guardPage();
     return;
   }
 
-  whenDomReady(() => BookMindAuth.setupLogoutLinks());
+  whenDomReady(() => LexoAuth.setupLogoutLinks());
 })();
 
-window.BookMindApiError = BookMindApiError;
+window.LexoApiError = LexoApiError;

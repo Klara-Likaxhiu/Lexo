@@ -1,7 +1,7 @@
 /** Reading Passport — secret paths, stamps, reviews, journey stats. */
-window.BookMindPathPassport = {
-  REVIEWS_KEY: "bookmind_path_reviews",
-  UNLOCKS_KEY: "bookmind_path_unlocks",
+window.LexoPathPassport = {
+  REVIEWS_KEY: "lexo_path_reviews",
+  UNLOCKS_KEY: "lexo_path_unlocks",
 
   SECRET_PATHS: [
     {
@@ -227,7 +227,7 @@ window.BookMindPathPassport = {
   },
 
   passportStats(paths, stats) {
-    const C = window.BookMindPathCompletion;
+    const C = window.LexoPathCompletion;
     const agg = C?.computeAggregateStats(paths) || {};
     const completed = (paths || []).filter(p => p.path_completed);
     const totalStarted = (paths || []).filter(p => !p.path_completed).length +

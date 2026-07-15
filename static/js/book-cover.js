@@ -1,4 +1,4 @@
-/** BookMindAI centralized cover component — hosted Supabase URLs only. */
+/** Lexo centralized cover component — hosted Supabase URLs only. */
 
 const HOSTED_COVER_MARKER = "/storage/v1/object/public/book-covers/";
 const COVER_RESOLVE_STALE_MS = 30000;
@@ -95,7 +95,7 @@ function stripExternalCoverFromBook(book) {
 
 const COVER_BATCH_SIZE = 8;
 
-const BookMindCoverQueue = {
+const LexoCoverQueue = {
   _books: new Map(),
   _roots: new Map(),
   _options: {},
@@ -104,11 +104,11 @@ const BookMindCoverQueue = {
 
   enqueue(books, root = document, options = {}) {
     (books || []).forEach(book => {
-      BookMindCoverService.registerBook(book);
-      const ref = BookMindCoverImage.bookRef(book);
-      if (BookMindCoverImage.getKnownUrl(book)) return;
-      if (!BookMindCoverImage._shouldAttemptResolve(book)) return;
-      const key = BookMindCoverImage.cacheKey(ref);
+      LexoCoverService.registerBook(book);
+      const ref = LexoCoverImage.bookRef(book);
+      if (LexoCoverImage.getKnownUrl(book)) return;
+      if (!LexoCoverImage._shouldAttemptResolve(book)) return;
+      const key = LexoCoverImage.cacheKey(ref);
       this._books.set(key, book);
       this._roots.set(key, root);
       this._options = { ...this._options, ...options };
@@ -140,10 +140,10 @@ const BookMindCoverQueue = {
     for (let i = 0; i < entries.length; i += COVER_BATCH_SIZE) {
       const chunk = entries.slice(i, i + COVER_BATCH_SIZE);
       const books = chunk.map(([, book]) => book);
-      await BookMindCoverImage._batchResolveBooks(books);
+      await LexoCoverImage._batchResolveBooks(books);
       chunk.forEach(([key, book]) => {
         const root = this._roots.get(key) || document;
-        BookMindCoverImage._renderBookCover(book, root, this._options);
+        LexoCoverImage._renderBookCover(book, root, this._options);
       });
     }
 
@@ -151,27 +151,27 @@ const BookMindCoverQueue = {
     if (this._books.size) {
       this._schedule();
     } else {
-      window.BookMindPerf?.endCoversLoad?.();
+      window.LexoPerf?.endCoversLoad?.();
     }
   },
 };
 
-const BookMindCoverService = {
+const LexoCoverService = {
   _bookRegistry: new Map(),
   _pending: new Map(),
 
   registerBook(book) {
     if (!book || typeof book !== "object") return book;
-    const ref = BookMindCoverImage.bookRef(book);
+    const ref = LexoCoverImage.bookRef(book);
     stripExternalCoverFromBook(book);
-    this._bookRegistry.set(BookMindCoverImage.cacheKey(ref), book);
+    this._bookRegistry.set(LexoCoverImage.cacheKey(ref), book);
     return book;
   },
 
   getBook(refOrBook) {
     if (!refOrBook) return null;
-    const ref = BookMindCoverImage.bookRef(refOrBook);
-    return this._bookRegistry.get(BookMindCoverImage.cacheKey(ref)) || refOrBook;
+    const ref = LexoCoverImage.bookRef(refOrBook);
+    return this._bookRegistry.get(LexoCoverImage.cacheKey(ref)) || refOrBook;
   },
 
   localUrl(book) {
@@ -187,8 +187,8 @@ const BookMindCoverService = {
       return { url: existing, book, cover_status: "ready", placeholder: false };
     }
 
-    const ref = BookMindCoverImage.bookRef(book);
-    const key = BookMindCoverImage.cacheKey(ref);
+    const ref = LexoCoverImage.bookRef(book);
+    const key = LexoCoverImage.cacheKey(ref);
     if (this._pending.has(key)) return this._pending.get(key);
 
     const payload = {
@@ -207,7 +207,7 @@ const BookMindCoverService = {
         title: ref.title,
         author: ref.author,
         isbn: ref.isbn,
-        bookId: BookMindCoverImage.cacheKey(ref),
+        bookId: LexoCoverImage.cacheKey(ref),
         google_id: ref.google_id,
         open_library_key: ref.open_library_key,
       }),
@@ -232,11 +232,11 @@ const BookMindCoverService = {
   },
 
   async resolveMany(books, root = document, options = {}) {
-    return BookMindCoverImage.resolveMissing(books, root, options);
+    return LexoCoverImage.resolveMissing(books, root, options);
   },
 };
 
-const BookMindCoverImage = {
+const LexoCoverImage = {
   _pendingBatch: new Map(),
 
   isMissingCoverUrl(url) {
@@ -253,7 +253,7 @@ const BookMindCoverImage = {
       author: book?.author || ai.author || "Unknown Author",
       genre: book?.genre || ai.genre || (book?.categories && book.categories[0]) || "Book",
       isbn: book?.isbn || book?.metadata?.isbn || book?.book_data?.isbn || null,
-      cover_url: BookMindCoverService.localUrl(book),
+      cover_url: LexoCoverService.localUrl(book),
       google_id: book?.google_id || book?.id || book?.book_id || null,
       open_library_key: book?.open_library_key || null,
       library_id: book?.library_id || null,
@@ -289,7 +289,7 @@ const BookMindCoverImage = {
   },
 
   getKnownUrl(book) {
-    return BookMindCoverService.localUrl(book);
+    return LexoCoverService.localUrl(book);
   },
 
   _shouldAttemptResolve(book) {
@@ -337,7 +337,7 @@ const BookMindCoverImage = {
   },
 
   html(book, options = {}) {
-    BookMindCoverService.registerBook(book);
+    LexoCoverService.registerBook(book);
     const ref = this.bookRef(book);
     const imgClass = options.imgClass || "book-cover-img";
     const knownUrl = this.getKnownUrl(book);
@@ -419,10 +419,10 @@ const BookMindCoverImage = {
   onError(img) {
     const wrap = img?.closest("[data-cover-key]");
     if (!wrap || wrap.dataset.coverLoading === "true") return;
-    const book = wrap.__sourceBook || BookMindCoverService.getBook(this.refFromWrap(wrap));
+    const book = wrap.__sourceBook || LexoCoverService.getBook(this.refFromWrap(wrap));
     wrap.dataset.coverLoading = "true";
     this.renderResolving(wrap, this.bookRef(book));
-    BookMindCoverService.resolve(book).then(result => {
+    LexoCoverService.resolve(book).then(result => {
       wrap.dataset.coverLoading = "false";
       if (result.url) {
         this.renderImage(wrap, this.bookRef(result.book), result.url, { book: result.book, imgClass: wrap.dataset.imgClass });
@@ -437,7 +437,7 @@ const BookMindCoverImage = {
   async _persistCoverUrl(ref, url) {
     if (!ref.library_id || !isHostedCoverUrl(url)) return;
     const headers = { "Content-Type": "application/json" };
-    if (window.BookMindAuth?.getAuthHeaders) Object.assign(headers, BookMindAuth.getAuthHeaders());
+    if (window.LexoAuth?.getAuthHeaders) Object.assign(headers, LexoAuth.getAuthHeaders());
     try {
       const response = await fetch("/api/library/cover", {
         method: "POST",
@@ -452,8 +452,8 @@ const BookMindCoverImage = {
       });
       if (response.ok) {
         const data = await response.json().catch(() => null);
-        if (data?.book && window.BookMindLibrary?._upsertBookInCache) {
-          BookMindLibrary._upsertBookInCache(data.book);
+        if (data?.book && window.LexoLibrary?._upsertBookInCache) {
+          LexoLibrary._upsertBookInCache(data.book);
         }
         console.info("[CoverDebug] persisted", {
           title: ref.title,
@@ -471,7 +471,7 @@ const BookMindCoverImage = {
     const sourceBooks = [];
 
     (books || []).forEach(book => {
-      BookMindCoverService.registerBook(book);
+      LexoCoverService.registerBook(book);
       const ref = this.bookRef(book);
       if (this.getKnownUrl(book)) return;
       if (!force && !this._shouldAttemptResolve(book)) return;
@@ -532,7 +532,7 @@ const BookMindCoverImage = {
   },
 
   _renderBookCover(book, root = document, options = {}) {
-    BookMindCoverService.registerBook(book);
+    LexoCoverService.registerBook(book);
     const ref = this.bookRef(book);
     const url = this.getKnownUrl(book);
     const key = this.cacheKey(ref);
@@ -557,16 +557,16 @@ const BookMindCoverImage = {
     (books || []).forEach(book => this._renderBookCover(book, root, options));
     const needsResolve = (books || []).filter(book => this._shouldAttemptResolve(book));
     if (needsResolve.length) {
-      BookMindCoverQueue.enqueue(needsResolve, root, options);
+      LexoCoverQueue.enqueue(needsResolve, root, options);
     }
     return Promise.resolve(books);
   },
 
   hydrateWrap(wrap, book, options = {}) {
     if (!wrap) return Promise.resolve(null);
-    BookMindCoverService.registerBook(book);
+    LexoCoverService.registerBook(book);
     wrap.__sourceBook = book;
-    return BookMindCoverService.resolve(book).then(result => {
+    return LexoCoverService.resolve(book).then(result => {
       const ref = this.bookRef(result.book || book);
       if (result.url) {
         this.renderImage(wrap, ref, result.url, { ...options, book: result.book });
@@ -583,7 +583,7 @@ const BookMindCoverImage = {
 
   hydrateLazy(root = document, options = {}) {
     root.querySelectorAll(".book-cover-wrap[data-cover-key]").forEach(wrap => {
-      const book = wrap.__sourceBook || BookMindCoverService.getBook(this.refFromWrap(wrap));
+      const book = wrap.__sourceBook || LexoCoverService.getBook(this.refFromWrap(wrap));
       const ref = this.bookRef(book);
       wrap.__sourceBook = book;
       const url = this.getKnownUrl(book);
@@ -592,7 +592,7 @@ const BookMindCoverImage = {
       } else if (wrap.dataset.coverLoading !== "true" && this._shouldAttemptResolve(book)) {
         this.renderResolving(wrap, ref, options);
         book._resolveStartedAt = Date.now();
-        BookMindCoverService.resolve(book).then(result => {
+        LexoCoverService.resolve(book).then(result => {
           wrap.dataset.coverLoading = "false";
           if (result.url) {
             this.renderImage(wrap, this.bookRef(result.book), result.url, { ...options, book: result.book });
@@ -617,7 +617,7 @@ const BookMindCoverImage = {
   },
 
   seedFromBooks(books) {
-    (books || []).forEach(book => BookMindCoverService.registerBook(book));
+    (books || []).forEach(book => LexoCoverService.registerBook(book));
   },
 };
 
@@ -640,40 +640,40 @@ const BookCover = {
             open_library_key: props.openLibraryKey ?? props.open_library_key ?? null,
           }
         : props;
-    return BookMindCoverImage.html(book, options);
+    return LexoCoverImage.html(book, options);
   },
 
-  resolve: book => BookMindCoverService.resolve(book),
-  resolveMany: (books, root, options) => BookMindCoverService.resolveMany(books, root, options),
-  resolveMissing: (books, root, options) => BookMindCoverImage.resolveMissing(books, root, options),
-  hydrate: (root, options) => BookMindCoverImage.hydrate(root, options),
-  hydrateLazy: (root, options) => BookMindCoverImage.hydrateLazy(root, options),
-  hydrateMany: (books, root, options) => BookMindCoverImage.hydrateMany(books, root, options),
-  hydrateWrap: (wrap, book, options) => BookMindCoverImage.hydrateWrap(wrap, book, options),
-  hydrateEager: (books, root, options) => BookMindCoverImage.resolveMissing(books, root, options),
-  seedFromBooks: books => BookMindCoverImage.seedFromBooks(books),
-  onError: img => BookMindCoverImage.onError(img),
-  escape: value => BookMindCoverImage.escape(value),
+  resolve: book => LexoCoverService.resolve(book),
+  resolveMany: (books, root, options) => LexoCoverService.resolveMany(books, root, options),
+  resolveMissing: (books, root, options) => LexoCoverImage.resolveMissing(books, root, options),
+  hydrate: (root, options) => LexoCoverImage.hydrate(root, options),
+  hydrateLazy: (root, options) => LexoCoverImage.hydrateLazy(root, options),
+  hydrateMany: (books, root, options) => LexoCoverImage.hydrateMany(books, root, options),
+  hydrateWrap: (wrap, book, options) => LexoCoverImage.hydrateWrap(wrap, book, options),
+  hydrateEager: (books, root, options) => LexoCoverImage.resolveMissing(books, root, options),
+  seedFromBooks: books => LexoCoverImage.seedFromBooks(books),
+  onError: img => LexoCoverImage.onError(img),
+  escape: value => LexoCoverImage.escape(value),
   getBookCover: book => getFinalCoverUrl(book),
   normalizeCoverUrl: book => getFinalCoverUrl(book),
   normalizeCoverUrlFromBook,
-  isMissingCoverUrl: url => BookMindCoverImage.isMissingCoverUrl(url),
+  isMissingCoverUrl: url => LexoCoverImage.isMissingCoverUrl(url),
   applyCoverToBook,
 };
 
-window.BookMindCoverImage = BookMindCoverImage;
-window.BookMindCoverService = BookMindCoverService;
+window.LexoCoverImage = LexoCoverImage;
+window.LexoCoverService = LexoCoverService;
 window.BookCover = BookCover;
 
 // Remove legacy browser-side broken URL caches.
 try {
-  localStorage.removeItem("bookmind_cover_broken_v6");
-  localStorage.removeItem("bookmind_cover_broken_v5");
-  localStorage.removeItem("bookmind_cover_cache_v5");
-  localStorage.removeItem("bookmind_cover_broken_migrated_v6");
-  sessionStorage.removeItem("bookmind_cover_broken_v6");
-  sessionStorage.removeItem("bookmind_cover_broken_v5");
-  sessionStorage.removeItem("bookmind_cover_cache_v5");
+  localStorage.removeItem("lexo_cover_broken_v6");
+  localStorage.removeItem("lexo_cover_broken_v5");
+  localStorage.removeItem("lexo_cover_cache_v5");
+  localStorage.removeItem("lexo_cover_broken_migrated_v6");
+  sessionStorage.removeItem("lexo_cover_broken_v6");
+  sessionStorage.removeItem("lexo_cover_broken_v5");
+  sessionStorage.removeItem("lexo_cover_cache_v5");
 } catch {
   /* ignore */
 }

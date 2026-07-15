@@ -134,7 +134,7 @@ def _apply_intelligence_exclusions(parsed: dict, excluded: set[str]) -> None:
 
 def analyze_reader_profile(data: ReaderProfileRequest) -> dict:
     prompt = f"""
-You are BookMindAI, an AI book recommendation assistant.
+You are Lexo, an AI book recommendation assistant.
 
 Analyze this reader based on their quiz answers, books read, and reading level.
 
@@ -235,7 +235,7 @@ def recommend_with_book_data(data: ReaderProfileRequest, *, user_id: str | None 
 
 def reading_companion(question: str, reader_profile: dict | None = None) -> dict:
     prompt = f"""
-You are BookMindAI, an AI librarian.
+You are Lexo, an AI librarian.
 
 User Question:
 {question}
@@ -277,7 +277,7 @@ Do not write anything outside the JSON.
         [
             {
                 "role": "system",
-                "content": "You are BookMindAI, an AI librarian. Always return valid JSON only.",
+                "content": "You are Lexo, an AI librarian. Always return valid JSON only.",
             },
             {
                 "role": "user",
@@ -320,7 +320,7 @@ def generate_reading_paths(
         excluded_books = reader_profile.get("excluded_books", [])
 
     prompt = f"""
-You are BookMindAI, an AI librarian and reading guide.
+You are Lexo, an AI librarian and reading guide.
 
 Create personalized reading paths for this user.
 
@@ -377,7 +377,7 @@ Use this exact structure:
         [
             {
                 "role": "system",
-                "content": "You are BookMindAI. Always return valid JSON only.",
+                "content": "You are Lexo. Always return valid JSON only.",
             },
             {
                 "role": "user",
@@ -500,7 +500,7 @@ def generate_genre_reading_path(
         favorite_genres = reader_profile.get("favorite_genres") or []
 
     prompt = f"""
-You are BookMindAI, an AI librarian creating a personalized genre starter path.
+You are Lexo, an AI librarian creating a personalized genre starter path.
 
 Target genre: {genre}
 
@@ -552,7 +552,7 @@ Respond ONLY in valid JSON:
         try:
             result = ai._openai_chat_completion(
                 [
-                    {"role": "system", "content": "You are BookMindAI. Always return valid JSON only."},
+                    {"role": "system", "content": "You are Lexo. Always return valid JSON only."},
                     {"role": "user", "content": prompt},
                 ],
                 temperature=0.7,
@@ -600,7 +600,7 @@ def generate_reader_intelligence(
         excluded_books = reader_profile.get("excluded_books", [])
 
     prompt = f"""
-You are BookMindAI's central Reader Intelligence engine.
+You are Lexo's central Reader Intelligence engine.
 
 Create one unified intelligence report for this reader.
 
@@ -715,7 +715,7 @@ Use this exact structure:
         [
             {
                 "role": "system",
-                "content": "You are BookMindAI's central intelligence engine. Always return valid JSON only.",
+                "content": "You are Lexo's central intelligence engine. Always return valid JSON only.",
             },
             {
                 "role": "user",
@@ -766,7 +766,7 @@ def generate_path_reflection(
     ]
 
     prompt = f"""
-You are BookMindAI, a warm and insightful reading companion.
+You are Lexo, a warm and insightful reading companion.
 
 The user just completed the reading path "{path_name}".
 
@@ -802,7 +802,7 @@ Respond ONLY in valid JSON:
         [
             {
                 "role": "system",
-                "content": "You are BookMindAI. Always return valid JSON only. Be personal, never generic.",
+                "content": "You are Lexo. Always return valid JSON only. Be personal, never generic.",
             },
             {"role": "user", "content": prompt},
         ],

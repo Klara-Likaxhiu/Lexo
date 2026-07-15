@@ -1,23 +1,23 @@
 /** Sync user settings and reader profile with Supabase via API. */
-const BookMindUserData = {
+const LexoUserData = {
   _hydratePromise: null,
   _hydratedAt: 0,
   _hydrateTtlMs: 5 * 60 * 1000,
 
   async loadSettings() {
-    if (!window.BookMindAuth?.isLoggedIn()) return null;
+    if (!window.LexoAuth?.isLoggedIn()) return null;
 
     let local = {};
     try {
-      local = JSON.parse(localStorage.getItem("bookmind_settings") || "{}");
+      local = JSON.parse(localStorage.getItem("lexo_settings") || "{}");
     } catch {
       local = {};
     }
 
-    const localTheme = localStorage.getItem("bookmind_theme");
-    const localSize = localStorage.getItem("bookmind_reading_size");
+    const localTheme = localStorage.getItem("lexo_theme");
+    const localSize = localStorage.getItem("lexo_reading_size");
 
-    const data = await BookMindAPI.get("/api/user/settings");
+    const data = await LexoAPI.get("/api/user/settings");
     const server = data.settings || {};
     const merged = {
       ...local,
@@ -34,19 +34,19 @@ const BookMindUserData = {
     };
 
     if (merged.appearance?.theme) {
-      localStorage.setItem("bookmind_theme", merged.appearance.theme === "dark" ? "dark" : "light");
+      localStorage.setItem("lexo_theme", merged.appearance.theme === "dark" ? "dark" : "light");
     }
     if (merged.appearance?.readingFontSize) {
-      localStorage.setItem("bookmind_reading_size", merged.appearance.readingFontSize);
+      localStorage.setItem("lexo_reading_size", merged.appearance.readingFontSize);
     }
 
-    localStorage.setItem("bookmind_settings", JSON.stringify(merged));
+    localStorage.setItem("lexo_settings", JSON.stringify(merged));
     return merged;
   },
 
   async saveSettings(settings) {
-    const localTheme = localStorage.getItem("bookmind_theme");
-    const localSize = localStorage.getItem("bookmind_reading_size");
+    const localTheme = localStorage.getItem("lexo_theme");
+    const localSize = localStorage.getItem("lexo_reading_size");
     const merged = {
       ...settings,
       appearance: {
@@ -56,21 +56,21 @@ const BookMindUserData = {
       },
     };
 
-    if (!window.BookMindAuth?.isLoggedIn()) {
-      localStorage.setItem("bookmind_settings", JSON.stringify(merged));
+    if (!window.LexoAuth?.isLoggedIn()) {
+      localStorage.setItem("lexo_settings", JSON.stringify(merged));
       return merged;
     }
-    const data = await BookMindAPI.put("/api/user/settings", { settings: merged });
-    localStorage.setItem("bookmind_settings", JSON.stringify(data.settings || merged));
+    const data = await LexoAPI.put("/api/user/settings", { settings: merged });
+    localStorage.setItem("lexo_settings", JSON.stringify(data.settings || merged));
     return data.settings || merged;
   },
 
   async loadReaderProfile() {
-    if (!window.BookMindAuth?.isLoggedIn()) {
+    if (!window.LexoAuth?.isLoggedIn()) {
       const raw = localStorage.getItem("readerProfile");
       return raw ? JSON.parse(raw) : null;
     }
-    const data = await BookMindAPI.get("/api/user/reader-profile");
+    const data = await LexoAPI.get("/api/user/reader-profile");
     if (data.profile) {
       const row = data.profile;
       let profileData = row.profile_data || {};
@@ -106,7 +106,7 @@ const BookMindUserData = {
     localStorage.setItem("reader_quiz_step", String(currentStep));
     localStorage.setItem("reader_profile_completion", String(completion));
 
-    if (!window.BookMindAuth?.isLoggedIn()) return { answers, currentStep, completion };
+    if (!window.LexoAuth?.isLoggedIn()) return { answers, currentStep, completion };
 
     const existing = JSON.parse(localStorage.getItem("readerProfile") || "null") || {};
     const profileData = {
@@ -119,7 +119,7 @@ const BookMindUserData = {
       },
     };
 
-    await BookMindAPI.put("/api/user/reader-profile", {
+    await LexoAPI.put("/api/user/reader-profile", {
       quiz_answers: typeof answers === "object"
         ? Object.entries(answers)
             .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(", ") : value}`)
@@ -137,8 +137,8 @@ const BookMindUserData = {
 
   async saveReaderProfile(profile) {
     localStorage.setItem("readerProfile", JSON.stringify(profile));
-    if (!window.BookMindAuth?.isLoggedIn()) return profile;
-    const data = await BookMindAPI.put("/api/user/reader-profile", {
+    if (!window.LexoAuth?.isLoggedIn()) return profile;
+    const data = await LexoAPI.put("/api/user/reader-profile", {
       quiz_answers: profile.quiz_answers || profile.quizAnswers || "",
       books_read: profile.books_read || profile.booksRead || "",
       reading_level: profile.reading_level || profile.readingLevel || "",
@@ -149,7 +149,7 @@ const BookMindUserData = {
   },
 
   async hydrate({ force = false } = {}) {
-    if (!window.BookMindAuth?.isLoggedIn()) return;
+    if (!window.LexoAuth?.isLoggedIn()) return;
 
     const freshEnough = !force && this._hydratedAt && Date.now() - this._hydratedAt < this._hydrateTtlMs;
     if (freshEnough) return;
@@ -171,4 +171,4 @@ const BookMindUserData = {
   },
 };
 
-window.BookMindUserData = BookMindUserData;
+window.LexoUserData = LexoUserData;

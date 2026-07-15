@@ -134,7 +134,7 @@
 
   <!-- Genre cards: uniform width/height, even spacing, softer shadows, aligned pills -->
   <g font-family="Inter, system-ui, sans-serif" font-size="16" font-weight="700" letter-spacing="2.6" fill="#ffffff">
-    <!-- BOOKMIND -->
+    <!-- LEXO -->
     <g filter="url(#barShadow)">
       <rect x="142" y="150" width="356" height="56" rx="18" fill="#28614e"/>
       <rect x="474" y="160" width="26" height="36" rx="12" fill="#ffffff"/>
@@ -143,7 +143,7 @@
         <path d="M12 4c-2.2-1.4-5.5-1.6-8 0v14c2.5-1.6 5.8-1.4 8 0"/>
         <path d="M12 4c2.2-1.4 5.5-1.6 8 0v14c-2.5-1.6-5.8-1.4-8 0"/>
       </g>
-      <text x="222" y="185">BOOKMIND</text>
+      <text x="222" y="185">LEXO</text>
     </g>
 
     <!-- MYSTERY -->

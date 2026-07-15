@@ -1,5 +1,5 @@
 /** My Library — Supabase-backed via /api/library with stale-while-revalidate cache. */
-const BookMindLibrary = {
+const LexoLibrary = {
   _cache: null,
   _books: [],
   _loaded: false,
@@ -7,8 +7,8 @@ const BookMindLibrary = {
   _bgRefresh: null,
   _backfillStarted: false,
   _lastError: null,
-  _persistKey: "bookmind_library_cache_v3",
-  _persistAtKey: "bookmind_library_cache_at",
+  _persistKey: "lexo_library_cache_v3",
+  _persistAtKey: "lexo_library_cache_at",
   _persistTtlMs: 5 * 60 * 1000,
 
   SHELVES: ["read", "reading", "want", "not_interested"],
@@ -47,13 +47,13 @@ const BookMindLibrary = {
   },
 
   _authHeaders() {
-    if (!window.BookMindAuth) return {};
-    return window.BookMindAuth.getAuthHeaders();
+    if (!window.LexoAuth) return {};
+    return window.LexoAuth.getAuthHeaders();
   },
 
   apiUrl(path) {
-    if (window.BookMindAuth?.apiUrl) {
-      return window.BookMindAuth.apiUrl(path);
+    if (window.LexoAuth?.apiUrl) {
+      return window.LexoAuth.apiUrl(path);
     }
     const normalized = path.startsWith("/") ? path : `/${path}`;
     return `${window.location.origin}${normalized}`;
@@ -86,8 +86,8 @@ const BookMindLibrary = {
   },
 
   _extractError(data, rawBody, status) {
-    if (window.BookMindAuth?.extractErrorMessage) {
-      return window.BookMindAuth.extractErrorMessage(data, rawBody, status);
+    if (window.LexoAuth?.extractErrorMessage) {
+      return window.LexoAuth.extractErrorMessage(data, rawBody, status);
     }
     if (typeof data?.detail === "string") return data.detail;
     if (Array.isArray(data?.detail)) {
@@ -98,24 +98,24 @@ const BookMindLibrary = {
   },
 
   async _hasAuth() {
-    if (!window.BookMindAPI?.ensureAuth) {
+    if (!window.LexoAPI?.ensureAuth) {
       return false;
     }
-    const token = await BookMindAPI.ensureAuth({ redirect: false });
+    const token = await LexoAPI.ensureAuth({ redirect: false });
     return Boolean(token);
   },
 
   async _request(path, { method = "GET", body = null } = {}) {
-    if (!window.BookMindAPI?.request) {
-      throw new Error("BookMindAPI is not loaded. Include js/api.js before js/library.js.");
+    if (!window.LexoAPI?.request) {
+      throw new Error("LexoAPI is not loaded. Include js/api.js before js/library.js.");
     }
 
-    const token = await BookMindAPI.ensureAuth({ redirect: true });
+    const token = await LexoAPI.ensureAuth({ redirect: true });
     if (!token) {
       throw new Error("Sign in to save books to your library.");
     }
 
-    const data = await BookMindAPI.request(path, { method, body, auth: true, redirect: true });
+    const data = await LexoAPI.request(path, { method, body, auth: true, redirect: true });
     if (data === null) {
       throw new Error("Redirecting to login.");
     }
@@ -123,8 +123,8 @@ const BookMindLibrary = {
   },
 
   async ensureLoaded(force = false) {
-    if (window.BookMindAuth?.whenReady) {
-      await window.BookMindAuth.whenReady();
+    if (window.LexoAuth?.whenReady) {
+      await window.LexoAuth.whenReady();
     }
 
     if (!(await this._hasAuth())) {
@@ -460,7 +460,7 @@ const BookMindLibrary = {
       favorite: Boolean(meta.favorite ?? book.favorite),
     };
 
-    console.info("[BookMindLibrary] save payload", {
+    console.info("[LexoLibrary] save payload", {
       title: payload.title,
       author: payload.author,
       cover_url: payload.cover_url,
@@ -562,7 +562,7 @@ const BookMindLibrary = {
   },
 
   _emitChange(detail) {
-    document.dispatchEvent(new CustomEvent("bookmind:library-changed", { detail }));
+    document.dispatchEvent(new CustomEvent("lexo:library-changed", { detail }));
   },
 
   _notify(message, type = "success") {
@@ -591,7 +591,7 @@ const BookMindLibrary = {
   /* ------------------------------------------- reading challenges (local) */
 
   getReadingData() {
-    const data = JSON.parse(localStorage.getItem("bookmind_reading_data")) || {};
+    const data = JSON.parse(localStorage.getItem("lexo_reading_data")) || {};
     return {
       finishes: data.finishes || {},
       activity: Array.isArray(data.activity) ? data.activity : [],
@@ -603,7 +603,7 @@ const BookMindLibrary = {
   },
 
   saveReadingData(data) {
-    localStorage.setItem("bookmind_reading_data", JSON.stringify(data));
+    localStorage.setItem("lexo_reading_data", JSON.stringify(data));
   },
 
   todayKey() {

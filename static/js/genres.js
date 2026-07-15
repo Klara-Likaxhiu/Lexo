@@ -1,5 +1,5 @@
 /** Shared genre list for quiz, settings, and recommendations. */
-window.BookMindGenres = {
+window.LexoGenres = {
   ALL: [
     "Fantasy",
     "Romance",

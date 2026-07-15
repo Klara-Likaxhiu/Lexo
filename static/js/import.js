@@ -36,7 +36,7 @@ const BookImport = {
     };
 
     this.bindEvents();
-    document.addEventListener("bookmind:auth-ready", () => {
+    document.addEventListener("lexo:auth-ready", () => {
       if (!this.els.modal?.hidden) {
         this.syncAuthState();
       }
@@ -79,17 +79,17 @@ const BookImport = {
     const btn = this.els.addBtn;
     if (!btn) return;
 
-    if (!window.BookMindAPI?.ensureAuth) {
+    if (!window.LexoAPI?.ensureAuth) {
       btn.disabled = true;
       this.setMessage("Sign in to add books to your library.", true);
       return;
     }
 
-    if (window.BookMindAuth?.whenReady) {
-      await window.BookMindAuth.whenReady();
+    if (window.LexoAuth?.whenReady) {
+      await window.LexoAuth.whenReady();
     }
 
-    const token = await BookMindAPI.ensureAuth({ redirect: false });
+    const token = await LexoAPI.ensureAuth({ redirect: false });
     if (!token) {
       btn.disabled = true;
       this.setMessage("Sign in to add books to your library.", true);
@@ -275,7 +275,7 @@ const BookImport = {
       return;
     }
 
-    if (!window.BookMindAPI?.ensureAuth) {
+    if (!window.LexoAPI?.ensureAuth) {
       this.setMessage("Sign in to add books to your library.", true);
       return;
     }
@@ -284,34 +284,34 @@ const BookImport = {
     this.setMessage("Saving to your library…");
 
     try {
-      if (window.BookMindAuth?.whenReady) {
-        await window.BookMindAuth.whenReady();
+      if (window.LexoAuth?.whenReady) {
+        await window.LexoAuth.whenReady();
       }
 
-      const token = await BookMindAPI.ensureAuth({ redirect: true });
+      const token = await LexoAPI.ensureAuth({ redirect: true });
       if (!token) {
         this.setMessage("Sign in to add books to your library.", true);
         return;
       }
 
-      await BookMindLibrary.ensureLoaded();
-      const existingShelf = BookMindLibrary.findShelf(book);
+      await LexoLibrary.ensureLoaded();
+      const existingShelf = LexoLibrary.findShelf(book);
 
-      await BookMindLibrary.addBookWithMeta(book, this.els.shelf.value, {
+      await LexoLibrary.addBookWithMeta(book, this.els.shelf.value, {
         source: this.els.source.value || undefined,
         totalPages: this.els.totalPages.value || undefined,
       });
 
-      const label = BookMindLibrary.getShelfLabel(this.els.shelf.value);
+      const label = LexoLibrary.getShelfLabel(this.els.shelf.value);
       const verb = existingShelf ? "moved to" : "added to";
       const flash = `"${book.title}" ${verb} ${label}.`;
 
-      sessionStorage.setItem("bookmind_import_flash", flash);
+      sessionStorage.setItem("lexo_import_flash", flash);
       this.close();
 
-      if (window.BookMindLibraryPage) {
-        window.BookMindLibraryPage.showToast(flash);
-        window.BookMindLibraryPage.refresh();
+      if (window.LexoLibraryPage) {
+        window.LexoLibraryPage.showToast(flash);
+        window.LexoLibraryPage.refresh();
       } else {
         location.reload();
       }

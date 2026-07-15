@@ -1,5 +1,5 @@
 /** Shared Reader DNA completion detection for Home and quiz pages. */
-window.BookMindReaderDna = {
+window.LexoReaderDna = {
   REQUIRED_ANSWER_KEYS: [
     "favoriteGenres",
     "preferredMood",

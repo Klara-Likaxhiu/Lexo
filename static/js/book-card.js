@@ -1,4 +1,4 @@
-const BookMindIcons = {
+const LexoIcons = {
   book: '<svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>',
   heart: '<svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>',
   check: '<svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335"/><path d="m9 11 3 3L22 4"/></svg>',
@@ -7,7 +7,7 @@ const BookMindIcons = {
   cart: '<svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>',
 };
 
-const BookMindBookCard = {
+const LexoBookCard = {
   render(book, options = {}) {
     const { showProgress = false } = options;
     const title = book.title || "Untitled Book";
@@ -41,12 +41,12 @@ const BookMindBookCard = {
           ${reason ? `<p class="reason">${this.escape(reason)}</p>` : ""}
 
           <div class="book-actions">
-            <button class="mini-btn save-btn" data-status="reading">${BookMindIcons.book} Reading</button>
-            <button class="mini-btn save-btn" data-status="want">${BookMindIcons.heart} Want</button>
-            <button class="mini-btn save-btn" data-status="read">${BookMindIcons.check} Finished</button>
-            <button class="mini-btn save-btn" data-status="not_interested">${BookMindIcons.ban} Not Interested</button>
-            <button class="mini-btn remove-btn">${BookMindIcons.trash} Remove</button>
-            <button class="mini-btn buy-btn">${BookMindIcons.cart} Buy</button>
+            <button class="mini-btn save-btn" data-status="reading">${LexoIcons.book} Reading</button>
+            <button class="mini-btn save-btn" data-status="want">${LexoIcons.heart} Want</button>
+            <button class="mini-btn save-btn" data-status="read">${LexoIcons.check} Finished</button>
+            <button class="mini-btn save-btn" data-status="not_interested">${LexoIcons.ban} Not Interested</button>
+            <button class="mini-btn remove-btn">${LexoIcons.trash} Remove</button>
+            <button class="mini-btn buy-btn">${LexoIcons.cart} Buy</button>
           </div>
         </div>
       </div>
@@ -54,7 +54,7 @@ const BookMindBookCard = {
   },
 
   renderProgressBlock(book) {
-    const { current, total, percent } = BookMindLibrary.getProgressInfo(book);
+    const { current, total, percent } = LexoLibrary.getProgressInfo(book);
     const pageLabel =
       total > 0 ? `Page ${current} of ${total}` : percent > 0 ? `${percent}% complete` : "Not started";
 
@@ -91,11 +91,11 @@ const BookMindBookCard = {
         event.stopPropagation();
         button.disabled = true;
         try {
-          const saved = await BookMindLibrary.addBook(book, this.dataset.status, { silent: true });
-          const label = BookMindLibrary.getShelfLabel(this.dataset.status);
-          const entry = BookMindLibrary.findBook(saved || book);
-          const shelfLabel = entry ? BookMindLibrary.getShelfLabel(entry.status) : label;
-          window.BookMindLibraryPage?.showToast?.(
+          const saved = await LexoLibrary.addBook(book, this.dataset.status, { silent: true });
+          const label = LexoLibrary.getShelfLabel(this.dataset.status);
+          const entry = LexoLibrary.findBook(saved || book);
+          const shelfLabel = entry ? LexoLibrary.getShelfLabel(entry.status) : label;
+          window.LexoLibraryPage?.showToast?.(
             `"${book.title}" moved to ${shelfLabel}.`
           );
           if (onChanged) {
@@ -115,8 +115,8 @@ const BookMindBookCard = {
       event.stopPropagation();
       this.disabled = true;
       try {
-        await BookMindLibrary.removeBook(book, { silent: true });
-        window.BookMindLibraryPage?.showToast?.(
+        await LexoLibrary.removeBook(book, { silent: true });
+        window.LexoLibraryPage?.showToast?.(
           `"${book.title}" removed from your library.`
         );
         if (onChanged) onChanged();
@@ -166,7 +166,7 @@ const BookMindBookCard = {
         }
         return;
       }
-      const percent = BookMindLibrary.computePercent(current, total) ?? 0;
+      const percent = LexoLibrary.computePercent(current, total) ?? 0;
       if (fillEl) fillEl.style.width = `${percent}%`;
       if (pctEl) pctEl.textContent = `${percent}%`;
       if (captionEl) captionEl.textContent = `Page ${current} of ${total}`;
@@ -204,7 +204,7 @@ const BookMindBookCard = {
       if (errorEl) errorEl.hidden = true;
 
       try {
-        const result = await BookMindLibrary.updateReadingProgress(
+        const result = await LexoLibrary.updateReadingProgress(
           book.library_id,
           current,
           total,
@@ -218,7 +218,7 @@ const BookMindBookCard = {
           errorEl.hidden = false;
         }
         options.onError?.(error.message);
-        BookMindLibrary._notify?.(error.message || "Could not save progress.", "error");
+        LexoLibrary._notify?.(error.message || "Could not save progress.", "error");
       } finally {
         saveBtn.disabled = false;
       }

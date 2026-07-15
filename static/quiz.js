@@ -1,5 +1,5 @@
 const TOTAL_STEPS = 12;
-const allGenres = window.BookMindGenres?.ALL || [
+const allGenres = window.LexoGenres?.ALL || [
   "Fantasy", "Romance", "Mystery", "Thriller", "Horror", "Sci-Fi",
   "Historical Fiction", "Literary Fiction", "Contemporary Fiction", "Classics",
   "Non-fiction", "Memoir", "Biography", "Self-help", "Poetry", "Young Adult",
@@ -393,9 +393,9 @@ async function saveProgress(stepIndex) {
   localStorage.setItem("reader_profile_completion", String(completion));
   syncLegacyStorageKeys(answers, completion);
 
-  if (window.BookMindUserData?.saveQuizProgress) {
+  if (window.LexoUserData?.saveQuizProgress) {
     try {
-      await BookMindUserData.saveQuizProgress({
+      await LexoUserData.saveQuizProgress({
         answers,
         currentStep: stepIndex,
         completion
@@ -668,8 +668,8 @@ async function finishQuiz() {
       };
       localStorage.setItem("readerProfile", JSON.stringify(profile));
 
-      if (window.BookMindUserData?.saveReaderProfile) {
-        await BookMindUserData.saveReaderProfile({
+      if (window.LexoUserData?.saveReaderProfile) {
+        await LexoUserData.saveReaderProfile({
           quiz_answers: formatQuizAnswersForAI(answers).join("\n"),
           books_read: profile.books_read || "",
           reading_level: answers.emotionalIntensity || "",
@@ -689,7 +689,7 @@ function showLoadingScreen() {
     <div class="dna-profile-card dna-profile-loading">
       <div class="dna-profile-spinner" aria-hidden="true"></div>
       <h1>Building your Reader DNA…</h1>
-      <p>BookMindAI is mapping your unique reading taste.</p>
+      <p>Lexo is mapping your unique reading taste.</p>
     </div>
   `;
 }
@@ -780,9 +780,9 @@ async function retakeQuiz() {
   answers = createEmptyAnswers();
   currentStep = 0;
 
-  if (window.BookMindUserData?.saveQuizProgress) {
+  if (window.LexoUserData?.saveQuizProgress) {
     try {
-      await BookMindUserData.saveQuizProgress({
+      await LexoUserData.saveQuizProgress({
         answers,
         currentStep: 0,
         completion: 0
@@ -796,13 +796,13 @@ async function retakeQuiz() {
 }
 
 async function initQuiz() {
-  if (window.BookMindAuth?.whenReady) {
-    await window.BookMindAuth.whenReady();
+  if (window.LexoAuth?.whenReady) {
+    await window.LexoAuth.whenReady();
   }
 
-  if (window.BookMindUserData?.loadQuizProgress) {
+  if (window.LexoUserData?.loadQuizProgress) {
     try {
-      await BookMindUserData.loadQuizProgress();
+      await LexoUserData.loadQuizProgress();
     } catch {
       /* offline */
     }

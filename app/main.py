@@ -1,4 +1,4 @@
-"""BookMindAI — FastAPI application entry point."""
+"""Lexo — FastAPI application entry point."""
 
 from __future__ import annotations
 
@@ -67,7 +67,7 @@ FRONTEND_PAGES: dict[str, str] = {
 }
 
 app = FastAPI(
-    title="BookMindAI",
+    title="Lexo",
     description="AI-powered reading companion with personalized discovery and library tracking.",
     version=__version__,
 )

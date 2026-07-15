@@ -1,8 +1,8 @@
-# 📖 BookMindAI
+# 📖 Lexo
 
 > Read smarter. Understand deeper.
 
-BookMindAI is an AI-powered reading companion. Paste an excerpt or upload a
+Lexo is an AI-powered reading companion. Paste an excerpt or upload a
 document, and it instantly produces a **summary**, **key takeaways**, and a
 **chat** you can ask anything about the text.
 
@@ -17,7 +17,7 @@ full LLM quality when you provide an **OpenAI API key**.
 - **Smart summaries** — concise, faithful summaries of any passage.
 - **Key takeaways** — the most important points pulled out as bullets.
 - **Keyword extraction** — quickly see what a text is about.
-- **Ask BookMind** — a grounded chat that answers questions using your text.
+- **Ask Lexo** — a grounded chat that answers questions using your text.
 - **File upload** — supports `.txt`, `.md`, and `.pdf`.
 - **Dual engine** — OpenAI when a key is set, smart offline fallback otherwise.
 - **Modern UI** — responsive, animated, dark-mode interface. No build step.
@@ -51,7 +51,7 @@ Then open <http://127.0.0.1:8000>.
 
 ## 🔑 Enabling full AI (optional)
 
-By default BookMindAI runs **offline** using a classic extractive summarizer —
+By default Lexo runs **offline** using a classic extractive summarizer —
 no key required. To unlock LLM-quality summaries and chat, add your key to
 `.env`:
 
@@ -71,7 +71,7 @@ via `OPENAI_BASE_URL`.
 ## 🧱 Project structure
 
 ```
-BookMindAI/
+Lexo/
 ├── app/
 │   ├── __init__.py      # package metadata
 │   ├── main.py          # FastAPI app + routes + static hosting
@@ -110,7 +110,7 @@ curl -s http://127.0.0.1:8000/api/analyze \
 
 ## 🛠️ How the offline engine works
 
-When no API key is present, BookMindAI uses term-frequency sentence scoring
+When no API key is present, Lexo uses term-frequency sentence scoring
 (a lightweight TextRank-style approach) to select the most important
 sentences for summaries and takeaways, and keyword overlap retrieval to
 answer chat questions from your text. It's fast, private, and requires no

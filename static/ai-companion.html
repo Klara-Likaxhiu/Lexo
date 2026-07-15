@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>AI Companion - BookMindAI</title>
+  <title>AI Companion - Lexo</title>
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="css/editorial.css">
   <link rel="stylesheet" href="css/design-system.css">
@@ -32,7 +32,7 @@
         <div class="chat-shell">
       <div class="chat-header">
         <p class="eyebrow">AI Reading Companion</p>
-        <h1>BookMindAI Librarian</h1>
+        <h1>Lexo Librarian</h1>
         <p id="modeText">Ask for books based on your mood, goal, genre, time, or Reader DNA.</p>
       </div>
 
@@ -67,8 +67,8 @@
   const chatMessages = document.getElementById("chatMessages");
   const modeText = document.getElementById("modeText");
 
-  const todayMood = localStorage.getItem("bookmind_today_mood");
-  const todayGoal = localStorage.getItem("bookmind_today_goal");
+  const todayMood = localStorage.getItem("lexo_today_mood");
+  const todayGoal = localStorage.getItem("lexo_today_goal");
 
   if (todayMood || todayGoal) {
     modeText.textContent = `Today's mode: ${todayMood || "any mood"} + ${todayGoal || "any goal"}.`;
@@ -95,7 +95,7 @@
 
   async function saveBook(book, status) {
     try {
-      await BookMindLibrary.addBook(book, status);
+      await LexoLibrary.addBook(book, status);
     } catch (error) {
       alert(error.message || "Could not save book.");
     }
@@ -137,7 +137,7 @@
     div.className = "message ai-message loading-message";
 
     div.innerHTML = `
-      <strong>BookMindAI</strong>
+      <strong>Lexo</strong>
       <p>Thinking... checking your Reader DNA, today’s mood, and reading goal.</p>
     `;
 
@@ -150,12 +150,12 @@
   function addAIRecommendationMessage(result, loadingDiv) {
     // Safety net: never show books already finished, not interested, or in My Library.
     const recs = (result.recommendations || []).filter(
-      book => !BookMindLibrary.findShelf(book)
+      book => !LexoLibrary.findShelf(book)
     );
     const reasoning = result.reasoning || [];
 
     loadingDiv.innerHTML = `
-      <strong>BookMindAI</strong>
+      <strong>Lexo</strong>
 
       <div class="ai-summary">
         <p>${result.message || "I found some books for you."}</p>
@@ -260,11 +260,11 @@
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...(window.BookMindAuth ? window.BookMindAuth.getAuthHeaders() : {})
+        ...(window.LexoAuth ? window.LexoAuth.getAuthHeaders() : {})
       },
       body: JSON.stringify({
         question: question,
-        reader_profile: await BookMindAPI.getReaderContext()
+        reader_profile: await LexoAPI.getReaderContext()
       })
     });
 
@@ -274,11 +274,11 @@
   });
 
   void (async () => {
-    if (window.BookMindAuth?.whenReady) {
-      await window.BookMindAuth.whenReady();
+    if (window.LexoAuth?.whenReady) {
+      await window.LexoAuth.whenReady();
     }
-    if (window.BookMindAuth?.isLoggedIn()) {
-      BookMindLibrary.ensureLoaded().catch(() => {});
+    if (window.LexoAuth?.isLoggedIn()) {
+      LexoLibrary.ensureLoaded().catch(() => {});
     }
   })();
 </script>

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# BookMindAI launcher: sets up a virtual env, installs deps, and runs the server.
+# Lexo launcher: sets up a virtual env, installs deps, and runs the server.
 set -euo pipefail
 
 cd "$(dirname "$0")"
@@ -27,5 +27,5 @@ fi
 HOST="${HOST:-127.0.0.1}"
 PORT="${PORT:-8000}"
 
-echo "→ BookMindAI running at http://${HOST}:${PORT}"
+echo "→ Lexo running at http://${HOST}:${PORT}"
 exec uvicorn app.main:app --host "$HOST" --port "$PORT" --reload

@@ -1,10 +1,10 @@
-/** BookMindAI Settings page controller. */
-const BookMindSettings = {
-  STORAGE_KEY: "bookmind_settings",
-  THEME_KEY: "bookmind_theme",
-  READING_SIZE_KEY: "bookmind_reading_size",
+/** Lexo Settings page controller. */
+const LexoSettings = {
+  STORAGE_KEY: "lexo_settings",
+  THEME_KEY: "lexo_theme",
+  READING_SIZE_KEY: "lexo_reading_size",
   get GENRES() {
-    return window.BookMindGenres?.ALL || [
+    return window.LexoGenres?.ALL || [
       "Fantasy", "Romance", "Mystery", "Thriller", "Horror", "Sci-Fi",
       "Historical Fiction", "Literary Fiction", "Contemporary Fiction", "Classics",
       "Non-fiction", "Memoir", "Biography", "Self-help", "Poetry", "Young Adult"
@@ -122,20 +122,20 @@ const BookMindSettings = {
   },
 
   async init() {
-    if (window.BookMindAuth) {
-      await window.BookMindAuth.whenReady();
+    if (window.LexoAuth) {
+      await window.LexoAuth.whenReady();
     }
 
-    const token = window.BookMindAPI
-      ? await BookMindAPI.ensureAuth({ redirect: true })
+    const token = window.LexoAPI
+      ? await LexoAPI.ensureAuth({ redirect: true })
       : null;
     if (!token) return;
 
     this.settings = this.load();
     this.applyAppearance(this.settings);
-    this.authUser = window.BookMindAuth ? window.BookMindAuth.getCurrentUser() : null;
+    this.authUser = window.LexoAuth ? window.LexoAuth.getCurrentUser() : null;
     this.readerProfile = JSON.parse(localStorage.getItem("readerProfile") || "null");
-    this.userProfile = JSON.parse(localStorage.getItem("bookmind_user_profile") || "{}");
+    this.userProfile = JSON.parse(localStorage.getItem("lexo_user_profile") || "{}");
 
     await this.loadAccount();
     this.renderGenres();
@@ -156,12 +156,12 @@ const BookMindSettings = {
 
     let user = null;
     try {
-      if (!window.BookMindAPI?.getMe) {
-        throw new Error("BookMindAPI is not loaded.");
+      if (!window.LexoAPI?.getMe) {
+        throw new Error("LexoAPI is not loaded.");
       }
-      user = await BookMindAPI.getMe({ redirect: true });
+      user = await LexoAPI.getMe({ redirect: true });
     } catch (error) {
-      user = window.BookMindAuth?.getCurrentUser() || null;
+      user = window.LexoAuth?.getCurrentUser() || null;
     }
 
     if (usernameEl) usernameEl.textContent = user?.username || "—";
@@ -207,7 +207,7 @@ const BookMindSettings = {
       const reader = new FileReader();
       reader.onload = event => {
         this.userProfile.profilePic = event.target.result;
-        localStorage.setItem("bookmind_user_profile", JSON.stringify(this.userProfile));
+        localStorage.setItem("lexo_user_profile", JSON.stringify(this.userProfile));
         document.getElementById("settingsAvatar").innerHTML =
           `<img src="${event.target.result}" alt="Profile picture">`;
         this.showToast("Profile picture updated.");
@@ -216,7 +216,7 @@ const BookMindSettings = {
     });
 
     document.getElementById("settingsLogoutBtn")?.addEventListener("click", () => {
-      if (window.BookMindAuth) window.BookMindAuth.logout();
+      if (window.LexoAuth) window.LexoAuth.logout();
     });
 
     document.getElementById("settingsChangePasswordBtn")?.addEventListener("click", () => {
@@ -340,9 +340,9 @@ const BookMindSettings = {
     document.getElementById("settingsExportBtn")?.addEventListener("click", () => {
       const payload = {
         exported_at: new Date().toISOString(),
-        library: JSON.parse(localStorage.getItem("bookmind_library") || "{}"),
+        library: JSON.parse(localStorage.getItem("lexo_library") || "{}"),
         reader_profile: JSON.parse(localStorage.getItem("readerProfile") || "null"),
-        user_profile: JSON.parse(localStorage.getItem("bookmind_user_profile") || "{}"),
+        user_profile: JSON.parse(localStorage.getItem("lexo_user_profile") || "{}"),
         reading_progress: JSON.parse(localStorage.getItem("reading_progress") || "{}"),
         reviews: JSON.parse(localStorage.getItem("book_reviews") || "[]"),
         settings: this.settings
@@ -352,7 +352,7 @@ const BookMindSettings = {
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `bookmind-reading-data-${Date.now()}.json`;
+      link.download = `lexo-reading-data-${Date.now()}.json`;
       link.click();
       URL.revokeObjectURL(url);
       this.showToast("Reading data exported.");
@@ -411,10 +411,10 @@ const BookMindSettings = {
       }
 
       try {
-        await window.BookMindAuth.changePassword(current, next);
+        await window.LexoAuth.changePassword(current, next);
         this.closeModal("passwordModal");
         this.showToast("Password updated. Signing you out…");
-        setTimeout(() => window.BookMindAuth.logout(), 1200);
+        setTimeout(() => window.LexoAuth.logout(), 1200);
       } catch (error) {
         this.showToast(error.message || "Could not change password.", "error");
       }
@@ -431,8 +431,8 @@ const BookMindSettings = {
       }
 
       try {
-        await window.BookMindAuth.deleteAccount(password, confirmation);
-        window.BookMindAuth.clearSession();
+        await window.LexoAuth.deleteAccount(password, confirmation);
+        window.LexoAuth.clearSession();
         window.location.href = "/login.html";
       } catch (error) {
         this.showToast(error.message || "Could not delete account.", "error");
@@ -453,4 +453,4 @@ const BookMindSettings = {
   }
 };
 
-document.addEventListener("DOMContentLoaded", () => BookMindSettings.init());
+document.addEventListener("DOMContentLoaded", () => LexoSettings.init());

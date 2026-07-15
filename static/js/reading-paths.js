@@ -12,9 +12,9 @@ const ratedPathsSection = document.getElementById("ratedPathsSection");
 const ratedPathsGrid = document.getElementById("ratedPathsGrid");
 const pathCompletionModal = document.getElementById("pathCompletionModal");
 
-const STORE_KEY = "bookmind_reading_paths";
-const Completion = () => window.BookMindPathCompletion;
-const Passport = () => window.BookMindPathPassport;
+const STORE_KEY = "lexo_reading_paths";
+const Completion = () => window.LexoPathCompletion;
+const Passport = () => window.LexoPathPassport;
 let focusPathId = new URLSearchParams(window.location.search).get("path");
 let saveTimer = null;
 let pendingReviewPathId = null;
@@ -81,11 +81,11 @@ function saveLocalPaths(result) {
 }
 
 async function loadPathsFromServer() {
-  if (!window.BookMindAPI?.get) return null;
-  const token = await BookMindAPI.ensureAuth({ redirect: false });
+  if (!window.LexoAPI?.get) return null;
+  const token = await LexoAPI.ensureAuth({ redirect: false });
   if (!token) return loadLocalPaths();
   try {
-    const data = await BookMindAPI.get("/api/reading-paths");
+    const data = await LexoAPI.get("/api/reading-paths");
     if (Array.isArray(data?.paths) && data.paths.length) return normalize(data);
     const local = loadLocalPaths();
     if (local?.paths?.length) {
@@ -101,12 +101,12 @@ async function loadPathsFromServer() {
 
 async function persistPaths(result, { immediate = false } = {}) {
   saveLocalPaths(result);
-  if (!window.BookMindAPI?.put) return;
+  if (!window.LexoAPI?.put) return;
   const run = async () => {
     try {
-      const token = await BookMindAPI.ensureAuth({ redirect: false });
+      const token = await LexoAPI.ensureAuth({ redirect: false });
       if (!token) return;
-      const data = await BookMindAPI.put("/api/reading-paths", {
+      const data = await LexoAPI.put("/api/reading-paths", {
         message: result.message,
         paths: result.paths,
       });
@@ -147,16 +147,16 @@ function orderPaths(paths) {
 }
 
 function showPathFlash() {
-  const flash = sessionStorage.getItem("bookmind_path_flash");
+  const flash = sessionStorage.getItem("lexo_path_flash");
   if (!flash) return;
-  sessionStorage.removeItem("bookmind_path_flash");
+  sessionStorage.removeItem("lexo_path_flash");
   showPathToast(flash);
 }
 
 void (async () => {
-  if (window.BookMindAPI?.ensureAuth) {
-    const token = await BookMindAPI.ensureAuth({ redirect: false });
-    if (token) await BookMindLibrary.ensureLoaded();
+  if (window.LexoAPI?.ensureAuth) {
+    const token = await LexoAPI.ensureAuth({ redirect: false });
+    if (token) await LexoLibrary.ensureLoaded();
   }
   const loaded = await loadPathsFromServer();
   if (loaded) {
@@ -171,17 +171,17 @@ generateBtn.addEventListener("click", async () => {
   generateBtn.textContent = "Generating...";
   generateBtn.disabled = true;
   pathsMessage.style.display = "block";
-  pathsMessage.innerHTML = `<h2>Building your personalized reading journeys...</h2><p>BookMindAI is analyzing your Reader DNA, library, mood, and goal.</p>`;
+  pathsMessage.innerHTML = `<h2>Building your personalized reading journeys...</h2><p>Lexo is analyzing your Reader DNA, library, mood, and goal.</p>`;
   try {
-    await BookMindLibrary.ensureLoaded();
-    const result = await BookMindAPI.post("/api/reader/paths", {
+    await LexoLibrary.ensureLoaded();
+    const result = await LexoAPI.post("/api/reader/paths", {
       reader_profile: JSON.parse(localStorage.getItem("readerProfile")),
-      library: BookMindLibrary.getLibrary(),
-      today_mood: localStorage.getItem("bookmind_today_mood"),
-      today_goal: localStorage.getItem("bookmind_today_goal"),
+      library: LexoLibrary.getLibrary(),
+      today_mood: localStorage.getItem("lexo_today_mood"),
+      today_goal: localStorage.getItem("lexo_today_goal"),
     });
     state = normalize(result);
-    const serverData = await BookMindAPI.get("/api/reading-paths").catch(() => null);
+    const serverData = await LexoAPI.get("/api/reading-paths").catch(() => null);
     const genrePaths = (serverData?.paths || []).filter(p => p.genre_slug) || [];
     const ids = new Set(state.paths.map(p => p.id));
     genrePaths.forEach(path => {
@@ -235,33 +235,33 @@ function toggleComplete(pathId, bookId) {
   if (!book) return;
 
   void (async () => {
-    const token = await BookMindAPI.ensureAuth({ redirect: true });
+    const token = await LexoAPI.ensureAuth({ redirect: true });
     if (!token) {
       showPathToast("Sign in to update your library.", true);
       return;
     }
-    await BookMindLibrary.ensureLoaded();
+    await LexoLibrary.ensureLoaded();
     const nextCompleted = !book.completed;
     const payload = { title: book.title, author: book.author || "", genre: book.genre || path.genre || "Book" };
     try {
       if (nextCompleted) {
-        const existing = BookMindLibrary.findBook(payload);
-        if (existing?.library_id) await BookMindLibrary.patchBook(existing.library_id, { status: "read", progress: 100 });
-        else await BookMindLibrary.addBook(payload, "read", { progress: 100, silent: true });
+        const existing = LexoLibrary.findBook(payload);
+        if (existing?.library_id) await LexoLibrary.patchBook(existing.library_id, { status: "read", progress: 100 });
+        else await LexoLibrary.addBook(payload, "read", { progress: 100, silent: true });
         book.completed = true;
         ensureStartedAt(path);
         showPathToast(`"${book.title}" marked as Finished.`);
       } else {
-        const entry = BookMindLibrary.findBook(payload);
-        if (entry?.library_id) await BookMindLibrary.patchBook(entry.library_id, { status: "reading", progress: entry.progress || 0 });
-        else BookMindLibrary.clearFinish(payload);
+        const entry = LexoLibrary.findBook(payload);
+        if (entry?.library_id) await LexoLibrary.patchBook(entry.library_id, { status: "reading", progress: entry.progress || 0 });
+        else LexoLibrary.clearFinish(payload);
         book.completed = false;
         invalidatePathCompletion(path);
         showPathToast(`"${book.title}" moved back to Currently Reading.`);
       }
       savePaths(state);
       renderPaths(state);
-      window.BookMindLibraryPage?.refresh?.();
+      window.LexoLibraryPage?.refresh?.();
     } catch (error) {
       showPathToast(error.message || "Could not update your library.", true);
     }
@@ -422,7 +422,7 @@ async function showJourneyModal({ path, badge, xp, daysTaken }) {
 
   const reflectionEl = document.getElementById("journeyReflectionText");
   const nextEl = document.getElementById("journeyNextSuggestion");
-  reflectionEl.innerHTML = `<span class="journey-reflection-loading">BookMindAI is reflecting on your journey…</span>`;
+  reflectionEl.innerHTML = `<span class="journey-reflection-loading">Lexo is reflecting on your journey…</span>`;
   nextEl.textContent = "";
 
   document.getElementById("journeySurpriseInput").value = "";
@@ -509,7 +509,7 @@ pathCompletionModal?.addEventListener("click", event => {
 /* ---------------------------------------------------------------- render */
 
 function libraryTitleOptions() {
-  const library = BookMindLibrary.getLibrary();
+  const library = LexoLibrary.getLibrary();
   const titles = new Set();
   Object.values(library).forEach(shelf =>
     (shelf || []).forEach(book => book?.title && titles.add(book.title))

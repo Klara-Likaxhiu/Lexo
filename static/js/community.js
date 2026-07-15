@@ -199,10 +199,10 @@ async function loadReviews() {
   renderSkeleton();
 
   try {
-    if (!window.BookMindAPI?.get) {
-      throw new Error("BookMindAPI is not loaded.");
+    if (!window.LexoAPI?.get) {
+      throw new Error("LexoAPI is not loaded.");
     }
-    const data = await BookMindAPI.get("/api/reviews/community?limit=10", { auth: false });
+    const data = await LexoAPI.get("/api/reviews/community?limit=10", { auth: false });
     state.reviews = data.reviews?.length ? data.reviews : DEMO_REVIEWS;
   } catch {
     state.reviews = DEMO_REVIEWS;
@@ -212,7 +212,7 @@ async function loadReviews() {
 }
 
 function getProfileGenres() {
-  const profile = BookMindUI?.readStorageJson?.("readerProfile", null);
+  const profile = LexoUI?.readStorageJson?.("readerProfile", null);
   return profile?.favorite_genres || [];
 }
 
@@ -497,14 +497,14 @@ function openBookDetails(book) {
 }
 
 function getJoinedClubs() {
-  return BookMindUI?.readStorageJson?.("bookmind_joined_clubs", []) || [];
+  return LexoUI?.readStorageJson?.("lexo_joined_clubs", []) || [];
 }
 
 function saveJoinedClub(clubId) {
   const joined = getJoinedClubs();
   if (!joined.includes(clubId)) {
     joined.push(clubId);
-    localStorage.setItem("bookmind_joined_clubs", JSON.stringify(joined));
+    localStorage.setItem("lexo_joined_clubs", JSON.stringify(joined));
   }
 }
 

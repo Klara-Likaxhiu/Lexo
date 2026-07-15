@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Profile - BookMindAI</title>
+  <title>Profile - Lexo</title>
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="css/editorial.css">
   <link rel="stylesheet" href="css/design-system.css">
@@ -71,16 +71,16 @@
 
 <script>
   document.addEventListener("DOMContentLoaded", async function () {
-    if (window.BookMindAuth?.whenReady) await window.BookMindAuth.whenReady();
+    if (window.LexoAuth?.whenReady) await window.LexoAuth.whenReady();
 
-    const authUser = await BookMindAPI.getMe({ redirect: true });
+    const authUser = await LexoAPI.getMe({ redirect: true });
     const usernameEl = document.getElementById("authUsername");
     if (usernameEl && authUser) usernameEl.textContent = authUser.username;
 
     const profile = JSON.parse(localStorage.getItem("readerProfile") || "null") || {};
-    const savedUserProfile = JSON.parse(localStorage.getItem("bookmind_user_profile") || "null") || {};
-    const pathStats = window.BookMindPathCompletion?.readStats?.() || { pathsCompleted: 0, completions: [] };
-    const rawPaths = JSON.parse(localStorage.getItem("bookmind_reading_paths") || "null");
+    const savedUserProfile = JSON.parse(localStorage.getItem("lexo_user_profile") || "null") || {};
+    const pathStats = window.LexoPathCompletion?.readStats?.() || { pathsCompleted: 0, completions: [] };
+    const rawPaths = JSON.parse(localStorage.getItem("lexo_reading_paths") || "null");
     const paths = rawPaths?.paths || [];
 
     const avatar = document.getElementById("profileAvatar");
@@ -103,7 +103,7 @@
     const journeySection = document.getElementById("journeyCollection");
     if (pathStats.pathsCompleted > 0 || paths.some(p => p.path_completed)) {
       journeySection.hidden = false;
-      const P = window.BookMindPathPassport;
+      const P = window.LexoPathPassport;
       const ps = P?.passportStats(paths, pathStats) || {};
       const favorite = P?.favoriteCompletedPath(pathStats.completions);
       const latest = P?.latestStamp(pathStats.completions);
@@ -134,13 +134,13 @@
       reader.onload = function (event) {
         avatar.innerHTML = `<img src="${event.target.result}" alt="Profile picture">`;
         savedUserProfile.profilePic = event.target.result;
-        localStorage.setItem("bookmind_user_profile", JSON.stringify(savedUserProfile));
+        localStorage.setItem("lexo_user_profile", JSON.stringify(savedUserProfile));
       };
       reader.readAsDataURL(file);
     });
 
     document.getElementById("saveProfileBtn").addEventListener("click", function () {
-      localStorage.setItem("bookmind_user_profile", JSON.stringify({
+      localStorage.setItem("lexo_user_profile", JSON.stringify({
         nickname: nicknameInput.value,
         bio: bioInput.value,
         profilePic: savedUserProfile.profilePic || null,
@@ -150,7 +150,7 @@
     });
 
     document.getElementById("logoutProfileBtn").addEventListener("click", function () {
-      if (window.BookMindAuth) window.BookMindAuth.logout();
+      if (window.LexoAuth) window.LexoAuth.logout();
     });
   });
 </script>
