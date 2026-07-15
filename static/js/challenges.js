@@ -76,27 +76,14 @@ function computeStreak(activity) {
 function gatherGoalStats() {
   const library = LexoLibrary.getLibrary();
   const data = LexoLibrary.getReadingData();
-
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth();
-
-  let booksThisYear = 0;
-  let booksThisMonth = 0;
-  Object.values(data.finishes || {}).forEach(iso => {
-    const d = new Date(iso);
-    if (d.getFullYear() === year) {
-      booksThisYear += 1;
-      if (d.getMonth() === month) booksThisMonth += 1;
-    }
-  });
+  const { goals, booksThisYear, booksThisMonth } = LexoLibrary.getGoalProgress();
 
   return {
     totalFinished: (library.read || []).length,
     booksThisYear,
     booksThisMonth,
     streak: computeStreak(data.activity),
-    goals: data.goals,
+    goals,
   };
 }
 

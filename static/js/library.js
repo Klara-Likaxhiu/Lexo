@@ -661,6 +661,28 @@ const LexoLibrary = {
       monthly: Math.max(0, Math.round(Number(goals.monthly) || 0)),
     };
     this.saveReadingData(data);
+    this._emitChange({ action: "goals-updated", goals: data.goals });
     return data.goals;
+  },
+
+  /* Shared goal-progress computation used by both the Challenges page
+     and the Home page "Reading Goal" card, so they always stay in sync. */
+  getGoalProgress() {
+    const data = this.getReadingData();
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
+
+    let booksThisYear = 0;
+    let booksThisMonth = 0;
+    Object.values(data.finishes || {}).forEach(iso => {
+      const d = new Date(iso);
+      if (d.getFullYear() === year) {
+        booksThisYear += 1;
+        if (d.getMonth() === month) booksThisMonth += 1;
+      }
+    });
+
+    return { goals: data.goals, booksThisYear, booksThisMonth };
   },
 };

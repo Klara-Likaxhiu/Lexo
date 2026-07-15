@@ -115,6 +115,52 @@ function renderRecentlyAdded() {
   }
 }
 
+function goalProgressPct(value, goal) {
+  if (!goal || goal <= 0) return 0;
+  return Math.min(100, Math.round((value / goal) * 100));
+}
+
+function goalProgressRow(label, value, goal) {
+  const pct = goalProgressPct(value, goal);
+  return `
+    <div class="reading-goal-row">
+      <div class="reading-goal-row-top">
+        <span class="reading-goal-row-label">${label}</span>
+        <span class="reading-goal-row-count">${value} / ${goal}</span>
+      </div>
+      <div class="challenge-bar"><div style="width:${pct}%"></div></div>
+      <p class="reading-goal-row-pct">${pct}% complete</p>
+    </div>
+  `;
+}
+
+function renderReadingGoal() {
+  const body = document.getElementById("readingGoalBody");
+  if (!body || !window.LexoLibrary) return;
+
+  const { goals, booksThisYear, booksThisMonth } = LexoLibrary.getGoalProgress();
+  const hasYearly = goals.yearly > 0;
+  const hasMonthly = goals.monthly > 0;
+
+  if (!hasYearly && !hasMonthly) {
+    body.innerHTML = `
+      <div class="reading-goal-empty">
+        <p class="reading-goal-empty-text">You haven't set a reading goal yet. Set one to track your progress here.</p>
+        <button type="button" class="btn btn-primary" id="setReadingGoalsBtn">Set Reading Goals</button>
+      </div>
+    `;
+    document.getElementById("setReadingGoalsBtn")?.addEventListener("click", () => {
+      window.location.href = "challenges.html#goalsSection";
+    });
+    return;
+  }
+
+  body.innerHTML = [
+    hasYearly ? goalProgressRow("Books this year", booksThisYear, goals.yearly) : "",
+    hasMonthly ? goalProgressRow("Books this month", booksThisMonth, goals.monthly) : "",
+  ].join("");
+}
+
 function recommendationsSkeleton(count = 3) {
   return Array.from({ length: count }, () => `
     <div class="recommendation-card-modern card skeleton-card" aria-hidden="true">
@@ -168,6 +214,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   renderContinueReading();
   renderRecentlyAdded();
+  renderReadingGoal();
 
   updateDNAProgress();
   setupMoodAndGoal();
@@ -179,9 +226,22 @@ document.addEventListener("DOMContentLoaded", async () => {
     fetchFreshRecommendations();
   });
 
+  document.getElementById("editGoalsBtn")?.addEventListener("click", () => {
+    window.location.href = "challenges.html#goalsSection";
+  });
+
   document.addEventListener("lexo:library-changed", event => {
     if (event.detail?.action === "background-refresh" || event.detail?.action === "refresh") {
       renderRecentlyAdded();
+    }
+    if (event.detail?.action === "goals-updated" || event.detail?.action === "progress") {
+      renderReadingGoal();
+    }
+  });
+
+  window.addEventListener("storage", event => {
+    if (event.key === "lexo_reading_data") {
+      renderReadingGoal();
     }
   });
 

@@ -73,24 +73,34 @@
         <h2 id="todayMission">Building today's mission…</h2>
       </article>
 
-      <article class="home-mood card mood-card dashboard-card">
-        <h2>Reading Mood</h2>
-        <div class="mood-options">
-          <button type="button" data-mood="happy">Feel Good</button>
-          <button type="button" data-mood="emotional">Emotional</button>
-          <button type="button" data-mood="plot twist">Think</button>
-          <button type="button" data-mood="cozy">Escape</button>
-          <button type="button" data-mood="romantic">Fast Read</button>
-        </div>
-        <div class="goal-options" aria-hidden="true">
-          <button type="button" data-goal="escape reality">Escape Reality</button>
-          <button type="button" data-goal="learn something">Learn Something</button>
-          <button type="button" data-goal="cry">Cry</button>
-          <button type="button" data-goal="laugh">Laugh</button>
-          <button type="button" data-goal="think deeply">Think</button>
-          <button type="button" data-goal="surprise me">Surprise Me</button>
-        </div>
-      </article>
+      <div class="home-feature-col">
+        <article class="home-mood card mood-card dashboard-card">
+          <h2>Reading Mood</h2>
+          <div class="mood-options">
+            <button type="button" data-mood="happy">Feel Good</button>
+            <button type="button" data-mood="emotional">Emotional</button>
+            <button type="button" data-mood="plot twist">Think</button>
+            <button type="button" data-mood="cozy">Escape</button>
+            <button type="button" data-mood="romantic">Fast Read</button>
+          </div>
+          <div class="goal-options" aria-hidden="true">
+            <button type="button" data-goal="escape reality">Escape Reality</button>
+            <button type="button" data-goal="learn something">Learn Something</button>
+            <button type="button" data-goal="cry">Cry</button>
+            <button type="button" data-goal="laugh">Laugh</button>
+            <button type="button" data-goal="think deeply">Think</button>
+            <button type="button" data-goal="surprise me">Surprise Me</button>
+          </div>
+        </article>
+
+        <article class="home-goal card goal-summary-card dashboard-card" id="readingGoalCard">
+          <div class="reading-goal-header">
+            <h2>Reading Goal</h2>
+            <button type="button" class="section-refresh-btn" id="editGoalsBtn">Edit Goals</button>
+          </div>
+          <div class="reading-goal-body" id="readingGoalBody"></div>
+        </article>
+      </div>
     </section>
 
     <section class="home-shelf-section">
