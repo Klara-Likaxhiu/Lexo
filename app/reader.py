@@ -402,6 +402,16 @@ def _apply_intelligence_exclusions(parsed: dict, excluded: set[str]) -> None:
                 break
         if replacement:
             dashboard["top_pick"] = {"match": replacement.get("match", 90), **replacement}
+        else:
+            dashboard["top_pick"] = {
+                "title": "Ask Lexo for a recommendation",
+                "author": "",
+                "genre": "",
+                "reason": "Generate recommendations or choose a mood to refresh today's AI pick.",
+                "match": 80,
+                "placeholder": True,
+            }
+    parsed["dashboard"] = dashboard
 
 
 def analyze_reader_profile(data: ReaderProfileRequest) -> dict:
@@ -904,6 +914,8 @@ def local_fallback_intelligence(
         title = str(ai.get("title") or "").strip()
         if not title or title.lower() == "ask lexo for a recommendation":
             return None
+        if _normalize_title(title) in excluded:
+            return None
         cover = None
         book_data = item.get("book_data")
         if isinstance(book_data, dict):
@@ -917,6 +929,7 @@ def local_fallback_intelligence(
             "cover_url": cover or ai.get("cover_url"),
         }
 
+    excluded = _collect_excluded_titles(reader_profile, library)
     top_pick: dict[str, Any] | None = None
     profile = reader_profile if isinstance(reader_profile, dict) else {}
 
@@ -939,23 +952,6 @@ def local_fallback_intelligence(
             break
 
     lib = library if isinstance(library, dict) else profile.get("library") if isinstance(profile.get("library"), dict) else {}
-    if top_pick is None and isinstance(lib, dict):
-        reading = lib.get("reading") or []
-        want = lib.get("want") or []
-        candidate = reading[0] if reading else (want[0] if want else None)
-        if isinstance(candidate, dict) and candidate.get("title"):
-            top_pick = {
-                "title": candidate.get("title"),
-                "author": candidate.get("author") or "",
-                "genre": candidate.get("genre") or "",
-                "reason": (
-                    "Continue with the book you already started."
-                    if reading
-                    else "A book waiting on your Want to Read shelf."
-                ),
-                "match": 85,
-                "cover_url": candidate.get("cover_url"),
-            }
 
     if top_pick is None:
         top_pick = {

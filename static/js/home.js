@@ -273,6 +273,31 @@ document.addEventListener("DOMContentLoaded", () => {
     window.LexoPerf?.endPageLoad?.();
   })();
 
+  function getExcludedPickTitles() {
+    const excluded = new Set();
+    try {
+      const library = LexoLibrary?.getLibrary?.() || {};
+      ["read", "reading", "want", "not_interested"].forEach(shelf => {
+        (library[shelf] || []).forEach(book => {
+          const key = LexoLibrary?.normalizeTitle?.(book?.title) || (book?.title || "").trim().toLowerCase();
+          if (key) excluded.add(key);
+        });
+      });
+      (LexoLibrary?.getExcludedBooks?.() || []).forEach(title => {
+        const key = LexoLibrary?.normalizeTitle?.(title) || (title || "").trim().toLowerCase();
+        if (key) excluded.add(key);
+      });
+    } catch (_) {
+      /* ignore */
+    }
+    return excluded;
+  }
+
+  function isExcludedPickTitle(title) {
+    const key = LexoLibrary?.normalizeTitle?.(title) || (title || "").trim().toLowerCase();
+    return Boolean(key && getExcludedPickTitles().has(key));
+  }
+
   function isEmptyTopPick(topPick) {
     const title = (topPick?.title || "").trim().toLowerCase();
     return (
@@ -283,12 +308,14 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function extractLocalTopPickBook() {
+    const isEligible = ai => ai?.title && !isEmptyTopPick(ai) && !isExcludedPickTitle(ai.title);
+
     try {
       const recs = JSON.parse(localStorage.getItem("lexo_recommendations_v1") || "null");
       const items = Array.isArray(recs?.items) ? recs.items : [];
       for (const item of items) {
         const ai = item?.ai_recommendation || item;
-        if (ai?.title && !isEmptyTopPick(ai)) {
+        if (isEligible(ai)) {
           return {
             title: ai.title,
             author: ai.author || "",
@@ -308,7 +335,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const recs = Array.isArray(profile?.recommendations) ? profile.recommendations : [];
       for (const item of recs) {
         const ai = item?.ai_recommendation || item;
-        if (ai?.title && !isEmptyTopPick(ai)) {
+        if (isEligible(ai)) {
           return {
             title: ai.title,
             author: ai.author || "",
@@ -318,26 +345,6 @@ document.addEventListener("DOMContentLoaded", () => {
             match: ai.match || 88,
           };
         }
-      }
-    } catch (_) {
-      /* ignore */
-    }
-
-    try {
-      const library = LexoLibrary?.getLibrary?.() || {};
-      const fromReading = (library.reading || [])[0];
-      const candidate = fromReading || (library.want || [])[0];
-      if (candidate?.title) {
-        return {
-          title: candidate.title,
-          author: candidate.author || "",
-          genre: candidate.genre || "",
-          reason: fromReading
-            ? "Continue with the book you already started."
-            : "A book waiting on your Want to Read shelf.",
-          cover_url: candidate.cover_url || null,
-          match: 85,
-        };
       }
     } catch (_) {
       /* ignore */
@@ -387,6 +394,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     let dashboard = intelligence?.dashboard || {};
     let topPick = dashboard.top_pick || {};
+
+    if (!isEmptyTopPick(topPick) && isExcludedPickTitle(topPick.title)) {
+      topPick = {};
+    }
 
     if (isEmptyTopPick(topPick) || intelligence?.fallback) {
       const localBook = extractLocalTopPickBook();
@@ -480,14 +491,14 @@ document.addEventListener("DOMContentLoaded", () => {
       profile_completion: localStorage.getItem("reader_profile_completion") || "0",
     };
     const fresh = LexoAPI._readIntelligenceCache?.(contextHint);
-    if (fresh?.dashboard && !fresh.fallback && !isEmptyTopPick(fresh.dashboard?.top_pick)) {
+    if (fresh?.dashboard && !fresh.fallback && !isEmptyTopPick(fresh.dashboard?.top_pick) && !isExcludedPickTitle(fresh.dashboard?.top_pick?.title)) {
       console.log("[Lexo] AI Pick: applying fresh cache");
       applyIntelligence(fresh);
       return { source: "cache", payload: fresh };
     }
 
     const stale = LexoAPI._readIntelligenceCache?.(contextHint, { allowStale: true });
-    if (stale?.dashboard && !stale.fallback && !isEmptyTopPick(stale.dashboard?.top_pick)) {
+    if (stale?.dashboard && !stale.fallback && !isEmptyTopPick(stale.dashboard?.top_pick) && !isExcludedPickTitle(stale.dashboard?.top_pick?.title)) {
       console.log("[Lexo] AI Pick: applying stale cache, will refresh");
       applyIntelligence(stale);
       return { source: "stale", payload: stale };
