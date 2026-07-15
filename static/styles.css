@@ -1750,10 +1750,10 @@ html.auth-pending body {
 }
 
 .companion-book-card .custom-cover {
-  width: 21px;
-  height: 31px;
-  margin-bottom: 6px;
-  border-radius: 4px;
+  width: 36px;
+  height: 53px;
+  margin-bottom: 8px;
+  border-radius: 6px;
 }
 
 .companion-book-meta {
@@ -2357,11 +2357,11 @@ html.auth-pending body {
 }
 
 .companion-cover-wrap.book-cover-wrap {
-  width: 21px;
-  height: 31px;
+  width: 36px;
+  height: 53px;
   aspect-ratio: auto;
-  margin-bottom: 6px;
-  border-radius: 4px;
+  margin-bottom: 8px;
+  border-radius: 6px;
   overflow: hidden;
   flex-shrink: 0;
 }
