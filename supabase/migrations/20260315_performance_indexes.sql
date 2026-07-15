@@ -1,15 +1,13 @@
 -- Performance indexes for frequent Lexo queries
-
--- Shelf / status filters
-create index if not exists idx_user_library_user_status
-  on public.user_library (user_id, status);
+-- Note: user_library uses date_added (not created_at).
+-- (user_id, status) is already indexed in schema.sql as idx_user_library_status.
 
 -- Continue-reading / recency sorts on the library
 create index if not exists idx_user_library_user_last_opened
   on public.user_library (user_id, last_opened_at desc nulls last);
 
-create index if not exists idx_user_library_user_created
-  on public.user_library (user_id, created_at desc);
+create index if not exists idx_user_library_user_date_added
+  on public.user_library (user_id, date_added desc);
 
 -- Community "my reviews" feed
 create index if not exists idx_community_reviews_user_updated
