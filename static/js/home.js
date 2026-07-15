@@ -310,59 +310,164 @@ document.addEventListener("DOMContentLoaded", () => {
     const dashboard = intelligence?.dashboard || {};
     const topPick = dashboard.top_pick || {};
 
-    subtitle.textContent = dashboard.greeting_subtitle || "Your personalized reading world is ready.";
-    mission.textContent = dashboard.today_mission || "Choose a book that matches your current mood.";
-    topPickLabel.textContent = "AI Pick of the Day";
-    topPickTitle.textContent = topPick.title || "Ask Lexo for a recommendation";
-    topPickReason.textContent = topPick.reason || "Your AI pick will appear here.";
+    if (subtitle) {
+      subtitle.textContent = dashboard.greeting_subtitle || "Your personalized reading world is ready.";
+    }
+    if (mission) {
+      mission.textContent = dashboard.today_mission || "Choose a book that matches your current mood.";
+    }
+    if (topPickLabel) topPickLabel.textContent = "AI Pick of the Day";
+    if (topPickTitle) {
+      topPickTitle.textContent = topPick.title || "Ask Lexo for a recommendation";
+    }
+    if (topPickReason) {
+      topPickReason.textContent = topPick.reason || "Your AI pick will appear here.";
+    }
     renderTopPickCover(topPick);
 
-    document.getElementById("topPickBtn").onclick = function () {
-      const item = {
-        ai_recommendation: {
-          title: topPick.title,
-          author: topPick.author,
-          genre: topPick.genre,
-          difficulty: "AI Pick",
-          reason: topPick.reason,
-        },
-        book_data: topPick.cover_url ? { cover_url: topPick.cover_url } : null,
-      };
+    const topPickBtn = document.getElementById("topPickBtn");
+    if (topPickBtn) {
+      topPickBtn.onclick = function () {
+        const item = {
+          ai_recommendation: {
+            title: topPick.title,
+            author: topPick.author,
+            genre: topPick.genre,
+            difficulty: "AI Pick",
+            reason: topPick.reason,
+          },
+          book_data: topPick.cover_url ? { cover_url: topPick.cover_url } : null,
+        };
 
-      localStorage.setItem("selectedBook", JSON.stringify(item));
-      window.location.href = "book-details.html";
+        localStorage.setItem("selectedBook", JSON.stringify(item));
+        window.location.href = "book-details.html";
+      };
+    }
+  }
+
+  function buildLocalIntelligenceFallback() {
+    const mood = localStorage.getItem("lexo_today_mood");
+    const goal = localStorage.getItem("lexo_today_goal");
+    let topPick = {
+      title: "Ask Lexo for a recommendation",
+      author: "",
+      genre: "",
+      reason: "Choose a mood or generate recommendations to unlock today's AI pick.",
+    };
+
+    try {
+      const recs = JSON.parse(localStorage.getItem("lexo_recommendations_v1") || "null");
+      const first = recs?.items?.[0]?.ai_recommendation || recs?.items?.[0];
+      if (first?.title) {
+        topPick = {
+          title: first.title,
+          author: first.author || "",
+          genre: first.genre || "",
+          reason: first.reason || "From your latest Lexo recommendations.",
+          cover_url: recs.items[0]?.book_data?.cover_url || first.cover_url || null,
+        };
+      }
+    } catch (_) {
+      /* ignore */
+    }
+
+    const missionParts = [];
+    if (mood) missionParts.push(`Match your ${mood} mood`);
+    if (goal) missionParts.push(`work toward ${goal}`);
+    const today_mission = missionParts.length
+      ? `${missionParts.join(" and ")} with a focused reading session.`
+      : "Choose a book that matches your current mood.";
+
+    return {
+      dashboard: {
+        greeting_subtitle: "Your personalized reading world is ready.",
+        today_mission,
+        top_pick: topPick,
+      },
+      fallback: true,
     };
   }
 
-  async function loadHomeIntelligence({ force = false } = {}) {
-    const subtitle = document.getElementById("homeSubtitle");
-    const mission = document.getElementById("todayMission");
+  function paintIntelligenceNow() {
     const mood = localStorage.getItem("lexo_today_mood");
     const goal = localStorage.getItem("lexo_today_goal");
-    const cached = LexoAPI._readIntelligenceCache({ today_mood: mood, today_goal: goal });
+    const contextHint = {
+      today_mood: mood,
+      today_goal: goal,
+      library: LexoLibrary?.getLibrary?.() || {},
+      profile_completion: localStorage.getItem("reader_profile_completion") || "0",
+    };
+    const fresh = LexoAPI._readIntelligenceCache?.(contextHint);
+    if (fresh?.dashboard) {
+      console.log("[Lexo] AI Pick: applying fresh cache");
+      applyIntelligence(fresh);
+      return { source: "cache", payload: fresh };
+    }
 
-    // Normal loads never hit OpenAI — only explicit mood/goal changes do (force: true).
-    if (!force) {
-      if (cached?.dashboard) applyIntelligence(cached);
+    const stale = LexoAPI._readIntelligenceCache?.(contextHint, { allowStale: true });
+    if (stale?.dashboard) {
+      console.log("[Lexo] AI Pick: applying stale cache, will refresh");
+      applyIntelligence(stale);
+      return { source: "stale", payload: stale };
+    }
+
+    const fallback = buildLocalIntelligenceFallback();
+    console.log("[Lexo] AI Pick: applying local fallback (no cache)");
+    applyIntelligence(fallback);
+    return { source: "fallback", payload: fallback };
+  }
+
+  let intelligenceInFlight = null;
+
+  async function loadHomeIntelligence({ force = false } = {}) {
+    console.log("[Lexo] Loading AI Pick…", { force });
+    const painted = paintIntelligenceNow();
+
+    // Unauthenticated: keep fallback / cache only.
+    if (!window.LexoAuth?.isLoggedIn?.()) {
+      updateDNAProgress();
       return;
     }
 
-    if (cached?.dashboard) applyIntelligence(cached);
-    else {
-      subtitle.textContent = "Lexo is personalizing your dashboard…";
-      mission.textContent = "Building today's mission…";
+    // Fresh matching cache: skip network on normal open.
+    if (!force && painted.source === "cache") {
+      updateDNAProgress();
+      return;
     }
 
-    try {
-      const intelligence = await LexoAPI.getReaderIntelligence({ force: true });
-      applyIntelligence(intelligence);
-    } catch {
-      if (!cached?.dashboard) {
-        subtitle.textContent = "Your personalized reading world is ready.";
-        mission.textContent = "Choose a mood and ask Lexo for suggestions.";
+    if (intelligenceInFlight) return intelligenceInFlight;
+
+    intelligenceInFlight = (async () => {
+      try {
+        const intelligence = await LexoAPI.getReaderIntelligence({
+          force: Boolean(force),
+          timeoutMs: 12000,
+        });
+        console.log("[Lexo] AI Pick response", intelligence);
+        if (intelligence?.dashboard) applyIntelligence(intelligence);
+      } catch (err) {
+        console.error("[Lexo] AI Pick / mission failed", err);
+        if (!painted.payload?.dashboard) {
+          applyIntelligence(buildLocalIntelligenceFallback());
+        }
+      } finally {
+        intelligenceInFlight = null;
+        updateDNAProgress();
       }
+    })();
+
+    const safety = setTimeout(() => {
+      const title = document.getElementById("topPickTitle")?.textContent || "";
+      if (/^loading/i.test(title.trim())) {
+        console.warn("[Lexo] AI Pick safety timeout — forcing fallback UI");
+        applyIntelligence(painted.payload || buildLocalIntelligenceFallback());
+      }
+    }, 8000);
+
+    try {
+      await intelligenceInFlight;
     } finally {
-      updateDNAProgress();
+      clearTimeout(safety);
     }
   }
 
@@ -442,18 +547,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   setupMoodAndGoal();
 
-  // Cached dashboard copy only — never call OpenAI on normal page open.
-  const scheduleCachedIntelligence = () => {
-    const mood = localStorage.getItem("lexo_today_mood");
-    const goal = localStorage.getItem("lexo_today_goal");
-    const cached = LexoAPI._readIntelligenceCache?.({ today_mood: mood, today_goal: goal });
-    if (cached?.dashboard) applyIntelligence(cached);
-  };
-  if ("requestIdleCallback" in window) {
-    requestIdleCallback(scheduleCachedIntelligence, { timeout: 1500 });
-  } else {
-    setTimeout(scheduleCachedIntelligence, 200);
-  }
+  // Resolve AI Pick + mission immediately (cache / fallback), then soft-refresh if needed.
+  void loadHomeIntelligence({ force: false });
 
   const RECOMMENDATION_BATCH_SIZE = 3;
   const RECOMMENDATION_QUESTION =

@@ -82,7 +82,7 @@ const LexoAPI = {
     return `Request failed (HTTP ${status}).`;
   },
 
-  async request(path, { method = "GET", body = null, auth = true, redirect = false, _retried = false } = {}) {
+  async request(path, { method = "GET", body = null, auth = true, redirect = false, _retried = false, timeoutMs = 15000 } = {}) {
     let token = null;
     if (auth) {
       token = await this.ensureAuth({ redirect });
@@ -107,11 +107,28 @@ const LexoAPI = {
       headers.Authorization = `Bearer ${token}`;
     }
 
-    const response = await fetch(url, {
-      method,
-      headers,
-      body: body == null ? undefined : JSON.stringify(body),
-    });
+    const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+    const timeout =
+      controller && timeoutMs > 0
+        ? setTimeout(() => controller.abort(), timeoutMs)
+        : null;
+
+    let response;
+    try {
+      response = await fetch(url, {
+        method,
+        headers,
+        body: body == null ? undefined : JSON.stringify(body),
+        signal: controller?.signal,
+      });
+    } catch (err) {
+      if (err?.name === "AbortError") {
+        throw new Error(`Request timed out after ${timeoutMs}ms (${path}).`);
+      }
+      throw err;
+    } finally {
+      if (timeout) clearTimeout(timeout);
+    }
 
     const rawBody = await response.text();
     const data = this._parseJsonBody(rawBody);
@@ -119,7 +136,7 @@ const LexoAPI = {
     if (auth && !_retried && this._isAuthExpired(response.status, data, rawBody)) {
       const refreshed = await this._refreshAndRetry({ redirect });
       if (refreshed) {
-        return this.request(path, { method, body, auth, redirect, _retried: true });
+        return this.request(path, { method, body, auth, redirect, _retried: true, timeoutMs });
       }
       if (redirect) return null;
       throw new Error("Your session has expired. Please sign in again.");
@@ -177,18 +194,28 @@ const LexoAPI = {
 
   async getReaderContext() {
     if (window.LexoLibrary) {
-      await LexoLibrary.ensureLoaded();
+      // Never block AI widgets forever on library load.
+      await Promise.race([
+        LexoLibrary.ensureLoaded().catch(() => null),
+        new Promise(resolve => setTimeout(resolve, 3000)),
+      ]);
     }
 
-    const readerProfile = JSON.parse(localStorage.getItem("readerProfile"));
-    const quizAnswers = JSON.parse(localStorage.getItem("reader_quiz_answers"));
-    const discoveryAnswers = quizAnswers || JSON.parse(localStorage.getItem("reader_discovery_answers"));
-    const extraDiscoveryAnswers = quizAnswers
-      ? {}
-      : JSON.parse(localStorage.getItem("reader_extra_discovery_answers"));
+    const parseJson = key => {
+      try {
+        return JSON.parse(localStorage.getItem(key) || "null");
+      } catch {
+        return null;
+      }
+    };
 
-    const library = LexoLibrary.getLibrary();
-    const reviews = JSON.parse(localStorage.getItem("book_reviews")) || [];
+    const readerProfile = parseJson("readerProfile");
+    const quizAnswers = parseJson("reader_quiz_answers");
+    const discoveryAnswers = quizAnswers || parseJson("reader_discovery_answers");
+    const extraDiscoveryAnswers = quizAnswers ? {} : parseJson("reader_extra_discovery_answers");
+
+    const library = LexoLibrary?.getLibrary?.() || { read: [], reading: [], want: [], not_interested: [] };
+    const reviews = parseJson("book_reviews") || [];
 
     return {
       profile: readerProfile,
@@ -197,7 +224,7 @@ const LexoAPI = {
       quiz_answers: quizAnswers,
       profile_completion: localStorage.getItem("reader_profile_completion") || "0",
       library: library,
-      excluded_books: LexoLibrary.getExcludedBooks(),
+      excluded_books: LexoLibrary?.getExcludedBooks?.() || [],
       reviews: reviews,
       today_mood: localStorage.getItem("lexo_today_mood"),
       today_goal: localStorage.getItem("lexo_today_goal"),
@@ -213,12 +240,41 @@ const LexoAPI = {
     return `${context.today_mood || ""}|${context.today_goal || ""}|${librarySig}|${context.profile_completion || "0"}`;
   },
 
-  _readIntelligenceCache(context) {
+  _migrateIntelligenceCacheKeys() {
     try {
+      if (localStorage.getItem("lexo_reader_intelligence") != null) return;
+      for (const key of ["bookmind_reader_intelligence", "bookmindai_reader_intelligence"]) {
+        const raw = localStorage.getItem(key);
+        if (raw == null) continue;
+        localStorage.setItem("lexo_reader_intelligence", raw);
+        localStorage.removeItem(key);
+        break;
+      }
+      if (localStorage.getItem("lexo_intelligence_meta") != null) return;
+      for (const key of ["bookmind_intelligence_meta", "bookmindai_intelligence_meta"]) {
+        const raw = localStorage.getItem(key);
+        if (raw == null) continue;
+        localStorage.setItem("lexo_intelligence_meta", raw);
+        localStorage.removeItem(key);
+        break;
+      }
+    } catch (_) {
+      /* ignore */
+    }
+  },
+
+  _readIntelligenceCache(context, { allowStale = false } = {}) {
+    this._migrateIntelligenceCacheKeys();
+    try {
+      const payload = JSON.parse(localStorage.getItem("lexo_reader_intelligence") || "null");
+      if (!payload) return null;
       const meta = JSON.parse(localStorage.getItem("lexo_intelligence_meta") || "null");
-      if (!meta || meta.key !== this._intelligenceCacheKey(context)) return null;
-      if (Date.now() - meta.at > 30 * 60 * 1000) return null;
-      return JSON.parse(localStorage.getItem("lexo_reader_intelligence") || "null");
+      if (!meta) return allowStale ? payload : null;
+      const keyMatches = meta.key === this._intelligenceCacheKey(context);
+      const fresh = Date.now() - meta.at <= 30 * 60 * 1000;
+      if (keyMatches && fresh) return payload;
+      if (allowStale && payload?.dashboard) return payload;
+      return null;
     } catch {
       return null;
     }
@@ -232,7 +288,7 @@ const LexoAPI = {
     );
   },
 
-  async getReaderIntelligence({ force = false } = {}) {
+  async getReaderIntelligence({ force = false, timeoutMs = 12000 } = {}) {
     const context = await this.getReaderContext();
     if (!force) {
       const cached = this._readIntelligenceCache(context);
@@ -240,12 +296,18 @@ const LexoAPI = {
     }
 
     const fetchIntelligence = async () => {
-      const intelligence = await this.post("/api/reader/intelligence", {
-        reader_profile: context,
-        library: context.library,
-        today_mood: context.today_mood,
-        today_goal: context.today_goal,
-      });
+      console.log("[Lexo] Loading AI Pick / mission via /api/reader/intelligence…");
+      const intelligence = await this.post(
+        "/api/reader/intelligence",
+        {
+          reader_profile: context,
+          library: context.library,
+          today_mood: context.today_mood,
+          today_goal: context.today_goal,
+        },
+        { timeoutMs }
+      );
+      console.log("[Lexo] Intelligence response", intelligence);
       this._writeIntelligenceCache(context, intelligence);
       return intelligence;
     };

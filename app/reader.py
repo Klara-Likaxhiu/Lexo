@@ -872,6 +872,71 @@ Respond ONLY in valid JSON:
     return parsed
 
 
+def local_fallback_intelligence(
+    reader_profile: dict | None = None,
+    library: dict | None = None,
+    today_mood: str | None = None,
+    today_goal: str | None = None,
+) -> dict:
+    """Instant dashboard payload when OpenAI is unavailable or times out."""
+    mood = (today_mood or "").strip()
+    goal = (today_goal or "").strip()
+    mission_bits = []
+    if mood:
+        mission_bits.append(f"match your {mood} mood")
+    if goal:
+        mission_bits.append(f"work toward {goal}")
+    today_mission = (
+        f"{mission_bits[0].capitalize()}" + (f" and {mission_bits[1]}" if len(mission_bits) > 1 else "") + " with a focused reading session."
+        if mission_bits
+        else "Choose a book that matches your current mood."
+    )
+
+    top_pick = {
+        "title": "Ask Lexo for a recommendation",
+        "author": "",
+        "genre": "",
+        "reason": "Generate recommendations or choose a mood to refresh today's AI pick.",
+        "match": 80,
+    }
+
+    if isinstance(reader_profile, dict):
+        recs = reader_profile.get("recommendations") or []
+        if isinstance(recs, list) and recs:
+            first = recs[0] if isinstance(recs[0], dict) else {}
+            ai = first.get("ai_recommendation") if isinstance(first.get("ai_recommendation"), dict) else first
+            if isinstance(ai, dict) and ai.get("title"):
+                top_pick = {
+                    "title": ai.get("title"),
+                    "author": ai.get("author") or "",
+                    "genre": ai.get("genre") or "",
+                    "reason": ai.get("reason") or "From your saved Lexo recommendations.",
+                    "match": int(ai.get("match") or 90),
+                    "cover_url": (first.get("book_data") or {}).get("cover_url") or ai.get("cover_url"),
+                }
+
+    lib = library if isinstance(library, dict) else {}
+    return {
+        "dashboard": {
+            "greeting_subtitle": "Your personalized reading world is ready.",
+            "today_mission": today_mission,
+            "top_pick": top_pick,
+        },
+        "discover": {"sections": []},
+        "journey": {"reader_identity": "", "insights": [], "growth_suggestions": []},
+        "achievements": [],
+        "stats": {
+            "read_count": len(lib.get("read") or []),
+            "reading_count": len(lib.get("reading") or []),
+            "want_count": len(lib.get("want") or []),
+            "not_interested_count": len(lib.get("not_interested") or []),
+            "favorite_genre": "",
+        },
+        "fallback": True,
+        "engine": "local-fallback",
+    }
+
+
 def generate_reader_intelligence(
     reader_profile: dict | None = None,
     library: dict | None = None,
@@ -882,6 +947,12 @@ def generate_reader_intelligence(
 
     if isinstance(reader_profile, dict):
         excluded_books = reader_profile.get("excluded_books", [])
+
+    fallback = local_fallback_intelligence(reader_profile, library, today_mood, today_goal)
+
+    if not ai.using_openai():
+        logger.warning("Generating AI Pick… skipped (no OpenAI key) — using local fallback")
+        return fallback
 
     prompt = f"""
 You are Lexo's central Reader Intelligence engine.
@@ -995,29 +1066,29 @@ Use this exact structure:
 }}
 """
 
-    result = ai._openai_chat_completion(
-        [
-            {
-                "role": "system",
-                "content": "You are Lexo's central intelligence engine. Always return valid JSON only.",
-            },
-            {
-                "role": "user",
-                "content": prompt,
-            },
-        ],
-        temperature=0.65,
-    )
+    logger.info("Generating AI Pick…")
+    try:
+        result = ai._openai_chat_completion(
+            [
+                {
+                    "role": "system",
+                    "content": "You are Lexo's central intelligence engine. Always return valid JSON only.",
+                },
+                {
+                    "role": "user",
+                    "content": prompt,
+                },
+            ],
+            temperature=0.65,
+            timeout=20.0,
+        )
+    except Exception as exc:  # noqa: BLE001 — never hang the dashboard
+        logger.exception("AI Pick generation failed: %s", exc)
+        return fallback
 
     parsed = _safe_json_loads(
         result,
-        {
-            "dashboard": {},
-            "discover": {"sections": []},
-            "journey": {"insights": [], "growth_suggestions": []},
-            "achievements": [],
-            "stats": {},
-        },
+        fallback,
     )
 
     excluded = _collect_excluded_titles(reader_profile, library)
@@ -1028,9 +1099,15 @@ Use this exact structure:
     dashboard = parsed.get("dashboard") or {}
     top_pick = dashboard.get("top_pick")
     if isinstance(top_pick, dict):
-        dashboard["top_pick"] = enrich_book_entry(top_pick)
+        try:
+            dashboard["top_pick"] = enrich_book_entry(top_pick, cache_only=True)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("AI Pick cover enrich failed: %s", exc)
+            dashboard["top_pick"] = top_pick
+    parsed["dashboard"] = dashboard
 
     parsed["engine"] = ai.engine_name()
+    logger.info("Mission created")
     return parsed
 
 

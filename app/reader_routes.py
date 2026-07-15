@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+import logging
 
 from app.reader import (
     analyze_reader_profile,
@@ -9,6 +10,7 @@ from app.reader import (
     generate_reader_intelligence,
     generate_path_reflection,
     build_intelligence_cache_key,
+    local_fallback_intelligence,
 )
 
 from app.reader_models import (
@@ -36,6 +38,8 @@ from app.recommendations_store import (
     save_recommendation_batch,
 )
 from app.supabase_rest import SupabaseRestError
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/reader", tags=["Reader"])
 
@@ -176,16 +180,28 @@ def reader_intelligence(
     )
     cached = get_intelligence_cache(user["id"], cache_key)
     if cached:
+        logger.info("AI Pick cache hit for user=%s", user.get("id"))
         return {**cached, "cached": True}
 
-    result = generate_reader_intelligence(
-        reader_profile=data.reader_profile,
-        library=data.library,
-        today_mood=data.today_mood,
-        today_goal=data.today_goal,
-    )
-    set_intelligence_cache(user["id"], cache_key, result)
-    return result
+    logger.info("Generating AI Pick for user=%s", user.get("id"))
+    try:
+        result = generate_reader_intelligence(
+            reader_profile=data.reader_profile,
+            library=data.library,
+            today_mood=data.today_mood,
+            today_goal=data.today_goal,
+        )
+        logger.info("Mission created for user=%s engine=%s", user.get("id"), result.get("engine"))
+        set_intelligence_cache(user["id"], cache_key, result)
+        return result
+    except Exception as exc:  # noqa: BLE001 — dashboard must never hang
+        logger.exception("Intelligence endpoint failed: %s", exc)
+        return local_fallback_intelligence(
+            data.reader_profile,
+            data.library,
+            data.today_mood,
+            data.today_goal,
+        )
 
 
 @router.post("/badges")

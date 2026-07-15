@@ -176,7 +176,7 @@ def _truncate_for_model(text: str, max_chars: int = 24000) -> str:
     return f"{head}\n\n[...content truncated for length...]\n\n{tail}"
 
 
-def _openai_chat_completion(messages: list[dict], temperature: float = 0.3) -> str:
+def _openai_chat_completion(messages: list[dict], temperature: float = 0.3, timeout: float = 60.0) -> str:
     from app.http_client import get_http_client
 
     url = f"{OPENAI_BASE_URL}/chat/completions"
@@ -191,7 +191,7 @@ def _openai_chat_completion(messages: list[dict], temperature: float = 0.3) -> s
     }
     started = time.perf_counter()
     client = get_http_client()
-    resp = client.post(url, headers=headers, json=payload, timeout=60.0)
+    resp = client.post(url, headers=headers, json=payload, timeout=timeout)
     resp.raise_for_status()
     data = resp.json()
     duration_ms = int((time.perf_counter() - started) * 1000)
